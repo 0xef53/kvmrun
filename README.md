@@ -75,7 +75,7 @@ The following steps illustrate how to run a virtual machine with a Debian as a g
     ```shell
     $ mk-debian-image -t stretch-slim
     ```
-    
+
 3. Wrap the resulting image file in a loop device:
 
     ```shell
@@ -109,7 +109,17 @@ $ kvmhelper set-vncpass alice
 Password: ecb8cffac56426bf57a70cb9abbbbd16
 Display/Port: 1025/6925
 Websocket port: 11725
+```
 
+The VNC server will listen on `127.0.0.2`. It's convenient to use SSH to forward the connection to the host server with VNC. Something like this:
+
+```shell
+$ ssh -L 127.0.0.1:6925:127.0.0.2:6925 <HOST-SERVER-ADDR>
+```
+
+After that you can connect to the VNC server:
+
+```shell
 $ gvncviewer localhost:1025
 ```
 
