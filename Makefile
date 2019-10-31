@@ -57,6 +57,7 @@ install: $(binaries)
 	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/kvmhelper
 	install -d $(DESTDIR)/usr/share/kvmrun
 	cp -t $(DESTDIR)/usr/share/kvmrun scripts/mk-debian-image
+	install -d $(DESTDIR)/var/lib/supervise
 	@echo
 
 deb-package: $(binaries)
