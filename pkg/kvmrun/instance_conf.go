@@ -166,7 +166,7 @@ func (c InstanceConf) Status() (string, error) {
 }
 
 func (c InstanceConf) Pid() int {
-	return -1
+	return 0
 }
 
 func (c InstanceConf) GetActualCPUs() int {
