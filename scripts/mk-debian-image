@@ -1,0 +1,238 @@
+#!/bin/bash
+set -eu
+
+# NOT FOR PRODUCTION USE
+#
+# This script shows how to prepare a bootable raw image
+# from an appropriate docker image.
+#
+# For more information:
+# https://github.com/0xef53/kvmrun/blob/master/scripts/README.md
+#
+# Dependencies: docker-ce, qemu-utils
+
+
+declare DOCKER_IMAGE_TAG=""
+declare GUEST_HOSTNAME=""
+declare IMAGE_SIZE="2G"
+declare IMAGE_FILE=""
+
+declare TRAP_ACT=""
+
+print_usage() {
+    cat <<EOF
+Usage:  ${0##*/} [OPTIONS]
+
+    --t            docker image tag (latest, stretch, stretch-slim)
+    --hostname     guest OS host name (will be generated if not set)
+    --size         image file size (default: $IMAGE_SIZE)
+
+Example:
+
+    ${0##*/} -t stretch-slim --hostname alice --size 5G
+
+EOF
+    exit 2
+}
+
+
+#
+# CHECK ARGUMENTS
+#
+
+if [[ $# -eq 0 ]]; then
+    print_usage
+fi
+
+TEMP=$(getopt -o t: --long hostname:,size: -n ${0##*/} -- "$@")
+if [[ $? -ne 0 ]]; then
+    print_usage
+fi
+
+eval set -- "$TEMP"
+
+while : ; do
+    case "$1" in
+        -t)
+            DOCKER_IMAGE_TAG="$2"
+            IMAGE_FILE="debian-${DOCKER_IMAGE_TAG//_/-}.img"
+            shift 2
+        ;;
+        --hostname)
+            GUEST_HOSTNAME="$2"
+            shift 2
+        ;;
+        --size)
+            IMAGE_SIZE="$2"
+            shift 2
+        ;;
+        --)
+            shift; break
+        ;;
+        *)
+            print_usage
+        ;;
+    esac
+done
+
+if [[ -z "$DOCKER_IMAGE_TAG" ]]; then
+    echo "Error: undefined docker image tag" >&2
+    echo "" >&2
+    print_usage
+fi
+
+
+#
+# MAIN
+#
+
+declare -r TMPTAG="$(mcookie | head -c7)"
+declare -r TMPDIR="$(mktemp -d)"
+
+TRAP_ACT="rm -Rf ${TMPDIR}; $TRAP_ACT"
+trap "$TRAP_ACT" 0
+
+
+echo "==> Creating the raw image file: $IMAGE_FILE"
+
+qemu-img create -f raw "$IMAGE_FILE" "$IMAGE_SIZE"
+printf 'n\np\n1\n\n+256M\na\nn\np\n2\n\n\nwri\n' | >/dev/null fdisk "$IMAGE_FILE" || :
+fdisk -l "$IMAGE_FILE" | awk '{if($1~"^Device"){x=1};if(x==1){print $0}}'
+
+declare -r LOOPDEV="$(losetup -P --show -f $IMAGE_FILE)"
+
+TRAP_ACT="losetup -d ${LOOPDEV}; $TRAP_ACT"
+trap "$TRAP_ACT" 0
+
+
+echo "==> Building the rootfs from debian:${DOCKER_IMAGE_TAG} (this may take a while)"
+
+cat > "${TMPDIR}/Dockerfile" <<EOF
+FROM debian:${DOCKER_IMAGE_TAG}
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN set -ex \\
+    && rm -f /etc/apt/apt.conf.d/docker-* \\
+    && rm -f /etc/dpkg/dpkg.cfg.d/docker-*
+
+RUN set -ex \\
+    && sed -i /etc/apt/sources.list \\
+        -e 's/\ main/ main contrib non-free/g' \\
+    && apt-get update \\
+    && apt-get --no-install-recommends --yes install \\
+        systemd systemd-sysv libpam-systemd udev kmod procps locales cron man-db netbase ucf \\
+        util-linux rsyslog acpid acpi-support-base file psmisc whois dialog \\
+        haveged ca-certificates apt-transport-https \\
+    \\
+    && apt-get --no-install-recommends --yes install \\
+        grub2 initramfs-tools linux-image-amd64 \\
+    \\
+    && apt-get clean
+
+CMD ["/bin/bash"]
+EOF
+
+docker build -q -t "debian:${TMPTAG}" "$TMPDIR" -f "${TMPDIR}/Dockerfile"
+
+TRAP_ACT="docker image rm debian:${TMPTAG}; $TRAP_ACT"
+trap "$TRAP_ACT" 0
+
+>/dev/null docker container run --rm \
+    --device "${LOOPDEV}p2" \
+    "debian:${TMPTAG}" \
+    mkfs.ext4 "${LOOPDEV}p2"
+
+declare -r ROOTFS_UUID="$(blkid -s UUID -ovalue ${LOOPDEV}p2)"
+
+install -d "${TMPDIR}/rootfs"
+mount "${LOOPDEV}p2" "${TMPDIR}/rootfs"
+
+TRAP_ACT=" 2>/dev/null umount ${TMPDIR}/rootfs || : ; $TRAP_ACT"
+trap "$TRAP_ACT" 0
+
+declare -r CID="$(docker container create debian:${TMPTAG})"
+
+docker export ${CID} | tar -x -C "${TMPDIR}/rootfs"
+
+umount "${TMPDIR}/rootfs"
+
+if [[ -z "$GUEST_HOSTNAME" ]]; then
+    GUEST_HOSTNAME="$(docker ps -a --filter id=$CID --format '{{.Names}}')"
+    GUEST_HOSTNAME="${GUEST_HOSTNAME//_/-}"
+fi
+
+>/dev/null docker container rm --force "$CID"
+
+echo
+
+
+echo "==> Configuring the bootloader and guest OS"
+
+declare -r GUEST_ROOT_PASSWORD="$(mcookie | head -c15)"
+
+cat > "${TMPDIR}/configure_boot" <<EOF
+#!/bin/bash
+set -eu
+
+mkfs.ext3 ${LOOPDEV}p1
+
+install -d /mnt /mnt/boot
+mount ${LOOPDEV}p2 /mnt
+mount ${LOOPDEV}p1 /mnt/boot
+
+cp -a /boot/. /mnt/boot
+
+echo '(hd0) ${LOOPDEV}' >/mnt/boot/grub/device.map
+
+install -d /mnt/dev /mnt/proc /mnt/sys
+mount --bind /dev /mnt/dev
+mount --bind /proc /mnt/proc
+mount --bind /sys /mnt/sys
+
+chroot /mnt \\
+    grub-mkconfig -o /boot/grub/grub.cfg
+
+sed -i /mnt/boot/grub/grub.cfg \\
+    -e '/linux.*vmlinuz/s/ root=[^\ ]*/ root=UUID=${ROOTFS_UUID}/g'
+
+chroot /mnt \\
+    grub-install \\
+        --no-floppy \\
+        --modules='ext2 part_msdos' \\
+        --skip-fs-probe \\
+        $LOOPDEV
+
+chroot /mnt \\
+    /bin/bash -c 'echo root:${GUEST_ROOT_PASSWORD} | chpasswd --crypt-method=SHA512'
+
+echo '$GUEST_HOSTNAME' >/mnt/etc/hostname
+
+cat >/mnt/etc/fstab <<FSTAB
+UUID=$ROOTFS_UUID   /       ext4    errors=remount-ro  0  1
+UUID=\$(blkid -s UUID -ovalue ${LOOPDEV}p1)  /boot   ext4    defaults           0  2
+FSTAB
+
+exit 0
+EOF
+
+chmod 0755 "${TMPDIR}/configure_boot"
+
+>/dev/null docker container run --rm -i \
+    --privileged \
+    --cap-add SYS_ADMIN \
+    --device "${LOOPDEV}" \
+    --device "${LOOPDEV}p1" \
+    --device "${LOOPDEV}p2" \
+    --volume "${TMPDIR}:/BUILD" \
+    "debian:${TMPTAG}" \
+    '/BUILD/configure_boot'
+
+echo
+
+
+echo "==> Successfully completed"
+echo "Root password:  $GUEST_ROOT_PASSWORD"
+echo
+
+exit 0

@@ -1,0 +1,9 @@
+bin/
+packages/
+debian/changelog
+debian/debhelper-build-stamp
+debian/files
+debian/*.debhelper.log
+debian/*.substvars
+debian/kvmrun-tools/
+debian/kvmrun/

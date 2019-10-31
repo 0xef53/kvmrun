@@ -1,0 +1,12 @@
+[Unit]
+Description=Kvmrun API service
+Documentation=https://github.com/0xef53/kvmrun
+After=network.target
+ConditionFileNotEmpty=/etc/kvmrun/kvmrun.ini
+
+[Service]
+Restart=always
+ExecStart=/usr/lib/kvmrun/kvmrund -config /etc/kvmrun/kvmrun.ini
+
+[Install]
+WantedBy=multi-user.target

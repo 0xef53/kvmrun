@@ -1,0 +1,129 @@
+_main_opts=(
+    'create-conf'
+    'remove-conf'
+    'info'
+    'set-memory'
+    'set-vcpus'
+    'set-vncpass'
+    'set-cpu-quota'
+    'set-cpu-model'
+    'set-kernel'
+    'attach-disk'
+    'detach-disk'
+    'update-disk'
+    'resize-disk'
+    'attach-netif'
+    'detach-netif'
+    'update-netif'
+    'attach-channel'
+    'detach-channel'
+    'set-netif-link'
+    'console'
+    'migrate'
+    'migrate-cancel'
+    'migrate-status'
+    'copy-config'
+)
+
+_opt_create_conf=('--mem' '--cpu' '--launcher' '--cpu-quota')
+_opt_set_memcpu=('--total')
+_opt_set_vncpass=('-p')
+_opt_set_kernel=('--remove-conf' '--image' '--initrd' '--modiso' '--cmdline')
+_opt_attach_disk=('--driver' '--iops-rd' '--iops-wr')
+_opt_update_disk=('--iops-rd' '--iops-wr')
+_opt_attach_netif=('--driver' '--hwaddr' '--ifup-script' '--ifdown-script')
+_opt_update_netif=('--ifup-script' '--ifdown-script')
+_opt_attach_channel=('--name')
+_opt_migrate=('--force' '--deploy-storage' '--vgname' '--pre-start-hook')
+_opt_copy_config=('--pre-start-hook')
+
+
+_vm_list() {
+    find /etc/kvmrun -mindepth 1 -maxdepth 1 -printf '%P\n'
+}
+
+_img_list() {
+    find /var/lib/kvmrun/kernels -mindepth 1 -maxdepth 1 -printf '%P\n'
+}
+
+_modules_list() {
+    find /var/lib/kvmrun/modules -mindepth 1 -maxdepth 1 -printf '%P\n'
+}
+
+_fmt() {
+    echo "@(${1// /|})"
+}
+
+_check_subcmd() {
+    local prev="$1"
+    local cmd="$2"
+
+    if [[ $prev == $cmd || ${COMP_WORDS[1]} == $cmd || ${COMP_WORDS[2]} == $cmd ]]; then
+        echo 0
+    else
+        echo 1
+    fi
+}
+
+_kvmhelper() {
+    local cur prev opts
+
+    COMPREPLY=()
+
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    wantfiles='@(--launcher|--pre-start-hook|--ifup-script|--ifdown-script)'
+    wantvms=$(_fmt "${_kvmhelper_opts_1[*]}")
+    wantstring='@(--mem|--cpu|--cpu-quota|--total|-p|--driver|--iops-rd|--iops-rd|--hwaddr|--vgname)'
+	wantimages='@(--image|--initrd)'
+	wantmodules='@(--modiso)'
+
+    if [[ $prev == $wantfiles ]]; then
+        _filedir
+    elif [[ $prev == $wantstring ]]; then
+        COMPREPLY=()
+	elif [[ $prev == $wantimages ]]; then
+        COMPREPLY=( $(compgen -W '$(_img_list)' -- "$cur") )
+	elif [[ $prev == $wantmodules ]]; then
+        COMPREPLY=( $(compgen -W '$(_modules_list)' -- "$cur") )
+    elif [[ $prev == 'list' ]]; then
+        COMPREPLY=()
+    elif [[ "$(_check_subcmd $prev 'create-conf')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_create_conf[@]} $(_vm_list)' -- "$cur") )
+    elif [[ $prev =~ (set-memory|set-vcpus|set-cpu-quota|set-cpu-model) ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_set_memcpu[@]} $(_vm_list)' -- "$cur") )
+    elif [[ $prev =~ (remove-conf|info) ]]; then
+        COMPREPLY=( $(compgen -W '$(_vm_list)' -- "$cur") )
+    elif [[ $prev == 'set-vncpass' ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_set_vncpass[@]} $(_vm_list)' -- "$cur") )
+    elif [[ "$(_check_subcmd $prev 'set-kernel')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_set_kernel[@]} $(_vm_list)' -- "$cur") )
+    elif [[ "$(_check_subcmd $prev 'attach-disk')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_attach_disk[@]} $(_vm_list)' -- "$cur") )
+    elif [[ "$(_check_subcmd $prev 'update-disk')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_update_disk[@]} $(_vm_list)' -- "$cur") )
+    elif [[ "$(_check_subcmd $prev 'attach-netif')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_attach_netif[@]} $(_vm_list)' -- "$cur") )
+    elif [[ "$(_check_subcmd $prev 'update-netif')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_update_netif[@]} $(_vm_list)' -- "$cur") )
+
+    elif [[ "$(_check_subcmd $prev 'attach-channel')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_attach_channel[@]} $(_vm_list)' -- "$cur") )
+
+    elif [[ "$(_check_subcmd $prev 'migrate')" == "0" ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_migrate[@]} $(_vm_list)' -- "$cur") )
+    elif [[ $prev == 'copy-config' ]]; then
+        COMPREPLY=( $(compgen -W '${_opt_copy_config[@]} $(_vm_list)' -- "$cur") )
+    elif (( $COMP_CWORD == 1 )); then
+        COMPREPLY=( $(compgen -W '--live --json --version list ${_main_opts[@]}' -- "$cur") )
+    elif (( $COMP_CWORD == 2 )); then
+        COMPREPLY=( $(compgen -W 'list ${_main_opts[@]}' -- "$cur") )
+    else
+        COMPREPLY=( $(compgen -W '$(_vm_list)' -- "$cur") )
+    fi
+
+    return 0
+}
+
+complete -F _kvmhelper kvmhelper
