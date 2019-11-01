@@ -1,0 +1,12 @@
+/var/log/kvmrun/kvmrund/kvmrund.log
+{
+	rotate 7
+	daily
+	missingok
+	notifempty
+	delaycompress
+	compress
+	postrotate
+		invoke-rc.d rsyslog rotate > /dev/null
+	endscript
+}

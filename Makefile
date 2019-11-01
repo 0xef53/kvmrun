@@ -52,12 +52,13 @@ install: $(binaries)
 	cp -t $(DESTDIR)/etc/kvmrun contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
 	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service
+	install -d $(DESTDIR)/etc/rsyslog.d
+	cp -t $(DESTDIR)/etc/rsyslog.d contrib/rsyslog/kvmrun.conf
 	install -d $(DESTDIR)/usr/share/kvmrun/tls
 	install -d $(DESTDIR)/etc/bash_completion.d
 	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/kvmhelper
 	install -d $(DESTDIR)/usr/share/kvmrun
 	cp -t $(DESTDIR)/usr/share/kvmrun scripts/mk-debian-image
-	install -d $(DESTDIR)/var/lib/supervise
 	@echo
 
 deb-package: $(binaries)
