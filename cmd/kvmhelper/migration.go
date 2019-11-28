@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/0xef53/kvmrun/pkg/block"
@@ -24,7 +23,7 @@ var cmdCopyConfig = cli.Command{
 	Usage:     "copy virtual machine configuration to another host",
 	ArgsUsage: "VMNAME DSTSERVER",
 	Flags: []cli.Flag{
-		cli.StringFlag{Name: "pre-start-hook", PlaceHolder: "FILE", Usage: "will be executed before copy-config starts"},
+		cli.GenericFlag{Name: "override-disk", PlaceHolder: "disk1:disk2", Value: NewStringMap(), Usage: "override disk path/name on the destination server"},
 	},
 	Action: func(c *cli.Context) {
 		os.Exit(executeRPC(c, copyConfig))
@@ -33,29 +32,15 @@ var cmdCopyConfig = cli.Command{
 
 func copyConfig(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
 	dstServer := c.Args().Tail()[0]
-	preStartHook := c.String("pre-start-hook")
-
-	if len(preStartHook) != 0 {
-		st, err := os.Stat(preStartHook)
-		if err != nil {
-			return append(errors, err)
-		}
-		if !(st.Mode().IsRegular() && st.Mode()&0100 > 0) {
-			return append(errors, fmt.Errorf("Not an executable file: %s", preStartHook))
-		}
-
-		cmd := exec.Command(preStartHook, vmname, dstServer)
-		cmd.Stderr = os.Stdout
-		cmd.Stdout = os.Stdout
-		if err := cmd.Run(); err != nil {
-			return append(errors, fmt.Errorf("pre-start hook error: %s", err))
-		}
-	}
+	overriddenDisks := c.Generic("override-disk").(*StringMap).Value()
 
 	req := rpccommon.InstanceRequest{
 		Name: vmname,
 		Data: &rpccommon.MigrationParams{
 			DstServer: dstServer,
+			Overrides: rpccommon.MigrationOverrides{
+				Disks: overriddenDisks,
+			},
 		},
 	}
 
@@ -74,8 +59,8 @@ var cmdMigrate = cli.Command{
 		cli.BoolFlag{Name: "watch,w", Usage: "watch the migration process"},
 		cli.BoolFlag{Name: "with-local-disks", Usage: "enable live storage migration for all local disks (conflicts with option --with-disk)"},
 		cli.StringSliceFlag{Name: "with-disk", Usage: "enable live storage migration for specified disks (conflicts with option --with-local-disks)"},
+		cli.GenericFlag{Name: "override-disk", PlaceHolder: "disk1:disk2", Value: NewStringMap(), Usage: "override disk path/name on the destination server"},
 		cli.BoolFlag{Name: "create-lv", Usage: "create logical volumes in the same group on the destination server"},
-		cli.StringFlag{Name: "pre-start-hook", PlaceHolder: "FILE", Usage: "will be executed before migration process starts"},
 	},
 	Action: func(c *cli.Context) {
 		os.Exit(executeRPC(c, migrate))
@@ -85,9 +70,8 @@ var cmdMigrate = cli.Command{
 func migrate(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
 	dstServer := c.Args().Tail()[0]
 	withLocalDisks := c.Bool("with-local-disks")
-	preStartHook := c.String("pre-start-hook")
-	deprecatedDeployStorage := c.Bool("deploy-storage")
 	chosenDisks := c.StringSlice("with-disk")
+	overriddenDisks := c.Generic("override-disk").(*StringMap).Value()
 
 	jsonReq := rpccommon.InstanceRequest{
 		Name: vmname,
@@ -106,88 +90,77 @@ func migrate(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCli
 		return append(errors, err)
 	}
 
-	// Check if migration is possible
+	// Only running virtual machines can be migrated
 	if vm.R == nil {
 		return append(errors, &kvmrun.NotRunningError{vmname})
 	}
 
-	if len(preStartHook) != 0 {
-		st, err := os.Stat(preStartHook)
-		if err != nil {
-			return append(errors, err)
-		}
-		if !(st.Mode().IsRegular() && st.Mode()&0100 > 0) {
-			return append(errors, fmt.Errorf("Not an executable file: %s", preStartHook))
-		}
-	}
+	attachedDisks := vm.R.GetDisks()
 
-	disks := make([]string, 0, len(vm.R.GetDisks()))
+	disksToMigrate := make([]string, 0, len(attachedDisks))
 
 	switch {
 	case len(chosenDisks) > 0:
-		storage := vm.R.GetDisks()
 		for _, p := range chosenDisks {
-			if storage.Exists(p) {
-				disks = append(disks, p)
+			if attachedDisks.Exists(p) {
+				disksToMigrate = append(disksToMigrate, p)
 			} else {
-				return append(errors, fmt.Errorf("Unknown disk: %s", p))
+				return append(errors, fmt.Errorf("Unable to migrate unknown disk: %s", p))
 			}
 		}
-		break
 	case withLocalDisks:
-		for _, d := range vm.R.GetDisks() {
+		for _, d := range attachedDisks {
 			b, err := kvmrun.NewDiskBackend(d.Path)
 			if err != nil {
 				return append(errors, err)
 			}
 			if b.IsLocal() {
-				disks = append(disks, d.Path)
+				disksToMigrate = append(disksToMigrate, d.Path)
 			}
-		}
-		break
-	case deprecatedDeployStorage:
-		for _, d := range vm.R.GetDisks() {
-			disks = append(disks, d.Path)
 		}
 	}
 
 	// This is a temporary solution.
 	// TODO: It should accept different types of disks (LVM/QCOW)
 	// and pass them to a destination server.
-	lvdisks := make(map[string]uint64)
-	if c.Bool("create-lv") && len(disks) > 0 {
-		for _, d := range disks {
-			switch ok, err := lvm.IsLogicalVolume(d); {
-			case ok:
-			case !ok, err == nil:
-				return append(errors, fmt.Errorf("Not a logical volume: %s", d))
-			default:
-				return append(errors, err)
+	createDisksOnDst := func() error {
+		lvmDisks := make(map[string]uint64)
+		if len(disksToMigrate) > 0 {
+			for _, d := range disksToMigrate {
+				switch ok, err := lvm.IsLogicalVolume(d); {
+				case ok:
+				case !ok, err == nil:
+					return fmt.Errorf("Not a logical volume: %s", d)
+				default:
+					return err
+				}
+				s, err := block.BlkGetSize64(d)
+				if err != nil {
+					return err
+				}
+				if v, ok := overriddenDisks[d]; ok {
+					lvmDisks[v] = s
+				} else {
+					lvmDisks[d] = s
+				}
 			}
-			s, err := block.BlkGetSize64(d)
-			if err != nil {
-				return append(errors, err)
-			}
-			lvdisks[d] = s
 		}
+
+		if len(lvmDisks) > 0 {
+			req := rpccommon.CreateDisksRequest{
+				Disks:     lvmDisks,
+				DstServer: dstServer,
+			}
+			if err := client.Request("RPC.PrepareDstDisks", &req, nil); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
-	// Run hooks and start the migration process
-	if len(preStartHook) != 0 {
-		cmd := exec.Command(preStartHook, vmname, dstServer)
-		cmd.Stderr = os.Stdout
-		cmd.Stdout = os.Stdout
-		if err := cmd.Run(); err != nil {
-			return append(errors, fmt.Errorf("pre-start hook error: %s", err))
-		}
-	}
-
-	if len(lvdisks) > 0 {
-		diskReq := rpccommon.CreateDisksRequest{
-			Disks:     lvdisks,
-			DstServer: dstServer,
-		}
-		if err := client.Request("RPC.PrepareDstDisks", &diskReq, nil); err != nil {
+	if c.Bool("create-lv") {
+		if err := createDisksOnDst(); err != nil {
 			return append(errors, err)
 		}
 	}
@@ -196,7 +169,10 @@ func migrate(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCli
 		Name: vmname,
 		Data: &rpccommon.MigrationParams{
 			DstServer: dstServer,
-			Disks:     disks,
+			Disks:     disksToMigrate,
+			Overrides: rpccommon.MigrationOverrides{
+				Disks: overriddenDisks,
+			},
 		},
 	}
 

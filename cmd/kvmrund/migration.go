@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -62,6 +61,17 @@ func (x *RPC) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp 
 		return err
 	}
 
+	if len(data.Overrides.Disks) > 0 {
+		confDisks := args.VM.C.(*kvmrun.InstanceConf).Disks
+		for orig, ovrd := range data.Overrides.Disks {
+			if d := confDisks.Get(orig); d != nil {
+				d.Path = ovrd
+			} else {
+				return &kvmrun.NotConnectedError{"instance_conf", orig}
+			}
+		}
+	}
+
 	manifest, err := json.Marshal(args.VM)
 	if err != nil {
 		return err
@@ -90,18 +100,13 @@ func (x *RPC) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp 
 		return err
 	}
 
-	return RPCClient.Request(data.DstServer, "RPC.CreateConfInstanceFromJSON", &req, nil)
+	return RPCClient.Request(data.DstServer, "RPC.CreateConfInstanceFromManifest", &req, nil)
 }
 
 func (x *RPC) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.MigrationParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
-		return err
-	}
-
-	m, err := MPool.Get(args.Name)
-	if err != nil {
 		return err
 	}
 
@@ -121,25 +126,50 @@ func (x *RPC) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceReq
 
 	// TODO: check if a virt.machine exists on the dst server
 
+	attachedDisks := args.VM.R.(*kvmrun.InstanceQemu).Disks
+
+	if len(data.Disks) > 0 {
+		opts.Disks = make(kvmrun.Disks, 0, len(data.Disks))
+		for _, diskPath := range data.Disks {
+			if d := attachedDisks.Get(diskPath); d != nil {
+				opts.Disks = append(opts.Disks, *d)
+			} else {
+				return &kvmrun.NotConnectedError{"instance_qemu", diskPath}
+			}
+		}
+	}
+
+	if len(data.Overrides.Disks) > 0 {
+		attachedConfDisks := args.VM.C.(*kvmrun.InstanceConf).Disks
+
+		opts.Overrides.Disks = make(map[string]string)
+
+		for orig, ovrd := range data.Overrides.Disks {
+			if d := attachedDisks.Get(orig); d != nil {
+				// "orig" could be a short name (BaseName) of disk,
+				// but we need the full name. So we use d.Path for that.
+				opts.Overrides.Disks[d.Path] = ovrd
+				d.Path = ovrd
+			} else {
+				return &kvmrun.NotConnectedError{"instance_qemu", orig}
+			}
+
+			if d := attachedConfDisks.Get(orig); d != nil {
+				d.Path = ovrd
+			} // It's OK if "orig" is not in the configuration
+		}
+	}
+
 	if b, err := json.Marshal(args.VM); err == nil {
 		opts.Manifest = b
 	} else {
 		return err
 	}
 
-	knownDisks := args.VM.R.GetDisks()
-
-	migrDisks := make(kvmrun.Disks, 0, len(data.Disks))
-
-	for _, diskPath := range data.Disks {
-		d := knownDisks.Get(diskPath)
-		if d == nil {
-			return fmt.Errorf("Unknown disk: %s", diskPath)
-		}
-		migrDisks = append(migrDisks, *d)
+	m, err := MPool.Get(args.Name)
+	if err != nil {
+		return err
 	}
-
-	opts.Disks = migrDisks
 
 	return m.Start(&opts)
 }
