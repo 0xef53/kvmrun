@@ -116,7 +116,7 @@ func (x *RPC) UpdateDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 
 	if data.IopsWr != -1 {
 		if args.Live {
-			if err := args.VM.R.SetDiskReadIops(data.Path, data.IopsWr); err != nil {
+			if err := args.VM.R.SetDiskWriteIops(data.Path, data.IopsWr); err != nil {
 				return err
 			}
 		}

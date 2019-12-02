@@ -63,25 +63,36 @@ func c_Term(mon *qmp.Monitor) int {
 }
 
 func c_Down(mon *qmp.Monitor) int {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+	terminated := make(chan struct{})
+	timeout := make(chan struct{})
 
-loop:
-	for {
-		select {
-		case <-time.After(time.Second * 30):
-			Info.Println("timed out: sending quit signal")
-			if err := mon.Run(qmp.Command{"quit", nil}, nil); err != nil {
-				Error.Println(err)
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-timeout:
+				return
+			case <-ticker.C:
 			}
-			break loop
-		case <-ticker.C:
-			if err := mon.Run(qmp.Command{"query-status", nil}, nil); err != nil {
+			if err := mon.Run(qmp.Command{"system_powerdown", nil}, nil); err != nil {
 				// It means the socket is closed. That is what we need
-				Info.Println("has been terminated")
-				break loop
+				break
 			}
 		}
+		close(terminated)
+	}()
+
+	select {
+	case <-time.After(time.Second * 30):
+		close(timeout)
+		Info.Println("timed out: sending quit signal")
+		if err := mon.Run(qmp.Command{"quit", nil}, nil); err != nil {
+			Error.Println(err)
+		}
+	case <-terminated:
+		Info.Println("has been terminated")
 	}
 
 	return 0
@@ -119,7 +130,7 @@ func main() {
 
 	vmname := filepath.Base(cwd)
 
-	mon, err := qmp.NewMonitor(filepath.Join(kvmrun.QMPMONDIR, vmname+".qmp1"), 256)
+	mon, err := qmp.NewMonitor(filepath.Join(kvmrun.QMPMONDIR, vmname+".qmp1"), time.Second*30)
 	if err != nil {
 		Error.Fatalln(err)
 	}

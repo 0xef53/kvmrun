@@ -92,7 +92,7 @@ func updateDisk(vmname string, live bool, c *cli.Context, client *rpcclient.Unix
 	params := rpccommon.DiskParams{
 		Path:   c.Args().Tail()[0],
 		IopsRd: c.Int("iops-rd"),
-		IopsWr: c.Int("iops-rd"),
+		IopsWr: c.Int("iops-wr"),
 	}
 
 	if params.IopsRd == -1 && params.IopsWr == -1 {
@@ -163,7 +163,7 @@ func copyDisk(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCl
 		return append(errors, err)
 	}
 
-	if c.Bool("wait") {
+	if c.Bool("watch") {
 		return diskJobStatus(vmname, live, c, client)
 	} else {
 		fmt.Println("Process started")
