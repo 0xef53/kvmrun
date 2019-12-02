@@ -107,17 +107,20 @@ type MigrationOpts struct {
 	DstServerIPs []net.IP
 	IncomingPort int
 	NBDPort      int
+	Overrides    struct {
+		Disks map[string]string
+	}
 }
 
 //
 // MAIN
 //
 
-func newQemuDriveMirrorOpts(addr string, port int, diskname string) *qt.DriveMirrorOptions {
+func newQemuDriveMirrorOpts(addr string, port int, srcName, dstName string) *qt.DriveMirrorOptions {
 	return &qt.DriveMirrorOptions{
-		JobID:  fmt.Sprintf("migr_%s", diskname),
-		Device: diskname,
-		Target: fmt.Sprintf("nbd:%s:%d:exportname=%s", addr, port, diskname),
+		JobID:  fmt.Sprintf("migr_%s", srcName),
+		Device: srcName,
+		Target: fmt.Sprintf("nbd:%s:%d:exportname=%s", addr, port, dstName),
 		Format: "nbd",
 		Sync:   "full",
 		Mode:   "existing",
@@ -570,7 +573,15 @@ func (m *Migration) mirrorDisks(ctx context.Context, allDisksReady, vmstateMigra
 	for _, d := range m.opts.Disks {
 		m.debugf("mirrorDisks(): running QMP command: drive-mirror; name=%s, remote_addr=%s:%d", d.BaseName(), m.opts.DstServerIPs[0].String(), m.opts.NBDPort)
 		d := d // shadow to be captured by closure
-		args := newQemuDriveMirrorOpts(m.opts.DstServerIPs[0].String(), m.opts.NBDPort, d.BaseName())
+		dstName := d.BaseName()
+		if ovrd, ok := m.opts.Overrides.Disks[d.Path]; ok {
+			if _d, err := kvmrun.NewDisk(ovrd); err == nil {
+				dstName = _d.BaseName()
+			} else {
+				return err
+			}
+		}
+		args := newQemuDriveMirrorOpts(m.opts.DstServerIPs[0].String(), m.opts.NBDPort, d.BaseName(), dstName)
 		if err := QPool.Run(m.vmname, qmp.Command{"drive-mirror", &args}, nil); err != nil {
 			return err
 		}
@@ -699,7 +710,11 @@ loop:
 func (m *Migration) checkDstDisks() error {
 	disks := make(map[string]uint64)
 	for _, d := range m.opts.Disks {
-		disks[d.Path] = d.QemuVirtualSize
+		if ovrd, ok := m.opts.Overrides.Disks[d.Path]; ok {
+			disks[ovrd] = d.QemuVirtualSize
+		} else {
+			disks[d.Path] = d.QemuVirtualSize
+		}
 	}
 
 	req := rpccommon.CheckDisksRequest{
@@ -751,7 +766,11 @@ func (m *Migration) startDstNBDServer() (int, error) {
 
 	disks := make([]string, 0, len(m.opts.Disks))
 	for _, d := range m.opts.Disks {
-		disks = append(disks, d.Path)
+		if ovrd, ok := m.opts.Overrides.Disks[d.Path]; ok {
+			disks = append(disks, ovrd)
+		} else {
+			disks = append(disks, d.Path)
+		}
 	}
 
 	req := rpccommon.InstanceRequest{

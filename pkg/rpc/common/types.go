@@ -55,9 +55,14 @@ type InstanceRequest struct {
 	VM      *kvmrun.VirtMachine
 }
 
+type MigrationOverrides struct {
+	Disks map[string]string
+}
+
 type MigrationParams struct {
 	DstServer string
 	Disks     []string
+	Overrides MigrationOverrides
 }
 
 type NetifParams struct {

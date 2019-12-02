@@ -55,12 +55,12 @@ func (d DevDrivers) HotPluggable(name string) bool {
 }
 
 type AlreadyConnectedError struct {
-	source string
-	object string
+	Source string
+	Object string
 }
 
 func (e *AlreadyConnectedError) Error() string {
-	return fmt.Sprintf("%s: object already connected: %s", e.source, e.object)
+	return fmt.Sprintf("%s: object already connected: %s", e.Source, e.Object)
 }
 
 func IsAlreadyConnectedError(err error) bool {
@@ -71,12 +71,12 @@ func IsAlreadyConnectedError(err error) bool {
 }
 
 type NotConnectedError struct {
-	source string
-	object string
+	Source string
+	Object string
 }
 
 func (e *NotConnectedError) Error() string {
-	return fmt.Sprintf("%s: object not found: %s", e.source, e.object)
+	return fmt.Sprintf("%s: object not found: %s", e.Source, e.Object)
 }
 
 func IsNotConnectedError(err error) bool {

@@ -39,7 +39,6 @@ type IntRange struct {
 
 func (r *IntRange) Set(value string) (err error) {
 	r.Min, r.Max, err = ParseIntRange(value)
-
 	if err != nil {
 		return err
 	}
@@ -63,7 +62,6 @@ type HwAddr string
 
 func (a *HwAddr) Set(value string) error {
 	hwaddr, err := net.ParseMAC(value)
-
 	if err != nil {
 		return err
 	}
@@ -79,4 +77,41 @@ func (a HwAddr) String() string {
 
 func (a HwAddr) Value() HwAddr {
 	return a
+}
+
+type StringMap struct {
+	m map[string]string
+}
+
+func NewStringMap() *StringMap {
+	return &StringMap{m: make(map[string]string)}
+}
+
+func (m *StringMap) Set(value string) error {
+	parts := strings.Split(value, ":")
+
+	if len(parts) != 2 || len(parts[0]) == 0 || len(parts[1]) == 0 {
+		return fmt.Errorf("A map value should be specified as 'valueA:valueB'")
+	}
+
+	if _, ok := m.m[parts[0]]; ok {
+		return fmt.Errorf("It's a duplicate: %s", value)
+	}
+
+	m.m[parts[0]] = parts[1]
+
+	return nil
+}
+
+func (m StringMap) String() string {
+	lines := []string{}
+	for k, v := range m.m {
+		lines = append(lines, "\""+k+":"+v+"\"")
+	}
+
+	return "[ " + strings.Join(lines, ", ") + " ]"
+}
+
+func (m StringMap) Value() map[string]string {
+	return m.m
 }

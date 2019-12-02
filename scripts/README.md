@@ -5,7 +5,7 @@ Some useful scripts
 
     It extends the specified Docker image by additional packages such as kernel image, initramfs tools, init system and grub loader.
 
-    Resulting content of rootfs moving to the second partition of raw image, created using `qemu-img` util. 
+    Resulting content of rootfs is copied to the second partition of raw image, created using `qemu-img` util. 
 
     Then script configures the bootloader (`grub.cfg`, `mbr`) and a few additional parameters, such as hostname, root password, fstab, etc. 
 
