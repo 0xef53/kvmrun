@@ -52,13 +52,13 @@ func requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
 			switch st {
 			case "inmigrate", "migrated":
 				switch info.Method {
-				case "RPC.GetInstanceJSON", "RPC.CancelMigrationProcess", "RPC.GetMigrationStat", "RPC.RemoveConfInstance":
+				case "RPC.GetInstanceJSON", "RPC.CancelMigrationProcess", "RPC.GetMigrationStat", "RPC.RemoveConfInstance", "RPC.GetQemuEvents":
 				default:
 					return fmt.Errorf("Virtual machine is locked because of status: %s", st)
 				}
 			case "incoming":
 				switch info.Method {
-				case "RPC.GetInstanceJSON", "RPC.InitQemuInstance", "RPC.StartNBDServer", "RPC.StopNBDServer", "RPC.RemoveConfInstance":
+				case "RPC.GetInstanceJSON", "RPC.InitQemuInstance", "RPC.StartNBDServer", "RPC.StopNBDServer", "RPC.RemoveConfInstance", "RPC.GetQemuEvents":
 				default:
 					return fmt.Errorf("Virtual machine is locked because of status: %s", st)
 				}

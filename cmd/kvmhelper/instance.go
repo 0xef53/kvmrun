@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	rpcclient "github.com/0xef53/kvmrun/pkg/rpc/client"
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
+
+	qmp "github.com/0xef53/go-qmp"
 
 	"github.com/0xef53/cli"
 )
@@ -89,6 +92,49 @@ func inspect(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCli
 		return append(errors, err)
 	}
 	fmt.Printf("%s\n", resp)
+
+	return errors
+}
+
+var cmdGetEvents = cli.Command{
+	Name:      "events",
+	Usage:     "print a list of QEMU events",
+	ArgsUsage: "VMNAME",
+	Action: func(c *cli.Context) {
+		os.Exit(executeRPC(c, getEvents))
+	},
+}
+
+func getEvents(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
+	req := rpccommon.InstanceRequest{
+		Name: vmname,
+	}
+
+	var resp []qmp.Event
+	if err := client.Request("RPC.GetQemuEvents", &req, &resp); err != nil {
+		return append(errors, err)
+	}
+
+	if c.GlobalBool("json") {
+		if b, err := json.MarshalIndent(resp, "", "    "); err == nil {
+			fmt.Println(string(b))
+		} else {
+			return append(errors, err)
+		}
+	} else {
+		for _, e := range resp {
+			if b, err := json.MarshalIndent(e.Data, "", "    "); err == nil {
+				fmt.Printf(
+					"[%s]  %s\n%s\n\n",
+					time.Unix(int64(e.Timestamp.Seconds), int64(e.Timestamp.Microseconds)).Format("2006-01-02 15:04:05.000000"),
+					e.Type,
+					b,
+				)
+			} else {
+				return append(errors, err)
+			}
+		}
+	}
 
 	return errors
 }

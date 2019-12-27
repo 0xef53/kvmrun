@@ -34,6 +34,7 @@ func main() {
 		cmdCreateConf,
 		cmdRemoveConf,
 		cmdInspect,
+		cmdGetEvents,
 		cmdSetMemory,
 		cmdSetCPUs,
 		cmdSetCPUQuota,

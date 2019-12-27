@@ -188,6 +188,22 @@ func (x *RPC) SendStop(r *http.Request, args *rpccommon.VMNameRequest, resp *str
 	return QPool.Run(args.Name, qmp.Command{"stop", nil}, nil)
 }
 
+func (x *RPC) GetQemuEvents(r *http.Request, args *rpccommon.InstanceRequest, resp *[]qmp.Event) error {
+	if args.VM.R != nil {
+		ee, found, err := QPool.FindEvents(args.Name, "", 0)
+		if err != nil {
+			return err
+		}
+		if found {
+			*resp = ee
+		} else {
+			*resp = make([]qmp.Event, 0, 0)
+		}
+	}
+
+	return nil
+}
+
 func (x *RPC) GetBrief(r *http.Request, args *rpccommon.BriefRequest, resp *[]*rpccommon.VMSummary) error {
 	var vmnames []string
 
