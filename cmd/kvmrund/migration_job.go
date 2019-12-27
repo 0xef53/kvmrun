@@ -94,6 +94,7 @@ type StatUpdate struct {
 	Transferred uint64
 	Speed       uint
 	NewStatus   string
+	ErrDesc     string
 }
 
 //
@@ -186,7 +187,69 @@ func (m *Migration) Inmigrate() bool {
 }
 
 func (m *Migration) Stat() *rpccommon.MigrationStat {
-	return m.stat
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	x := *m.stat
+
+	qemu := *m.stat.Qemu
+
+	disks := make(map[string]*rpccommon.StatInfo, len(m.stat.Disks))
+	for k, v := range m.stat.Disks {
+		tmp := *v
+		disks[k] = &tmp
+	}
+
+	x.Qemu = &qemu
+	x.Disks = disks
+
+	return &x
+}
+
+func (m *Migration) updateStat(u *StatUpdate) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	printDebugStat := func(name string, st *rpccommon.StatInfo) {
+		m.debugf(
+			"%s: total=%d, transferred=%d, remaining=%d, percent=%d, speed=%dmbit/s",
+			name,
+			st.Total,
+			st.Transferred,
+			st.Remaining,
+			st.Percent,
+			st.Speed,
+		)
+	}
+
+	switch u.Kind {
+	case "status":
+		m.stat.Status = u.NewStatus
+	case "error":
+		m.stat.Desc = u.ErrDesc
+	case "qemu":
+		if u.Total == 0 {
+			break
+		}
+		st := &rpccommon.StatInfo{}
+		st.Total = u.Total
+		st.Remaining = u.Remaining
+		st.Transferred = u.Transferred
+		st.Percent = uint(u.Transferred * 100 / u.Total)
+		st.Speed = u.Speed
+		m.stat.Qemu = st
+		printDebugStat("qemu_vmstate", st)
+	case "disk":
+		st := &rpccommon.StatInfo{}
+		st.Total = m.stat.Disks[u.Name].Total // copy from previous
+		st.Remaining = u.Remaining
+		st.Transferred = u.Transferred
+		st.Percent = uint(u.Transferred * 100 / st.Total)
+		st.Speed = uint(((u.Transferred - m.stat.Disks[u.Name].Transferred) * 8) / 1 >> (10 * 2)) // mbit/s
+		m.stat.Disks[u.Name] = st
+		printDebugStat(u.Name, st)
+	}
+
 }
 
 func (m *Migration) Start(opts *MigrationOpts) error {
@@ -239,12 +302,13 @@ func (m *Migration) Start(opts *MigrationOpts) error {
 			m.statPipe <- StatUpdate{Kind: "status", NewStatus: "completed"}
 		case IsInterruptedError(err):
 			m.statPipe <- StatUpdate{Kind: "status", NewStatus: "interrupted"}
+			m.statPipe <- StatUpdate{Kind: "error", ErrDesc: err.Error()}
 			m.printf("Interrupted by the CANCEL command")
 		default:
 			m.statPipe <- StatUpdate{Kind: "status", NewStatus: "failed"}
+			m.statPipe <- StatUpdate{Kind: "error", ErrDesc: err.Error()}
 			m.printf("Fatal error: %s", err)
 		}
-		m.err = err
 
 		// Wait until the stat collector is completed
 		close(m.terminateStat)
@@ -270,58 +334,19 @@ func (m *Migration) Start(opts *MigrationOpts) error {
 	go func() {
 		defer close(m.statCompleted)
 
-		printDebugStat := func(name string, st *rpccommon.StatInfo) {
-			m.debugf(
-				"%s: total=%d, transferred=%d, remaining=%d, percent=%d, speed=%dmbit/s",
-				name,
-				st.Total,
-				st.Transferred,
-				st.Remaining,
-				st.Percent,
-				st.Speed,
-			)
-		}
-
 		for {
 			select {
 			case <-m.terminateStat:
-				if m.err != nil {
-					m.stat.Desc = m.err.Error()
-				}
-				jb, err := json.Marshal(m.stat)
+				b, err := json.Marshal(m.Stat())
 				if err != nil {
 					m.printf(err.Error())
 				}
-				if err := ioutil.WriteFile(filepath.Join(kvmrun.VMCONFDIR, m.vmname, "supervise/migration_stat"), jb, 0644); err != nil {
+				if err := ioutil.WriteFile(filepath.Join(kvmrun.VMCONFDIR, m.vmname, "supervise/migration_stat"), b, 0644); err != nil {
 					m.printf(err.Error())
 				}
 				return
 			case x := <-m.statPipe:
-				switch x.Kind {
-				case "status":
-					m.stat.Status = x.NewStatus
-				case "qemu":
-					if x.Total == 0 {
-						break
-					}
-					st := &rpccommon.StatInfo{}
-					st.Total = x.Total
-					st.Remaining = x.Remaining
-					st.Transferred = x.Transferred
-					st.Percent = uint(x.Transferred * 100 / x.Total)
-					st.Speed = x.Speed
-					m.stat.Qemu = st
-					printDebugStat("qemu_vmstate", st)
-				case "disk":
-					st := &rpccommon.StatInfo{}
-					st.Total = m.stat.Disks[x.Name].Total // copy from previous
-					st.Remaining = x.Remaining
-					st.Transferred = x.Transferred
-					st.Percent = uint(x.Transferred * 100 / st.Total)
-					st.Speed = uint(((x.Transferred - m.stat.Disks[x.Name].Transferred) * 8) / 1 >> (10 * 2)) // mbit/s
-					m.stat.Disks[x.Name] = st
-					printDebugStat(x.Name, st)
-				}
+				m.updateStat(&x)
 			}
 		}
 	}()
@@ -525,13 +550,13 @@ func (m *Migration) mirrorDisks(ctx context.Context, allDisksReady, vmstateMigra
 		return nil, errJobNotFound
 	}
 
-	waitForReady := func(ctx context.Context, d *kvmrun.Disk) error {
+	waitForReady := func(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
 		jobID := "migr_" + d.BaseName()
 
 		// Stat will be available after the job status changes to running
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		if _, err := QPool.WaitJobStatusChangeEvent(m.vmname, timeoutCtx, jobID, "running", uint64(time.Now().Unix())); err != nil {
+		if _, err := QPool.WaitJobStatusChangeEvent(m.vmname, timeoutCtx, jobID, "running", uint64(ts.Unix())); err != nil {
 			return err
 		}
 
@@ -581,11 +606,12 @@ func (m *Migration) mirrorDisks(ctx context.Context, allDisksReady, vmstateMigra
 				return err
 			}
 		}
+		ts := time.Now()
 		args := newQemuDriveMirrorOpts(m.opts.DstServerIPs[0].String(), m.opts.NBDPort, d.BaseName(), dstName)
 		if err := QPool.Run(m.vmname, qmp.Command{"drive-mirror", &args}, nil); err != nil {
 			return err
 		}
-		group1.Go(func() error { return waitForReady(ctx1, &d) })
+		group1.Go(func() error { return waitForReady(ctx1, ts, &d) })
 	}
 
 	m.debugf("mirrorDisks(): waiting for disks synchronization ...")
@@ -631,10 +657,8 @@ loop:
 
 	m.debugf("mirrorDisks(): QEMU migration is completed. Waiting for total disks synchronization ...")
 
-	waitForCompleted := func(ctx context.Context, d *kvmrun.Disk) error {
+	waitForCompleted := func(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
 		jobID := "migr_" + d.BaseName()
-
-		ts := time.Now()
 
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -684,12 +708,13 @@ loop:
 		}{
 			Device: "migr_" + d.BaseName(),
 		}
+		ts := time.Now()
 		if err := QPool.Run(m.vmname, qmp.Command{"block-job-complete", &jobID}, nil); err != nil {
 			// Non-fatal error
 			m.printf(err.Error())
 			continue
 		}
-		group2.Go(func() error { return waitForCompleted(ctx2, &d) })
+		group2.Go(func() error { return waitForCompleted(ctx2, ts, &d) })
 	}
 
 	switch err := group2.Wait(); {

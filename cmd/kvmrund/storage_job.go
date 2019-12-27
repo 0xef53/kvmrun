@@ -157,7 +157,47 @@ func (t *DiskJob) Inprogress() bool {
 }
 
 func (t *DiskJob) Stat() *rpccommon.DiskJobStat {
-	return t.stat
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	x := *t.stat
+
+	qemuJob := *t.stat.QemuJob
+	x.QemuJob = &qemuJob
+
+	return &x
+}
+
+func (t *DiskJob) updateStat(u *StatUpdate) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	printDebugStat := func(name string, st *rpccommon.StatInfo) {
+		t.debugf(
+			"%s: total=%d, transferred=%d, remaining=%d, percent=%d, speed=%dmbit/s",
+			name,
+			st.Total,
+			st.Transferred,
+			st.Remaining,
+			st.Percent,
+			st.Speed,
+		)
+	}
+
+	switch u.Kind {
+	case "status":
+		t.stat.Status = u.NewStatus
+	case "qemu_job":
+		st := &rpccommon.StatInfo{}
+		st.Total = u.Total
+		st.Remaining = u.Remaining
+		st.Transferred = u.Transferred
+		st.Percent = uint(u.Transferred * 100 / u.Total)
+		st.Speed = uint(((u.Transferred - t.stat.QemuJob.Transferred) * 8) / 1 >> (10 * 2)) // mbit/s
+		t.stat.QemuJob = st
+		printDebugStat(t.diskname, st)
+	}
+
 }
 
 func (t *DiskJob) startProcess(fn func(context.Context) error, opts *DiskJobOpts) error {
@@ -232,36 +272,12 @@ func (t *DiskJob) startProcess(fn func(context.Context) error, opts *DiskJobOpts
 	go func() {
 		defer close(t.statCompleted)
 
-		printDebugStat := func(name string, st *rpccommon.StatInfo) {
-			t.debugf(
-				"%s: total=%d, transferred=%d, remaining=%d, percent=%d, speed=%dmbit/s",
-				name,
-				st.Total,
-				st.Transferred,
-				st.Remaining,
-				st.Percent,
-				st.Speed,
-			)
-		}
-
 		for {
 			select {
 			case <-t.terminateStat:
 				return
 			case x := <-t.statPipe:
-				switch x.Kind {
-				case "status":
-					t.stat.Status = x.NewStatus
-				case "qemu_job":
-					st := &rpccommon.StatInfo{}
-					st.Total = x.Total
-					st.Remaining = x.Remaining
-					st.Transferred = x.Transferred
-					st.Percent = uint(x.Transferred * 100 / x.Total)
-					st.Speed = uint(((x.Transferred - t.stat.QemuJob.Transferred) * 8) / 1 >> (10 * 2)) // mbit/s
-					t.stat.QemuJob = st
-					printDebugStat(t.diskname, st)
-				}
+				t.updateStat(&x)
 			}
 		}
 	}()
@@ -309,7 +325,11 @@ func (t *DiskJob) localCopy(ctx context.Context) error {
 
 	defer os.Remove(filepath.Join(chrootDir, t.opts.DstDisk.Path))
 
+	var ts time.Time
+
 	t.debugf("localCopy(): running QMP command: drive-backup: src=%s, dst=%s", t.diskname, t.opts.DstDisk.Path)
+
+	ts = time.Now()
 
 	args := newQemuDriveBackupOpts(t.opts.SrcDisk.BaseName(), t.opts.DstDisk.Path)
 	if err := QPool.Run(t.opts.VMName, qmp.Command{"drive-backup", &args}, nil); err != nil {
@@ -345,11 +365,11 @@ func (t *DiskJob) localCopy(ctx context.Context) error {
 	// Stat will be available after the job status changes to running
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	if _, err := QPool.WaitJobStatusChangeEvent(t.opts.VMName, timeoutCtx, jobID, "running", uint64(time.Now().Unix())); err != nil {
+	if _, err := QPool.WaitJobStatusChangeEvent(t.opts.VMName, timeoutCtx, jobID, "running", uint64(ts.Unix())); err != nil {
 		return err
 	}
 
-	ts := time.Now()
+	ts = time.Now()
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()

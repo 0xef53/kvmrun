@@ -50,21 +50,15 @@ func requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
 		// Restrictions for moving virt.machines
 		if st, err := vm.Status(); err == nil {
 			switch st {
-			case "inmigrate":
+			case "inmigrate", "migrated":
 				switch info.Method {
-				case "RPC.GetInstanceJSON", "RPC.CancelMigrationProcess", "RPC.GetMigrationStat":
-				default:
-					return fmt.Errorf("Virtual machine is locked because of status: %s", st)
-				}
-			case "migrated":
-				switch info.Method {
-				case "RPC.GetInstanceJSON", "RPC.GetMigrationStat", "RPC.RemoveConfInstance":
+				case "RPC.GetInstanceJSON", "RPC.CancelMigrationProcess", "RPC.GetMigrationStat", "RPC.RemoveConfInstance":
 				default:
 					return fmt.Errorf("Virtual machine is locked because of status: %s", st)
 				}
 			case "incoming":
 				switch info.Method {
-				case "RPC.GetInstanceJSON", "RPC.InitQemuInstance", "RPC.StartNBDServer", "RPC.StopNBDServer":
+				case "RPC.GetInstanceJSON", "RPC.InitQemuInstance", "RPC.StartNBDServer", "RPC.StopNBDServer", "RPC.RemoveConfInstance":
 				default:
 					return fmt.Errorf("Virtual machine is locked because of status: %s", st)
 				}
