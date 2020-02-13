@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-var VERSION = VersionInfo{0, 3, 3}
+var VERSION = VersionInfo{0, 4, 0}
 
 type VersionInfo struct {
 	Major int `json:"major"`
