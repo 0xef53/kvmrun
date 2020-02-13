@@ -346,6 +346,10 @@ func (c *InstanceConf) SetDiskWriteIops(dpath string, iops int) error {
 	return nil
 }
 
+func (c InstanceConf) RemoveDiskBitmap(dpath string) error {
+	return ErrNotImplemented
+}
+
 func (c InstanceConf) GetNetIfaces() NetIfaces {
 	nn := make(NetIfaces, len(c.NetIfaces))
 	copy(nn, c.NetIfaces)

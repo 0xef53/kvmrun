@@ -33,6 +33,7 @@ type Instance interface {
 	RemoveDisk(string) error
 	SetDiskReadIops(string, int) error
 	SetDiskWriteIops(string, int) error
+	RemoveDiskBitmap(string) error
 
 	GetNetIfaces() NetIfaces
 	AppendNetIface(NetIface) error

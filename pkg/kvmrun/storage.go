@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xef53/kvmrun/pkg/block"
 	"github.com/0xef53/kvmrun/pkg/iscsi"
+	"github.com/0xef53/kvmrun/pkg/nbd"
 )
 
 var DiskDrivers = DevDrivers{
@@ -32,6 +33,7 @@ type Disk struct {
 	Addr            string      `json:"addr,omitempty"`
 	Bootindex       uint        `json:"bootindex,omitempty"`
 	QemuVirtualSize uint64      `json:"-"`
+	HasBitmap       bool        `json:"-"`
 }
 
 func NewDisk(p string) (*Disk, error) {
@@ -164,6 +166,12 @@ func NewDiskBackend(p string) (DiskBackend, error) {
 			return nil, err
 		}
 		return *b, nil
+	case strings.HasPrefix(p, "nbd://"):
+		b, err := NewNBDDisk(p)
+		if err != nil {
+			return nil, err
+		}
+		return *b, nil
 	case strings.HasPrefix(p, "/dev/"):
 		b, err := NewBlkDisk(p)
 		if err != nil {
@@ -286,4 +294,43 @@ func ParseSCSIAddr(s string) (string, string, string) {
 	}
 
 	return busName, busAddr, lun
+}
+
+type NBDDisk struct {
+	Path string
+	URI  nbd.URI
+}
+
+func NewNBDDisk(p string) (*NBDDisk, error) {
+	u, err := nbd.ParseURI(p)
+	if err != nil {
+		return nil, err
+	}
+
+	d := NBDDisk{
+		Path: p,
+		URI:  *u,
+	}
+
+	return &d, nil
+}
+
+func (d NBDDisk) QdevID() string {
+	return "blk_" + d.URI.ExportName
+}
+
+func (d NBDDisk) BaseName() string {
+	return d.URI.ExportName
+}
+
+func (d NBDDisk) Size() (uint64, error) {
+	return 0, ErrNotImplemented
+}
+
+func (d NBDDisk) IsLocal() bool {
+	return false
+}
+
+func (d NBDDisk) IsAvailable() (bool, error) {
+	return true, nil
 }

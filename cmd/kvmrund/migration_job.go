@@ -459,6 +459,7 @@ func (m *Migration) migrateVMState(ctx context.Context, allDisksReady, vmstateMi
 			qt.MigrationCapabilityStatus{"auto-converge", true},
 			qt.MigrationCapabilityStatus{"compress", false},
 			qt.MigrationCapabilityStatus{"block", false},
+			qt.MigrationCapabilityStatus{"dirty-bitmaps", true},
 		},
 	}
 	if err := QPool.Run(m.vmname, qmp.Command{"migrate-set-capabilities", &capsArgs}, nil); err != nil {
