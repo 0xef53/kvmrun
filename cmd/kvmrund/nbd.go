@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	qmp "github.com/0xef53/go-qmp"
+	qmp "github.com/0xef53/go-qmp/v2"
 
 	"github.com/0xef53/kvmrun/pkg/kvmrun"
 	qt "github.com/0xef53/kvmrun/pkg/qemu/types"

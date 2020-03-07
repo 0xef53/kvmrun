@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	qmp "github.com/0xef53/go-qmp"
+	qmp "github.com/0xef53/go-qmp/v2"
 )
 
 // QMPPool represents a pool of QMPConn objects

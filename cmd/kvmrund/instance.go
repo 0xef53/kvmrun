@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"sort"
 
-	qmp "github.com/0xef53/go-qmp"
+	qmp "github.com/0xef53/go-qmp/v2"
 
 	"github.com/0xef53/kvmrun/pkg/kvmrun"
 	"github.com/0xef53/kvmrun/pkg/ps"

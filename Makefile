@@ -10,10 +10,8 @@ else
 endif
 
 BUILD_MOUNTS := \
-    -v $(PROJECT_NAME)_src:/go/src \
     -v $(PROJECT_NAME)_pkg:/go/pkg \
-    -v $(CWD)/bin:/go/bin \
-    -v $(CWD):/go/src/$(PROJECT_REPO) \
+    -v $(CWD):/go/$(PROJECT_NAME) \
     -v $(CWD)/scripts/build.sh:/usr/local/bin/build.sh
 
 PKG_MOUNTS := \
@@ -26,7 +24,7 @@ binaries = bin/kvmhelper bin/kvmrund bin/launcher \
            bin/gencert
 
 
-.PHONY: all build package clean
+.PHONY: all build deb-package clean
 
 all: build
 
@@ -35,8 +33,7 @@ $(binaries):
 	@echo "#  Building binaries     #"
 	@echo "##########################"
 	@echo
-	install -d bin
-	docker run --rm -i -w /go $(BUILD_MOUNTS) golang:latest build.sh
+	docker run --rm -i -w /go/$(PROJECT_NAME) $(BUILD_MOUNTS) golang:latest build.sh
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"

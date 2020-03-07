@@ -1,19 +1,17 @@
 #!/bin/bash
 set -eu
 
-if [[ -z "${GOPATH:-}" ]] ; then
-	echo "Undefined GOPATH variable" >&2
-	exit 1
-fi
+declare -rx PROJECT_REPO="github.com/0xef53/kvmrun"
+declare -rx GOOS="linux"
+declare -rx GOBIN="$(pwd)/bin"
 
-declare -r PROJECT_REPO="github.com/0xef53/kvmrun"
-declare -r GOOS="linux"
+declare -r USER_GROUP="$(stat --printf "%u:%g" .)"
 
-declare -r USER_GROUP="$(stat --printf "%u:%g" ${GOPATH}/src/${PROJECT_REPO})"
-trap "chown -R $USER_GROUP ${GOPATH}/bin" 0
+install -d "$GOBIN"
+trap "chown -R $USER_GROUP $GOBIN" 0
 
 go version
-gofmt -w "${GOPATH}/src/${PROJECT_REPO}"
-go get -v -ldflags "-s -w" "${PROJECT_REPO}/..."
+go fmt "${PROJECT_REPO}/..."
+go install -v -ldflags "-s -w" "${PROJECT_REPO}/cmd/..."
 
 exit 0

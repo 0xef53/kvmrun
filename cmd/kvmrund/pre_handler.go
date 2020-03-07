@@ -8,7 +8,7 @@ import (
 	"github.com/0xef53/kvmrun/pkg/kvmrun"
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 
-	qmp "github.com/0xef53/go-qmp"
+	qmp "github.com/0xef53/go-qmp/v2"
 
 	rpc "github.com/gorilla/rpc/v2"
 )
