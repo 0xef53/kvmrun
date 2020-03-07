@@ -82,6 +82,7 @@ var cmdUpdateDisk = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{Name: "iops-rd", Value: -1, PlaceHolder: "UINT", Usage: "read I/O operations limit per second"},
 		cli.IntFlag{Name: "iops-wr", Value: -1, PlaceHolder: "UINT", Usage: "write I/O operations limit per second"},
+		cli.BoolFlag{Name: "remove-bitmap", Usage: "stop write tracking and remove the dirty bitmap (if exists)"},
 	},
 	Action: func(c *cli.Context) {
 		os.Exit(executeRPC(c, updateDisk))
@@ -95,18 +96,22 @@ func updateDisk(vmname string, live bool, c *cli.Context, client *rpcclient.Unix
 		IopsWr: c.Int("iops-wr"),
 	}
 
-	if params.IopsRd == -1 && params.IopsWr == -1 {
-		return errors
-	}
-
 	req := rpccommon.InstanceRequest{
 		Name: vmname,
 		Live: live,
 		Data: &params,
 	}
 
-	if err := client.Request("RPC.UpdateDisk", &req, nil); err != nil {
-		return append(errors, err)
+	if params.IopsRd != -1 || params.IopsWr != -1 {
+		if err := client.Request("RPC.SetDiskIops", &req, nil); err != nil {
+			return append(errors, err)
+		}
+	}
+
+	if c.Bool("remove-bitmap") {
+		if err := client.Request("RPC.RemoveDiskBitmap", &req, nil); err != nil {
+			return append(errors, err)
+		}
 	}
 
 	return errors
@@ -143,6 +148,8 @@ var cmdCopyDisk = cli.Command{
 	ArgsUsage: "VMNAME SRCDISK DSTDISK",
 	Flags: []cli.Flag{
 		cli.BoolFlag{Name: "watch,w", Usage: "watch the operation process"},
+		cli.BoolFlag{Name: "incremental,inc,i", Usage: "only copy data described by a dirty bitmap (if exists)"},
+		cli.BoolFlag{Name: "clear-bitmap", Usage: "clear/reset a dirty bitmap (if exists) before starting"},
 	},
 	Action: func(c *cli.Context) {
 		os.Exit(executeRPC(c, copyDisk))
@@ -154,8 +161,10 @@ func copyDisk(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCl
 		Name: vmname,
 		Live: live,
 		Data: &rpccommon.DiskCopyingParams{
-			SrcName: c.Args().Tail()[0],
-			DstName: c.Args().Tail()[1],
+			SrcName:     c.Args().Tail()[0],
+			TargetURI:   c.Args().Tail()[1],
+			Incremental: c.Bool("incremental"),
+			ClearBitmap: c.Bool("clear-bitmap"),
 		},
 	}
 

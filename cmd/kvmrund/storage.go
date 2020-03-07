@@ -91,7 +91,7 @@ func (x *RPC) DetachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 	return args.VM.C.Save()
 }
 
-func (x *RPC) UpdateDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (x *RPC) SetDiskIops(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -145,7 +145,20 @@ func (x *RPC) ResizeDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 	}
 
 	return nil
+}
 
+func (x *RPC) RemoveDiskBitmap(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+	var data *rpccommon.DiskParams
+
+	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
+		return err
+	}
+
+	if args.VM.R != nil {
+		return args.VM.R.RemoveDiskBitmap(data.Path)
+	}
+
+	return nil
 }
 
 func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
@@ -166,16 +179,23 @@ func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceR
 		return fmt.Errorf("Unknown disk: %s", data.SrcName)
 	}
 
-	if args.VM.R.GetDisks().Exists(data.DstName) {
-		return fmt.Errorf("Unable to copy into the attached disk: %s", data.DstName)
+	if args.VM.R.GetDisks().Exists(data.TargetURI) {
+		return fmt.Errorf("Unable to work with the attached disk: %s", data.TargetURI)
 	}
 
-	srcSize, err := srcDisk.Backend.Size()
-	if err != nil {
-		return err
+	var srcSize uint64
+
+	if srcDisk.IsLocal() {
+		s, err := srcDisk.Backend.Size()
+		if err != nil {
+			return err
+		}
+		srcSize = s
+	} else {
+		srcSize = srcDisk.QemuVirtualSize
 	}
 
-	dstDisk, err := kvmrun.NewDisk(data.DstName)
+	dstDisk, err := kvmrun.NewDisk(data.TargetURI)
 	if err != nil {
 		return err
 	}
@@ -183,13 +203,16 @@ func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceR
 	if ok, err := dstDisk.IsAvailable(); !ok {
 		return err
 	}
-	dstSize, err := dstDisk.Backend.Size()
-	if err != nil {
-		return err
-	}
 
-	if dstSize < srcSize {
-		return fmt.Errorf("Size of destination disk does not match the requested size")
+	if dstDisk.IsLocal() {
+		dstSize, err := dstDisk.Backend.Size()
+		if err != nil {
+			return err
+		}
+
+		if dstSize < srcSize {
+			return fmt.Errorf("Size of destination disk does not match the requested size")
+		}
 	}
 
 	t, err := TPool.Get(srcDisk.Path)
@@ -198,11 +221,13 @@ func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceR
 	}
 
 	opts := DiskJobOpts{
-		SrcDisk: srcDisk,
-		DstDisk: dstDisk,
-		SrcSize: srcSize,
-		VMName:  args.Name,
-		VMUid:   args.VM.R.Uid(),
+		SrcDisk:     srcDisk,
+		DstDisk:     dstDisk,
+		SrcSize:     srcSize,
+		VMName:      args.Name,
+		VMUid:       args.VM.R.Uid(),
+		Incremental: data.Incremental,
+		ClearBitmap: data.ClearBitmap,
 	}
 
 	return t.StartCopyingProcess(&opts)

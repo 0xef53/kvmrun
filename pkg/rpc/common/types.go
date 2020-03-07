@@ -144,8 +144,10 @@ type CheckDisksRequest struct {
 }
 
 type DiskCopyingParams struct {
-	SrcName string
-	DstName string
+	SrcName     string
+	TargetURI   string
+	Incremental bool
+	ClearBitmap bool
 }
 
 type MigrationStat struct {

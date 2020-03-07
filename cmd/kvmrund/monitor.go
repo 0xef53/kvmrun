@@ -92,6 +92,15 @@ func (p *QMPPool) Run(vmname string, cmd interface{}, res interface{}) error {
 	return m.Run(cmd, res)
 }
 
+func (p *QMPPool) RunTransaction(vmname string, cmds []qmp.Command, res interface{}) error {
+	m, err := p.getMonitor(vmname)
+	if err != nil {
+		return err
+	}
+
+	return m.RunTransaction(cmds, res, nil)
+}
+
 func (p *QMPPool) GetEvents(vmname string, ctx context.Context, t string, after uint64) ([]qmp.Event, error) {
 	m, err := p.getMonitor(vmname)
 	if err != nil {

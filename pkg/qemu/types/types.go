@@ -61,7 +61,10 @@ type NetdevTapOptions struct {
 
 // BlockInfo describes a virtual device and the backing device associated with it.
 type BlockInfo struct {
-	Device   string `json:"device"`
+	Device       string `json:"device"`
+	DirtyBitmaps []struct {
+		Name string `json:"name"`
+	} `json:"dirty-bitmaps"`
 	Inserted struct {
 		File             string `json:"file"`
 		BackingFile      string `json:"backing_file"`
@@ -239,6 +242,7 @@ type DriveBackupOptions struct {
 	Target string `json:"target"`
 	Format string `json:"format,omitempty"`
 	Sync   string `json:"sync"`
+	Bitmap string `json:"bitmap,omitempty"`
 	Mode   string `json:"mode,omitempty"`
 	Speed  uint64 `json:"speed,omitempty"`
 }
@@ -253,4 +257,10 @@ type BlockJobInfo struct {
 	Paused bool   `json:"paused"`
 	Speed  uint64 `json:"speed"`
 	Ready  bool   `json:"ready"`
+}
+
+// BlockDirtyBitmapOptions is a common structure for operations with dirty bitmaps.
+type BlockDirtyBitmapOptions struct {
+	Node string `json:"node"`
+	Name string `json:"name"`
 }

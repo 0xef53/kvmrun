@@ -81,11 +81,13 @@ func (p *DiskJobPool) Release(diskname string) {
 //
 
 type DiskJobOpts struct {
-	VMName  string
-	VMUid   int
-	SrcDisk *kvmrun.Disk
-	DstDisk *kvmrun.Disk
-	SrcSize uint64
+	VMName      string
+	VMUid       int
+	SrcDisk     *kvmrun.Disk
+	DstDisk     *kvmrun.Disk
+	SrcSize     uint64
+	Incremental bool
+	ClearBitmap bool
 }
 
 func newQemuDriveBackupOpts(srcDiskName, dstDiskPath string) *qt.DriveBackupOptions {
@@ -286,11 +288,11 @@ func (t *DiskJob) startProcess(fn func(context.Context) error, opts *DiskJobOpts
 }
 
 func (t *DiskJob) StartCopyingProcess(opts *DiskJobOpts) error {
-	return t.startProcess(t.localCopy, opts)
+	return t.startProcess(t.copy, opts)
 }
 
-func (t *DiskJob) localCopy(ctx context.Context) error {
-	t.debugf("localCopy(): main process started")
+func (t *DiskJob) copy(ctx context.Context) error {
+	t.debugf("copy(): main process started")
 
 	var success bool
 
@@ -298,42 +300,78 @@ func (t *DiskJob) localCopy(ctx context.Context) error {
 		if success {
 			return
 		}
-		t.debugf("localCopy(): something went wrong. Removing the scraps")
+		t.debugf("copy(): something went wrong. Removing the scraps")
 		t.cleanWhenInterrupted()
 	}()
 
 	t.statPipe <- StatUpdate{Kind: "status", NewStatus: "inprogress"}
 
-	// Mknod inside chroot
-	chrootDir := filepath.Join(kvmrun.CHROOTDIR, t.opts.VMName)
-
-	if err := os.MkdirAll(filepath.Join(chrootDir, filepath.Dir(t.opts.DstDisk.Path)), 0755); err != nil {
-		return err
+	if t.opts.DstDisk.IsLocal() {
+		if err := t.prepareChroot(t.opts.VMName, t.opts.DstDisk.Path); err != nil {
+			return err
+		}
+		defer func() {
+			if err := os.Remove(filepath.Join(kvmrun.CHROOTDIR, t.opts.VMName, t.opts.DstDisk.Path)); err != nil {
+				t.printf("Failed to remove dstDisk from chroot: %s: %s", t.opts.DstDisk.Path, err)
+			}
+		}()
 	}
-
-	stat := syscall.Stat_t{}
-	if err := syscall.Stat(t.opts.DstDisk.Path, &stat); err != nil {
-		return fmt.Errorf("stat %s: %s", t.opts.DstDisk.Path, err)
-	}
-
-	if err := syscall.Mknod(filepath.Join(chrootDir, t.opts.DstDisk.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
-		return fmt.Errorf("mknod %s: %s", t.opts.DstDisk.Path, err)
-	}
-	if err := os.Chown(filepath.Join(chrootDir, t.opts.DstDisk.Path), t.opts.VMUid, 0); err != nil {
-		return err
-	}
-
-	defer os.Remove(filepath.Join(chrootDir, t.opts.DstDisk.Path))
 
 	var ts time.Time
 
-	t.debugf("localCopy(): running QMP command: drive-backup: src=%s, dst=%s", t.diskname, t.opts.DstDisk.Path)
+	t.debugf("copy(): running QMP command: drive-backup: src=%s, dst=%s", t.diskname, t.opts.DstDisk.Path)
 
 	ts = time.Now()
 
 	args := newQemuDriveBackupOpts(t.opts.SrcDisk.BaseName(), t.opts.DstDisk.Path)
-	if err := QPool.Run(t.opts.VMName, qmp.Command{"drive-backup", &args}, nil); err != nil {
-		return err
+
+	if t.opts.Incremental {
+		bitmapArgs := qt.BlockDirtyBitmapOptions{
+			Node: t.opts.SrcDisk.BaseName(),
+			Name: "backup",
+		}
+
+		if t.opts.SrcDisk.HasBitmap {
+			if t.opts.ClearBitmap {
+				t.printf("Mode: full backup (with bitmap reset)")
+				t.debugf("copy(): running QMP transaction: block-dirty-bitmap-clear + drive-backup (src=%s, dst=%s", t.opts.SrcDisk.BaseName(), t.opts.DstDisk.Path)
+
+				commands := []qmp.Command{
+					qmp.Command{"block-dirty-bitmap-clear", &bitmapArgs},
+					qmp.Command{"drive-backup", &args},
+				}
+				if err := QPool.RunTransaction(t.opts.VMName, commands, nil); err != nil {
+					return err
+				}
+			} else {
+				t.printf("Mode: incremental backup")
+				t.debugf("copy(): running QMP command: drive-backup (src=%s, dst=%s)", t.opts.SrcDisk.BaseName(), t.opts.DstDisk.Path)
+
+				args.Sync = "incremental"
+				args.Bitmap = "backup"
+
+				if err := QPool.Run(t.opts.VMName, qmp.Command{"drive-backup", &args}, nil); err != nil {
+					return err
+				}
+			}
+		} else {
+			t.printf("Mode: full backup")
+			t.debugf("copy(): running QMP transaction: block-dirty-bitmap-add + drive-backup (src=%s, dst=%s", t.opts.SrcDisk.BaseName(), t.opts.DstDisk.Path)
+
+			commands := []qmp.Command{
+				qmp.Command{"block-dirty-bitmap-add", bitmapArgs},
+				qmp.Command{"drive-backup", &args},
+			}
+			if err := QPool.RunTransaction(t.opts.VMName, commands, nil); err != nil {
+				return err
+			}
+		}
+	} else {
+		t.printf("Mode: full disk copying")
+
+		if err := QPool.Run(t.opts.VMName, qmp.Command{"drive-backup", &args}, nil); err != nil {
+			return err
+		}
 	}
 
 	// We start collecting statistics after the JOB_STATUS_CHANGE event
@@ -425,9 +463,30 @@ func (t *DiskJob) localCopy(ctx context.Context) error {
 
 	success = true
 
-	t.debugf("localCopy(): completed")
+	t.debugf("copy(): completed")
 
 	return nil
+}
+
+// This function partially duplicates the same name function from kvmrun/cmd/launcher.
+// TODO: need to unify.
+func (t *DiskJob) prepareChroot(vmname, diskPath string) error {
+	chrootDir := filepath.Join(kvmrun.CHROOTDIR, vmname)
+
+	if err := os.MkdirAll(filepath.Join(chrootDir, filepath.Dir(diskPath)), 0755); err != nil {
+		return err
+	}
+
+	stat := syscall.Stat_t{}
+	if err := syscall.Stat(diskPath, &stat); err != nil {
+		return fmt.Errorf("stat %s: %s", diskPath, err)
+	}
+
+	if err := syscall.Mknod(filepath.Join(chrootDir, diskPath), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
+		return fmt.Errorf("mknod %s: %s", diskPath, err)
+	}
+
+	return os.Chown(filepath.Join(chrootDir, diskPath), t.opts.VMUid, 0)
 }
 
 func (t *DiskJob) cleanWhenInterrupted() {

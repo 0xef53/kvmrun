@@ -549,6 +549,11 @@ func (r *InstanceQemu) initStorage() error {
 
 			disk.Addr = fmt.Sprintf("%s:%s/%d", parentBusName, r.scsiBuses[parentBusName].Addr, lun)
 		}
+		for _, m := range dev.DirtyBitmaps {
+			if m.Name == "backup" {
+				disk.HasBitmap = true
+			}
+		}
 
 		pool = append(pool, *disk)
 	}
@@ -761,6 +766,25 @@ func (r *InstanceQemu) SetDiskWriteIops(dpath string, iops int) error {
 	d.IopsWr = iops
 
 	return nil
+}
+
+func (r *InstanceQemu) RemoveDiskBitmap(dpath string) error {
+	d := r.Disks.Get(dpath)
+	if d == nil {
+		return &NotConnectedError{"instance_qemu", dpath}
+	}
+
+	if !d.HasBitmap {
+		return nil
+	}
+
+	opts := qt.BlockDirtyBitmapOptions{
+		Node: d.BaseName(),
+		Name: "backup",
+	}
+
+	return r.mon.Run(qmp.Command{"block-dirty-bitmap-remove", &opts}, nil)
+
 }
 
 func (r *InstanceQemu) initNetwork() error {
