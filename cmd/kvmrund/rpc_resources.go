@@ -9,7 +9,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) SetMemLimits(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetMemLimits(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.MemLimitsParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -54,7 +54,7 @@ func (x *RPC) SetMemLimits(r *http.Request, args *rpccommon.InstanceRequest, res
 	return args.VM.C.Save()
 }
 
-func (x *RPC) SetCPUCount(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetCPUCount(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.CPUCountParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -100,7 +100,7 @@ func (x *RPC) SetCPUCount(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return args.VM.C.Save()
 }
 
-func (x *RPC) SetCPUQuota(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetCPUQuota(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var value int
 
 	if err := json.Unmarshal(args.DataRaw, &value); err != nil {
@@ -120,7 +120,7 @@ func (x *RPC) SetCPUQuota(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return args.VM.C.Save()
 }
 
-func (x *RPC) SetCPUModel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetCPUModel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var model string
 
 	if err := json.Unmarshal(args.DataRaw, &model); err != nil {

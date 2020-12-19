@@ -192,8 +192,9 @@ var cmdDiskJobCancel = cli.Command{
 }
 
 func diskJobCancel(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
-	req := rpccommon.DiskJobIDRequest{
-		JobID: c.Args().Tail()[0],
+	req := rpccommon.DiskJobRequest{
+		VMName:   vmname,
+		DiskName: c.Args().Tail()[0],
 	}
 
 	if err := client.Request("RPC.CancelDiskJobProcess", &req, nil); err != nil {
@@ -215,11 +216,12 @@ var cmdDiskJobStatus = cli.Command{
 }
 
 func diskJobStatus(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
-	req := rpccommon.DiskJobIDRequest{
-		JobID: c.Args().Tail()[0],
+	req := rpccommon.DiskJobRequest{
+		VMName:   vmname,
+		DiskName: c.Args().Tail()[0],
 	}
 
-	st := rpccommon.DiskJobStat{}
+	st := rpccommon.DiskCopyingTaskStat{}
 
 	if err := client.Request("RPC.GetDiskJobStat", &req, &st); err != nil {
 		return append(errors, err)
@@ -291,14 +293,14 @@ func diskJobStatus(vmname string, live bool, c *cli.Context, client *rpcclient.U
 	// Watch the progress ...
 loop:
 	for {
-		st := rpccommon.DiskJobStat{}
+		st := rpccommon.DiskCopyingTaskStat{}
 
 		if err := client.Request("RPC.GetDiskJobStat", &req, &st); err != nil {
 			return append(errors, err)
 		}
 
 		switch st.Status {
-		case "completed", "none":
+		case "completed":
 			close(completed)
 			// workaround to make sure that the progress bar
 			// will have enough time to show 100%
@@ -307,7 +309,7 @@ loop:
 		case "inprogress":
 			barPipe <- st.QemuJob
 			time.Sleep(1 * time.Second)
-		case "failed", "interrupted":
+		case "failed", "interrupted", "none":
 			break loop
 		}
 	}
@@ -321,11 +323,11 @@ loop:
 	}
 
 	switch st.Status {
-	case "completed", "none":
+	case "completed":
 		fmt.Println("Successfully completed")
 	case "failed":
 		errors = append(errors, fmt.Errorf("Process failed: %s", st.Desc))
-	case "interrupted":
+	case "interrupted", "none":
 		errors = append(errors, fmt.Errorf("Process is interrupted"))
 	}
 

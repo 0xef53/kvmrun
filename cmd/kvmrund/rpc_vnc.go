@@ -11,7 +11,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) GetVNCRequisites(r *http.Request, args *rpccommon.InstanceRequest, resp *rpccommon.VNCRequisites) error {
+func (h *rpcHandler) GetVNCRequisites(r *http.Request, args *rpccommon.InstanceRequest, resp *rpccommon.VNCRequisites) error {
 	var data *rpccommon.VNCParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {

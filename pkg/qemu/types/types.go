@@ -54,7 +54,7 @@ type NetdevTapOptions struct {
 	Type       string `json:"type"`
 	ID         string `json:"id"`
 	Ifname     string `json:"ifname"`
-	Vhost      string `json:"vhost"`
+	Vhost      bool   `json:"vhost"`
 	Script     string `json:"script"`
 	Downscript string `json:"downscript"`
 }

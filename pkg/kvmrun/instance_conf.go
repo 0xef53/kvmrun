@@ -83,24 +83,6 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	return Instance(&vmc), nil
 }
 
-func (c InstanceConf) Clone() Instance {
-	x := InstanceConf{
-		name:     c.name,
-		Mem:      c.Mem,
-		CPU:      c.CPU,
-		Kernel:   c.Kernel,
-		Machine:  c.Machine,
-		uid:      c.uid,
-		confname: c.confname,
-	}
-
-	x.Disks = c.Disks.Clone()
-	x.NetIfaces = c.NetIfaces.Clone()
-	//x.Channels = c.Channels.Clone()
-
-	return Instance(&x)
-}
-
 func (c InstanceConf) IsIncoming() bool {
 	return c.confname == "incoming_config"
 }
@@ -133,7 +115,7 @@ func (c InstanceConf) SaveStartupConfig() error {
 }
 
 func (c InstanceConf) config() string {
-	return filepath.Join(VMCONFDIR, c.name, c.confname)
+	return filepath.Join(CONFDIR, c.name, c.confname)
 }
 
 func (c InstanceConf) Name() string {
@@ -145,7 +127,7 @@ func (c InstanceConf) Uid() int {
 }
 
 func (c InstanceConf) Status() (string, error) {
-	switch b, err := ioutil.ReadFile(filepath.Join(VMCONFDIR, c.name, "supervise/migration_stat")); {
+	switch b, err := ioutil.ReadFile(filepath.Join(CONFDIR, c.name, ".runtime/migration_stat")); {
 	case err == nil:
 		st := struct {
 			Status string
@@ -265,7 +247,7 @@ func (c *InstanceConf) SetTotalMem(s int) error {
 }
 
 func (c InstanceConf) GetDisks() Disks {
-	// TODO: Clone()
+	// Currently deep copy is not needed
 	dd := make(Disks, len(c.Disks))
 	copy(dd, c.Disks)
 	return dd
@@ -351,6 +333,7 @@ func (c InstanceConf) RemoveDiskBitmap(dpath string) error {
 }
 
 func (c InstanceConf) GetNetIfaces() NetIfaces {
+	// Currently deep copy is not needed
 	nn := make(NetIfaces, len(c.NetIfaces))
 	copy(nn, c.NetIfaces)
 	return nn
@@ -416,6 +399,7 @@ func (c *InstanceConf) SetNetIfaceLinkDown(ifname string) error {
 }
 
 func (c InstanceConf) GetChannels() Channels {
+	// Currently deep copy is not needed
 	cc := make(Channels, len(c.Channels))
 	copy(cc, c.Channels)
 	return cc

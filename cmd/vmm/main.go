@@ -19,7 +19,7 @@ var (
 func main() {
 	cli.AppHelpTemplate = AppHelpTemplate
 	app := cli.NewApp()
-	app.Name = "kvmhelper"
+	app.Name = "vmm"
 	app.Usage = "interface for management virtual machines"
 	app.Version = kvmrun.VERSION.String()
 	app.HideVersion = true
@@ -34,6 +34,10 @@ func main() {
 		cmdCreateConf,
 		cmdRemoveConf,
 		cmdInspect,
+		cmdStart,
+		cmdStop,
+		cmdRestart,
+		cmdReset,
 		cmdGetEvents,
 		cmdSetMemory,
 		cmdSetCPUs,
@@ -59,6 +63,7 @@ func main() {
 		cmdMigrateCancel,
 		cmdMigrateStatus,
 		cmdCopyConfig,
+		cmdGetServerTasks,
 		cmdPrintVersion,
 	}
 

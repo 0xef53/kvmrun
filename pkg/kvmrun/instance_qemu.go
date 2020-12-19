@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -65,9 +66,22 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 
 	switch err := r.initVersion(); {
 	case err == nil:
-	case qmp.IsSocketNotAvailable(err):
-		return nil, &NotRunningError{}
+	case qmp.IsSocketNotAvailable(err), qmp.IsSocketClosed(err):
+		return nil, &NotRunningError{vmname}
 	default:
+		switch err.(type) {
+		case *net.OpError:
+			err := err.(*net.OpError).Err
+			fmt.Printf("QWERTY 1 %#v (%T)\n", err, err)
+			switch err.(type) {
+			case *os.SyscallError:
+				fmt.Printf("QWERTY 2 %#v (%T)\n", err.(*os.SyscallError).Err, err.(*os.SyscallError).Err)
+				if errno, ok := err.(*os.SyscallError).Err.(syscall.Errno); ok {
+					fmt.Printf("QWERTY 3 %#v (%T)\n", errno, errno)
+				}
+			}
+		}
+
 		return nil, err
 	}
 
@@ -90,34 +104,25 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 
 	switch err := gr.Wait(); {
 	case err == nil:
-	case qmp.IsSocketNotAvailable(err):
+	case qmp.IsSocketNotAvailable(err), qmp.IsSocketClosed(err):
 		return nil, &NotRunningError{vmname}
 	default:
+		switch err.(type) {
+		case *net.OpError:
+			err := err.(*net.OpError).Err
+			fmt.Printf("QWERTY 11 %#v (%T)\n", err, err)
+			switch err.(type) {
+			case *os.SyscallError:
+				fmt.Printf("QWERTY 22 %#v (%T)\n", err.(*os.SyscallError).Err, err.(*os.SyscallError).Err)
+				if errno, ok := err.(*os.SyscallError).Err.(syscall.Errno); ok {
+					fmt.Printf("QWERTY 33 %#v (%T)\n", errno, errno)
+				}
+			}
+		}
 		return nil, err
 	}
 
 	return Instance(&r), nil
-}
-
-func (r InstanceQemu) Clone() Instance {
-	x := InstanceQemu{
-		name:       r.name,
-		Mem:        r.Mem,
-		CPU:        r.CPU,
-		Kernel:     r.Kernel,
-		Machine:    r.Machine,
-		uid:        r.uid,
-		pid:        r.pid,
-		cmdline:    r.cmdline,
-		mon:        r.mon,
-		startupCfg: r.startupCfg,
-	}
-
-	x.Disks = r.Disks.Clone()
-	x.NetIfaces = r.NetIfaces.Clone()
-	//x.Channels = r.Channels.Clone()
-
-	return Instance(&x)
 }
 
 func (r InstanceQemu) IsIncoming() bool {
@@ -137,10 +142,9 @@ func (r InstanceQemu) Uid() int {
 }
 
 func (r InstanceQemu) Status() (string, error) {
-	// TODO: use inmigrate status when disks are copying
-
 	var status string
 
+	// Incoming migration
 	var st qt.StatusInfo
 	if err := r.mon.Run(qmp.Command{"query-status", nil}, &st); err != nil {
 		return "", err
@@ -152,7 +156,7 @@ func (r InstanceQemu) Status() (string, error) {
 		status = st.Status
 	}
 
-	// Checking the current migration status
+	// Outgoing migration
 	migrSt := struct {
 		Status    string `json:"status"`
 		TotalTime uint64 `json:"total-time"`
@@ -166,6 +170,17 @@ func (r InstanceQemu) Status() (string, error) {
 	case "completed":
 		if migrSt.TotalTime != 0 {
 			status = "migrated"
+		}
+	}
+
+	// Return inmigrate also if there is at least one disk with an active migration job
+	jobs := make([]qt.BlockJobInfo, 0, len(r.Disks))
+	if err := r.mon.Run(qmp.Command{"query-block-jobs", nil}, &jobs); err != nil {
+		return "", err
+	}
+	for _, j := range jobs {
+		if strings.HasPrefix(j.Device, "migr_") {
+			status = "inmigrate"
 		}
 	}
 
@@ -564,7 +579,7 @@ func (r *InstanceQemu) initStorage() error {
 }
 
 func (r InstanceQemu) GetDisks() Disks {
-	// TODO: Clone ?
+	// Currently deep copy is not needed
 	dd := make(Disks, len(r.Disks))
 	copy(dd, r.Disks)
 	return dd
@@ -841,6 +856,7 @@ func (r *InstanceQemu) initNetwork() error {
 }
 
 func (r InstanceQemu) GetNetIfaces() NetIfaces {
+	// Currently deep copy is not needed
 	nn := make(NetIfaces, len(r.NetIfaces))
 	copy(nn, r.NetIfaces)
 	return nn
@@ -859,7 +875,7 @@ func (r *InstanceQemu) AppendNetIface(iface NetIface) error {
 		Type:       "tap",
 		ID:         iface.Ifname,
 		Ifname:     iface.Ifname,
-		Vhost:      "on",
+		Vhost:      true,
 		Script:     "no",
 		Downscript: "no",
 	}
@@ -1023,6 +1039,7 @@ func (r *InstanceQemu) initChannels() error {
 }
 
 func (r InstanceQemu) GetChannels() Channels {
+	// Currently deep copy is not needed
 	cc := make(Channels, len(r.Channels))
 	copy(cc, r.Channels)
 	return cc

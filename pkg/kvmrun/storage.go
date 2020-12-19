@@ -67,27 +67,50 @@ func (d Disk) IsAvailable() (bool, error) {
 	return d.Backend.IsAvailable()
 }
 
-type Disks []Disk
-
-// // Clone returns a duplicate of a Disks object (deep copy).
-func (dd Disks) Clone() Disks {
-	x := make(Disks, 0, len(dd))
-
-	for _, disk := range dd {
-		tmpDisk := disk
-
-		switch v := disk.Backend.(type) {
-		case BlkDisk, ISCSIDisk:
-			tmpDisk.Backend = v
-		default:
-			panic(fmt.Sprintf("unknown backend type: %T", v))
-		}
-
-		x = append(x, tmpDisk)
+func (d Disk) QemuCommandArgs() []string {
+	driveOpts := []string{
+		fmt.Sprintf("file=%s", d.Path),
+		fmt.Sprintf("id=%s", d.BaseName()),
+		"format=raw",
+		"if=none",
+		"aio=native",
+		"cache=none",
+		"detect-zeroes=on",
+		fmt.Sprintf("iops_rd=%d", d.IopsRd),
+		fmt.Sprintf("iops_wr=%d", d.IopsWr),
 	}
 
-	return x
+	deviceOpts := []string{
+		d.Driver,
+		fmt.Sprintf("drive=%s", d.BaseName()),
+		fmt.Sprintf("id=%s", d.QdevID()),
+	}
+
+	switch d.Driver {
+	case "virtio-blk-pci":
+		// PCI devices have the addr parameter
+		deviceOpts = append(deviceOpts, "bus=pci.0")
+		if d.Addr != "" {
+			deviceOpts = append(deviceOpts, fmt.Sprintf("addr=%s", d.Addr))
+		}
+	case "scsi-hd":
+		// SCSI devices have channel, scsi-id, and lun parameters
+		deviceOpts = append(deviceOpts, "channel=0,scsi-id=1")
+		bus, _, lun := ParseSCSIAddr(d.Addr)
+		deviceOpts = append(deviceOpts, fmt.Sprintf("bus=%s.0", bus))
+		if lun != "" {
+			deviceOpts = append(deviceOpts, fmt.Sprintf("lun=%s", lun))
+		}
+	}
+
+	if d.Bootindex > 0 {
+		deviceOpts = append(deviceOpts, fmt.Sprintf("bootindex=%d", d.Bootindex))
+	}
+
+	return []string{"-drive", strings.Join(driveOpts, ","), "-device", strings.Join(deviceOpts, ",")}
 }
+
+type Disks []Disk
 
 // Get returns a pointer to an element with Path == p.
 func (dd Disks) Get(p string) *Disk {
@@ -179,7 +202,7 @@ func NewDiskBackend(p string) (DiskBackend, error) {
 		}
 		return *b, nil
 	}
-	return nil, fmt.Errorf("Unable to determine the type of %s", p)
+	return nil, &UnknownDiskBackendError{p: p}
 }
 
 type BlkDisk struct {
@@ -333,4 +356,19 @@ func (d NBDDisk) IsLocal() bool {
 
 func (d NBDDisk) IsAvailable() (bool, error) {
 	return true, nil
+}
+
+type UnknownDiskBackendError struct {
+	p string
+}
+
+func (e *UnknownDiskBackendError) Error() string {
+	return fmt.Sprintf("could not determine backend type for disk:", e.p)
+}
+
+func IsUnknownDiskBackendError(err error) bool {
+	if _, ok := err.(*UnknownDiskBackendError); ok {
+		return true
+	}
+	return false
 }

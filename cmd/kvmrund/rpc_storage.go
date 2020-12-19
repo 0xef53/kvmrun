@@ -11,7 +11,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) AttachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) AttachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -70,15 +70,32 @@ func (x *RPC) AttachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 	return args.VM.C.Save()
 }
 
-func (x *RPC) DetachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) DetachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
 		return err
 	}
 
-	// TODO: we should check if there is an active job with this disk
+	// Check if there is an active job with this disk
+	var diskname string
 
+	switch be, err := kvmrun.NewDiskBackend(data.Path); err.(type) {
+	case nil:
+		diskname = be.BaseName()
+	case *kvmrun.UnknownDiskBackendError:
+		// Try args.DiskName as a short disk name
+		diskname = data.Path
+	default:
+		return err
+	}
+
+	taskID := "disk-copying:" + diskname + "@" + args.Name
+	if h.tasks.InProgress(taskID) {
+		return fmt.Errorf("found an active task for %s", diskname)
+	}
+
+	// Remove
 	if args.Live {
 		if err := args.VM.R.RemoveDisk(data.Path); err != nil && !kvmrun.IsNotConnectedError(err) {
 			return err
@@ -91,7 +108,7 @@ func (x *RPC) DetachDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 	return args.VM.C.Save()
 }
 
-func (x *RPC) SetDiskIops(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetDiskIops(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -133,7 +150,7 @@ func (x *RPC) SetDiskIops(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return nil
 }
 
-func (x *RPC) ResizeDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) ResizeDisk(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -147,7 +164,7 @@ func (x *RPC) ResizeDisk(r *http.Request, args *rpccommon.InstanceRequest, resp 
 	return nil
 }
 
-func (x *RPC) RemoveDiskBitmap(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) RemoveDiskBitmap(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.DiskParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -161,7 +178,7 @@ func (x *RPC) RemoveDiskBitmap(r *http.Request, args *rpccommon.InstanceRequest,
 	return nil
 }
 
-func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	// This operation is relevant only when
 	// the virtual machine is running
 	if args.VM.R == nil {
@@ -215,12 +232,7 @@ func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceR
 		}
 	}
 
-	t, err := TPool.Get(srcDisk.Path)
-	if err != nil {
-		return err
-	}
-
-	opts := DiskJobOpts{
+	opts := DiskCopyingTaskOpts{
 		SrcDisk:     srcDisk,
 		DstDisk:     dstDisk,
 		SrcSize:     srcSize,
@@ -230,40 +242,54 @@ func (x *RPC) StartDiskCopyingProcess(r *http.Request, args *rpccommon.InstanceR
 		ClearBitmap: data.ClearBitmap,
 	}
 
-	return t.StartCopyingProcess(&opts)
+	return h.tasks.StartDiskCopying(&opts)
 }
 
-func (x *RPC) CancelDiskJobProcess(r *http.Request, args *rpccommon.DiskJobIDRequest, resp *struct{}) error {
-	t, err := TPool.Get(args.JobID)
-	if err != nil {
+func (h *rpcHandler) CancelDiskJobProcess(r *http.Request, args *rpccommon.DiskJobRequest, resp *struct{}) error {
+	var diskname string
+
+	switch be, err := kvmrun.NewDiskBackend(args.DiskName); err.(type) {
+	case nil:
+		diskname = be.BaseName()
+	case *kvmrun.UnknownDiskBackendError:
+		// Try args.DiskName as a short disk name
+		diskname = args.DiskName
+	default:
 		return err
 	}
 
-	return t.Cancel()
+	taskID := "disk-copying:" + diskname + "@" + args.VMName
+
+	h.tasks.Cancel(taskID)
+
+	return nil
 }
 
-func (x *RPC) GetDiskJobStat(r *http.Request, args *rpccommon.DiskJobIDRequest, resp *rpccommon.DiskJobStat) error {
-	if !TPool.Exists(args.JobID) {
-		resp.Status = "none"
-		resp.QemuJob = new(rpccommon.StatInfo)
-		return nil
-	}
+func (h *rpcHandler) GetDiskJobStat(r *http.Request, args *rpccommon.DiskJobRequest, resp *rpccommon.DiskCopyingTaskStat) error {
+	var diskname string
 
-	t, err := TPool.Get(args.JobID)
-	if err != nil {
+	switch be, err := kvmrun.NewDiskBackend(args.DiskName); err.(type) {
+	case nil:
+		diskname = be.BaseName()
+	case *kvmrun.UnknownDiskBackendError:
+		// Try args.DiskName as a short disk name
+		diskname = args.DiskName
+	default:
 		return err
 	}
 
-	(*resp) = *(t.Stat())
+	taskID := "disk-copying:" + diskname + "@" + args.VMName
 
-	if lastErr := t.Err(); lastErr != nil {
+	(*resp) = *(h.tasks.DiskCopyingStat(taskID))
+
+	if lastErr := h.tasks.Err(taskID); lastErr != nil {
 		resp.Desc = lastErr.Error()
 	}
 
 	return nil
 }
 
-func (x *RPC) CheckDisks(r *http.Request, args *rpccommon.CheckDisksRequest, resp *struct{}) error {
+func (h *rpcHandler) CheckDisks(r *http.Request, args *rpccommon.CheckDisksRequest, resp *struct{}) error {
 	for devpath := range args.Disks {
 		disk, err := kvmrun.NewDisk(devpath)
 		if err != nil {
@@ -286,7 +312,7 @@ func (x *RPC) CheckDisks(r *http.Request, args *rpccommon.CheckDisksRequest, res
 	return nil
 }
 
-func (x *RPC) PrepareDisks(r *http.Request, args *rpccommon.CreateDisksRequest, resp *struct{}) error {
+func (h *rpcHandler) PrepareDisks(r *http.Request, args *rpccommon.CreateDisksRequest, resp *struct{}) error {
 	// TODO: This is a dirty hack for lvm drives. Should be rewritten
 	for devpath := range args.Disks {
 		vgname := strings.Split(devpath, "/")[2]
@@ -299,6 +325,6 @@ func (x *RPC) PrepareDisks(r *http.Request, args *rpccommon.CreateDisksRequest, 
 	return nil
 }
 
-func (x *RPC) PrepareDstDisks(r *http.Request, args *rpccommon.CreateDisksRequest, resp *struct{}) error {
-	return RPCClient.Request(args.DstServer, "RPC.PrepareDisks", args, nil)
+func (h *rpcHandler) PrepareDstDisks(r *http.Request, args *rpccommon.CreateDisksRequest, resp *struct{}) error {
+	return h.rpcClient.Request(args.DstServer, "RPC.PrepareDisks", args, nil)
 }

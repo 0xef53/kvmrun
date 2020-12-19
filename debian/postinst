@@ -24,6 +24,8 @@ case "$1" in
             /usr/lib/kvmrun/gencert
         fi
 
+        ln -fs '/usr/sbin/vmm' '/usr/sbin/kvmhelper'
+
         invoke-rc.d rsyslog restart
     ;;
 

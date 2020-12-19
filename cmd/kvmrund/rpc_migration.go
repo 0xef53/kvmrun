@@ -2,59 +2,21 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/0xef53/kvmrun/pkg/kvmrun"
 	"github.com/0xef53/kvmrun/pkg/pwd"
 	"github.com/0xef53/kvmrun/pkg/qemu"
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
-	"github.com/0xef53/kvmrun/pkg/runsv"
 )
 
-// IncomingVM is an auxiliary structure to correctly converting
-// incoming JSON to kvmrun.VirtMachine.
-type IncomingVM struct {
-	kvmrun.VirtMachine
-}
-
-func (vm *IncomingVM) UnmarshalJSON(data []byte) error {
-	tmp := struct {
-		Name string          `json:"name"`
-		R    json.RawMessage `json:"run"`
-		C    json.RawMessage `json:"conf"`
-	}{}
-
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	vmc := kvmrun.NewInstanceConf(tmp.Name)
-	vmr := kvmrun.NewIncomingConf(tmp.Name)
-
-	if err := json.Unmarshal(tmp.C, &vmc); err != nil {
-		return err
-	}
-
-	if len(tmp.R) != 0 {
-		if err := json.Unmarshal(tmp.R, &vmr); err != nil {
-			return err
-		}
-	} else {
-		vmr = nil
-	}
-
-	vm.Name = tmp.Name
-	vm.C = vmc
-	vm.R = vmr
-
-	return nil
-}
-
-func (x *RPC) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.MigrationParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -82,15 +44,17 @@ func (x *RPC) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp 
 		Manifest: manifest,
 	}
 
+	/* TO_REMOVE
 	// Run file
-	if l, err := os.Readlink(filepath.Join(kvmrun.VMCONFDIR, args.Name, "run")); err == nil {
+	if l, err := os.Readlink(filepath.Join(kvmrun.CONFDIR, args.Name, "run")); err == nil {
 		req.Launcher = l
 	}
 
 	// Finish file
-	if l, err := os.Readlink(filepath.Join(kvmrun.VMCONFDIR, args.Name, "finish")); err == nil {
+	if l, err := os.Readlink(filepath.Join(kvmrun.CONFDIR, args.Name, "finish")); err == nil {
 		req.Finisher = l
 	}
+	*/
 
 	// Some extra files that may contain additional
 	// configuration such as network settings.
@@ -100,17 +64,18 @@ func (x *RPC) CopyConfig(r *http.Request, args *rpccommon.InstanceRequest, resp 
 		return err
 	}
 
-	return RPCClient.Request(data.DstServer, "RPC.CreateConfInstanceFromManifest", &req, nil)
+	return h.rpcClient.Request(data.DstServer, "RPC.CreateConfInstanceFromManifest", &req, nil)
 }
 
-func (x *RPC) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.MigrationParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
 		return err
 	}
 
-	opts := MigrationOpts{
+	opts := MigrationTaskOpts{
+		VMName:    args.Name,
 		DstServer: data.DstServer,
 	}
 
@@ -124,7 +89,15 @@ func (x *RPC) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceReq
 		return &rpccommon.MigrationError{&kvmrun.NotRunningError{args.Name}}
 	}
 
-	// TODO: check if a virt.machine exists on the dst server
+	// Check if a virt.machine exists on the dst server
+	var found bool
+
+	if err := h.rpcClient.Request(opts.DstServer, "RPC.IsConfExist", &rpccommon.VMNameRequest{Name: args.Name}, &found); err != nil {
+		return err
+	}
+	if found {
+		return fmt.Errorf("Already exists on the destination server: %s", args.Name)
+	}
 
 	attachedDisks := args.VM.R.(*kvmrun.InstanceQemu).Disks
 
@@ -166,63 +139,42 @@ func (x *RPC) StartMigrationProcess(r *http.Request, args *rpccommon.InstanceReq
 		return err
 	}
 
-	m, err := MPool.Get(args.Name)
-	if err != nil {
-		return err
-	}
-
-	return m.Start(&opts)
+	return h.tasks.StartMigration(&opts)
 }
 
-func (x *RPC) CancelMigrationProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
-	m, err := MPool.Get(args.Name)
-	if err != nil {
-		return err
-	}
-
-	return m.Cancel()
+func (h *rpcHandler) CancelMigrationProcess(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+	h.tasks.Cancel("migration:" + args.Name)
+	return nil
 }
 
-func (x *RPC) StartIncomingInstance(r *http.Request, args *rpccommon.NewManifestInstanceRequest, port *int) error {
+func (h *rpcHandler) StartIncomingInstance(r *http.Request, args *rpccommon.NewManifestInstanceRequest, port *int) error {
 	var vm IncomingVM
 
 	if err := json.Unmarshal(args.Manifest, &vm); err != nil {
 		return err
 	}
 
-	if err := kvmrun.CreateService(vm.Name); err != nil {
-		return err
+	vmdir := filepath.Join(kvmrun.CONFDIR, vm.Name)
+	vmlogdir := filepath.Join(kvmrun.LOGDIR, vm.Name)
+
+	if _, err := os.Stat(filepath.Join(vmdir, "config")); err == nil {
+		return fmt.Errorf("Already exists: %s", vmdir)
 	}
+
+	for _, d := range []string{vmdir, vmlogdir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return err
+		}
+	}
+
 	if err := vm.C.Save(); err != nil {
 		return err
-	}
-
-	// Run file
-	if len(args.Launcher) > 0 && args.Launcher != "/usr/lib/kvmrun/launcher" {
-		launcher := filepath.Join(kvmrun.VMCONFDIR, vm.Name, "run")
-		if err := os.Remove(launcher); err != nil {
-			return err
-		}
-		if err := os.Symlink(args.Launcher, launcher); err != nil {
-			return err
-		}
-	}
-
-	// Finish file
-	if len(args.Finisher) > 0 && args.Finisher != "/usr/lib/kvmrun/finisher" {
-		finisher := filepath.Join(kvmrun.VMCONFDIR, vm.Name, "finish")
-		if err := os.Remove(finisher); err != nil {
-			return err
-		}
-		if err := os.Symlink(args.Finisher, finisher); err != nil {
-			return err
-		}
 	}
 
 	// Extra files
 	if args.ExtraFiles != nil {
 		for fname, content := range args.ExtraFiles {
-			if err := ioutil.WriteFile(filepath.Join(kvmrun.VMCONFDIR, vm.Name, fname), content, 0644); err != nil {
+			if err := ioutil.WriteFile(filepath.Join(kvmrun.CONFDIR, vm.Name, fname), content, 0644); err != nil {
 				return err
 			}
 		}
@@ -246,19 +198,17 @@ func (x *RPC) StartIncomingInstance(r *http.Request, args *rpccommon.NewManifest
 	if err := vm.R.Save(); err != nil {
 		return err
 	}
-	// Run
-	if err := runsv.EnableWaitPid(vm.Name, true, 10); err != nil {
-		return err
-	}
-	if err := runsv.CheckState(vm.Name, 10); err != nil {
+
+	// Enable, start and test
+	if err := h.sctl.Enable(vm.Name); err != nil {
 		return err
 	}
 
-	return nil
+	return h.sctl.StartAndTest(vm.Name, 10*time.Second, nil)
 }
 
-func (x *RPC) GetMigrationStat(r *http.Request, args *rpccommon.VMNameRequest, resp *rpccommon.MigrationStat) error {
-	switch b, err := ioutil.ReadFile(filepath.Join(kvmrun.VMCONFDIR, args.Name, "supervise/migration_stat")); {
+func (h *rpcHandler) GetMigrationStat(r *http.Request, args *rpccommon.VMNameRequest, resp *rpccommon.MigrationTaskStat) error {
+	switch b, err := ioutil.ReadFile(filepath.Join(kvmrun.CONFDIR, args.Name, ".runtime/migration_stat")); {
 	case err == nil:
 		return json.Unmarshal(b, resp)
 	case os.IsNotExist(err):
@@ -266,23 +216,52 @@ func (x *RPC) GetMigrationStat(r *http.Request, args *rpccommon.VMNameRequest, r
 		return err
 	}
 
-	if !MPool.Exists(args.Name) {
-		resp.Status = "none"
-		resp.Qemu = new(rpccommon.StatInfo)
-		resp.Disks = make(map[string]*rpccommon.StatInfo)
-		return nil
+	taskID := "migration:" + args.Name
+
+	(*resp) = *(h.tasks.MigrationStat(taskID))
+
+	if lastErr := h.tasks.Err(taskID); lastErr != nil {
+		resp.Desc = lastErr.Error()
 	}
 
-	m, err := MPool.Get(args.Name)
+	return nil
+}
+
+// IncomingVM is an auxiliary structure to correctly converting
+// incoming JSON to kvmrun.VirtMachine.
+type IncomingVM struct {
+	kvmrun.VirtMachine
+}
+
+func (vm *IncomingVM) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Name string          `json:"name"`
+		R    json.RawMessage `json:"run"`
+		C    json.RawMessage `json:"conf"`
+	}{}
+
+	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
+	vmc := kvmrun.NewInstanceConf(tmp.Name)
+	vmr := kvmrun.NewIncomingConf(tmp.Name)
 
-	(*resp) = *(m.Stat())
-
-	if lastErr := m.Err(); lastErr != nil {
-		resp.Desc = lastErr.Error()
+	if err := json.Unmarshal(tmp.C, &vmc); err != nil {
+		return err
 	}
+
+	if len(tmp.R) != 0 {
+		if err := json.Unmarshal(tmp.R, &vmr); err != nil {
+			return err
+		}
+	} else {
+		vmr = nil
+	}
+
+	vm.Name = tmp.Name
+	vm.C = vmc
+	vm.R = vmr
 
 	return nil
 }

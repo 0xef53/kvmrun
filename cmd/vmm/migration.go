@@ -227,7 +227,7 @@ func migrateStatus(vmname string, live bool, c *cli.Context, client *rpcclient.U
 		Name: vmname,
 	}
 
-	st := rpccommon.MigrationStat{}
+	st := rpccommon.MigrationTaskStat{}
 
 	if err := client.Request("RPC.GetMigrationStat", &req, &st); err != nil {
 		return append(errors, err)
@@ -305,7 +305,7 @@ func migrateStatus(vmname string, live bool, c *cli.Context, client *rpcclient.U
 	// Watch the progress ...
 loop:
 	for {
-		st := rpccommon.MigrationStat{}
+		st := rpccommon.MigrationTaskStat{}
 
 		if err := client.Request("RPC.GetMigrationStat", &req, &st); err != nil {
 			return append(errors, err)

@@ -8,7 +8,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) AttachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) AttachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.NetifParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -44,7 +44,7 @@ func (x *RPC) AttachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return args.VM.C.Save()
 }
 
-func (x *RPC) DetachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) DetachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.NetifParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -64,7 +64,7 @@ func (x *RPC) DetachNetif(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return args.VM.C.Save()
 }
 
-func (x *RPC) UpdateNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) UpdateNetif(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.NetifParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -95,7 +95,7 @@ func (x *RPC) UpdateNetif(r *http.Request, args *rpccommon.InstanceRequest, resp
 	return nil
 }
 
-func (x *RPC) SetNetifLinkUp(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetNetifLinkUp(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.NetifParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -105,7 +105,7 @@ func (x *RPC) SetNetifLinkUp(r *http.Request, args *rpccommon.InstanceRequest, r
 	return args.VM.R.SetNetIfaceLinkUp(data.Ifname)
 }
 
-func (x *RPC) SetNetifLinkDown(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetNetifLinkDown(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.NetifParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {

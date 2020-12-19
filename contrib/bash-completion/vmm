@@ -65,7 +65,7 @@ _check_subcmd() {
     fi
 }
 
-_kvmhelper() {
+_vmm() {
     local cur prev opts
 
     COMPREPLY=()
@@ -74,7 +74,7 @@ _kvmhelper() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     wantfiles='@(--launcher|--pre-start-hook|--ifup-script|--ifdown-script)'
-    wantvms=$(_fmt "${_kvmhelper_opts_1[*]}")
+    wantvms=$(_fmt "${_vmm_opts_1[*]}")
     wantstring='@(--mem|--cpu|--cpu-quota|--total|-p|--driver|--iops-rd|--iops-rd|--hwaddr|--vgname)'
 	wantimages='@(--image|--initrd)'
 	wantmodules='@(--modiso)'
@@ -126,4 +126,5 @@ _kvmhelper() {
     return 0
 }
 
-complete -F _kvmhelper kvmhelper
+complete -F _vmm vmm
+complete -F _vmm kvmhelper

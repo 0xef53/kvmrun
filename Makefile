@@ -19,9 +19,8 @@ PKG_MOUNTS := \
     -v $(CWD)/packages:/root/source/packages \
     -v $(CWD)/scripts/build-deb.sh:/usr/local/bin/build-deb.sh
 
-binaries = bin/kvmhelper bin/kvmrund bin/launcher \
-           bin/netinit bin/finisher bin/control \
-           bin/gencert
+binaries = bin/vmm bin/kvmrund bin/launcher \
+           bin/netinit bin/gencert
 
 
 .PHONY: all build deb-package clean
@@ -45,15 +44,15 @@ build: $(binaries)
 install: $(binaries)
 	install -d $(DESTDIR)/usr/sbin $(DESTDIR)/usr/lib/kvmrun $(DESTDIR)/etc/kvmrun
 	cp -t $(DESTDIR)/usr/lib/kvmrun $(binaries) contrib/svlog/svlog_run
-	mv -t $(DESTDIR)/usr/sbin $(DESTDIR)/usr/lib/kvmrun/kvmhelper
+	mv -t $(DESTDIR)/usr/sbin $(DESTDIR)/usr/lib/kvmrun/vmm
 	cp -t $(DESTDIR)/etc/kvmrun contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
-	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service
+	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service
 	install -d $(DESTDIR)/etc/rsyslog.d
 	cp -t $(DESTDIR)/etc/rsyslog.d contrib/rsyslog/kvmrun.conf
 	install -d $(DESTDIR)/usr/share/kvmrun/tls
 	install -d $(DESTDIR)/etc/bash_completion.d
-	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/kvmhelper
+	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/vmm
 	install -d $(DESTDIR)/usr/share/kvmrun
 	cp -t $(DESTDIR)/usr/share/kvmrun scripts/mk-debian-image
 	@echo

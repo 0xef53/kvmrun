@@ -12,7 +12,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) StartNBDServer(r *http.Request, args *rpccommon.InstanceRequest, port *int) error {
+func (h *rpcHandler) StartNBDServer(r *http.Request, args *rpccommon.InstanceRequest, port *int) error {
 	var data *rpccommon.NBDParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -33,7 +33,7 @@ func (x *RPC) StartNBDServer(r *http.Request, args *rpccommon.InstanceRequest, p
 		},
 	}
 
-	if err := QPool.Run(args.Name, qmp.Command{"nbd-server-start", &opts}, nil); err != nil {
+	if err := h.mon.Run(args.Name, qmp.Command{"nbd-server-start", &opts}, nil); err != nil {
 		return err
 	}
 
@@ -49,7 +49,7 @@ func (x *RPC) StartNBDServer(r *http.Request, args *rpccommon.InstanceRequest, p
 			Device:   d.BaseName(),
 			Writable: true,
 		}
-		if err := QPool.Run(args.Name, qmp.Command{"nbd-server-add", &opts}, nil); err != nil {
+		if err := h.mon.Run(args.Name, qmp.Command{"nbd-server-add", &opts}, nil); err != nil {
 			return err
 		}
 	}
@@ -57,6 +57,6 @@ func (x *RPC) StartNBDServer(r *http.Request, args *rpccommon.InstanceRequest, p
 	return nil
 }
 
-func (x *RPC) StopNBDServer(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
-	return QPool.Run(args.Name, qmp.Command{"nbd-server-stop", nil}, nil)
+func (h *rpcHandler) StopNBDServer(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+	return h.mon.Run(args.Name, qmp.Command{"nbd-server-stop", nil}, nil)
 }

@@ -1,14 +1,12 @@
 package kvmrun
 
 import (
-	qmp "github.com/0xef53/go-qmp/v2"
+	"fmt"
 
-	"github.com/0xef53/kvmrun/pkg/runsv"
+	qmp "github.com/0xef53/go-qmp/v2"
 )
 
 type Instance interface {
-	Clone() Instance
-
 	Name() string
 	Status() (string, error)
 
@@ -68,15 +66,16 @@ type Instance interface {
 }
 
 type VirtMachine struct {
-	Name        string   `json:"name"`
-	C           Instance `json:"conf"`
-	R           Instance `json:"run,omitempty"`
-	isInmigrate bool     `json:"-"`
+	Name string   `json:"name"`
+	C    Instance `json:"conf"`
+	R    Instance `json:"run,omitempty"`
+	//-isInmigrate bool     `json:"-"`
 }
 
 func GetVirtMachine(vmname string, mon *qmp.Monitor) (*VirtMachine, error) {
 	vmc, err := GetInstanceConf(vmname)
 	if err != nil {
+		fmt.Printf("GetVirtMachine error 1: %#v (%T)", err, err)
 		return nil, err
 	}
 
@@ -85,6 +84,7 @@ func GetVirtMachine(vmname string, mon *qmp.Monitor) (*VirtMachine, error) {
 	case nil:
 	case *NotRunningError:
 	default:
+		fmt.Printf("GetVirtMachine error 2: %#v (%T)", err, err)
 		return nil, err
 	}
 
@@ -97,41 +97,33 @@ func GetVirtMachine(vmname string, mon *qmp.Monitor) (*VirtMachine, error) {
 	return &vm, nil
 }
 
-func (vm VirtMachine) Clone() *VirtMachine {
-	x := VirtMachine{
-		Name: vm.Name,
-		C:    vm.C.Clone(),
-		R:    vm.R.Clone(),
-	}
-
-	return &x
-}
-
-func (vm *VirtMachine) Status() (string, error) {
-	vmi := vm.C
-	if vm.R != nil {
-		vmi = vm.R
-	}
-
-	// Trying to get the special status of instance.
-	// Exiting on success.
-	if st, err := vmi.Status(); err == nil {
-		switch st {
-		case "incoming", "inmigrate", "migrated":
-			return st, nil
-		}
-	} else {
-		return "", err
-	}
-
-	// And finally looking at the status of a service
-	if !runsv.IsEnabled(vm.Name) {
-		return "inactive", nil
-	}
-	serviceState, err := runsv.GetWantState(vm.Name)
-	if err != nil {
-		return "", err
-	}
-
-	return serviceState, nil
-}
+/*
+//func (vm *VirtMachine) Status(dbus *dbus.Conn) (string, error) {
+//	vmi := vm.C
+//	if vm.R != nil {
+//		vmi = vm.R
+//	}
+//
+//	// Trying to get the special status of instance.
+//	// Exiting on success.
+//	if st, err := vmi.Status(); err == nil {
+//		switch st {
+//		case "incoming", "inmigrate", "migrated":
+//			return st, nil
+//		}
+//	} else {
+//		return "", err
+//	}
+//
+//	// And finally looking at the status of a service
+//	if !runsv.IsEnabled(vm.Name) {
+//		return "inactive", nil
+//	}
+//	serviceState, err := runsv.GetWantState(vm.Name)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	return serviceState, nil
+//}
+*/

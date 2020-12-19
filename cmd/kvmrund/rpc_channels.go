@@ -9,7 +9,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) AttachChannel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) AttachChannel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.ChannelParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {
@@ -38,7 +38,7 @@ func (x *RPC) AttachChannel(r *http.Request, args *rpccommon.InstanceRequest, re
 	return args.VM.C.Save()
 }
 
-func (x *RPC) DetachChannel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) DetachChannel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.ChannelParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {

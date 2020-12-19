@@ -36,7 +36,6 @@ func createConf(vmname string, live bool, c *cli.Context, client *rpcclient.Unix
 
 	req := rpccommon.NewInstanceRequest{
 		Name:      vmname,
-		Launcher:  c.String("launcher"),
 		MemTotal:  int(mem.Max),
 		MemActual: int(mem.Min),
 		CPUTotal:  int(cpu.Max),
@@ -92,6 +91,101 @@ func inspect(vmname string, live bool, c *cli.Context, client *rpcclient.UnixCli
 		return append(errors, err)
 	}
 	fmt.Printf("%s\n", resp)
+
+	if err := client.Request("RPC.PrintTasksStat", nil, nil); err != nil {
+		return append(errors, err)
+	}
+
+	return errors
+}
+
+var cmdStart = cli.Command{
+	Name:      "start",
+	Usage:     "start a virtual machine process",
+	ArgsUsage: "VMNAME",
+	Action: func(c *cli.Context) {
+		os.Exit(executeRPC(c, startVM))
+	},
+}
+
+func startVM(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
+	req := rpccommon.InstanceRequest{
+		Name: vmname,
+	}
+
+	if err := client.Request("RPC.StartSystemdUnit", &req, nil); err != nil {
+		return append(errors, err)
+	}
+
+	return errors
+}
+
+var cmdStop = cli.Command{
+	Name:      "stop",
+	Usage:     "stop a running virtual machine",
+	ArgsUsage: "VMNAME",
+	Flags: []cli.Flag{
+		cli.BoolFlag{Name: "wait,w", Usage: "block until the operation completes"},
+	},
+
+	Action: func(c *cli.Context) {
+		os.Exit(executeRPC(c, stopVM))
+	},
+}
+
+func stopVM(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
+	req := rpccommon.VMShutdownRequest{
+		Name: vmname,
+		Wait: c.Bool("wait"),
+	}
+
+	if err := client.Request("RPC.StopSystemdUnit", &req, nil); err != nil {
+		return append(errors, err)
+	}
+
+	return errors
+}
+
+var cmdReset = cli.Command{
+	Name:      "reset",
+	Usage:     "reset a running virtual machine",
+	ArgsUsage: "VMNAME",
+	Action: func(c *cli.Context) {
+		os.Exit(executeRPC(c, resetVM))
+	},
+}
+
+func resetVM(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
+	req := rpccommon.VMShutdownRequest{
+		Name: vmname,
+		Wait: true,
+	}
+
+	if err := client.Request("RPC.ResetSystemdUnit", &req, nil); err != nil {
+		return append(errors, err)
+	}
+
+	return errors
+}
+
+var cmdRestart = cli.Command{
+	Name:      "restart",
+	Usage:     "restart a running virtual machine",
+	ArgsUsage: "VMNAME",
+	Action: func(c *cli.Context) {
+		os.Exit(executeRPC(c, restartVM))
+	},
+}
+
+func restartVM(vmname string, live bool, c *cli.Context, client *rpcclient.UnixClient) (errors []error) {
+	req := rpccommon.VMShutdownRequest{
+		Name: vmname,
+		Wait: true,
+	}
+
+	if err := client.Request("RPC.RestartSystemdUnit", &req, nil); err != nil {
+		return append(errors, err)
+	}
 
 	return errors
 }
@@ -252,6 +346,8 @@ func printBriefLine(s *rpccommon.VMSummary) {
 			lifetime = fmt.Sprintf("%s", formatTime(s.LifeTime))
 		}
 		state = s.State
+	} else {
+		fmt.Printf("%#v\n", s)
 	}
 
 	fmt.Printf(

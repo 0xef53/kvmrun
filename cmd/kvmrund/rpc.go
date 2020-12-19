@@ -4,16 +4,77 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 
+	"github.com/0xef53/kvmrun/pkg/appconf"
 	"github.com/0xef53/kvmrun/pkg/kvmrun"
+	rpcclient "github.com/0xef53/kvmrun/pkg/rpc/client"
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
+	"github.com/0xef53/kvmrun/pkg/systemd"
 
 	qmp "github.com/0xef53/go-qmp/v2"
-
 	rpc "github.com/gorilla/rpc/v2"
 )
 
-func requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
+type rpcHandler struct {
+	appConf   *appconf.KvmrunConfig
+	rpcClient *rpcclient.TlsClient
+
+	sctl *systemd.Manager
+
+	mon   *QMPPool
+	tasks *TaskPool
+}
+
+// ReleaseResources cleans all resources allocated for the virtual machine.
+// All background tasks will try to be gracefully interrupted.
+// This function should be called before the QEMU process begins to stop.
+func (h *rpcHandler) ReleaseResources(r *http.Request, args *rpccommon.VMNameRequest, resp *struct{}) error {
+	h.tasks.CancelAll(args.Name)
+	h.mon.CloseMonitor(args.Name)
+	return nil
+}
+
+func (h *rpcHandler) GetTasks(r *http.Request, args *struct{}, resp *map[string]bool) error {
+	(*resp) = h.tasks.Stat()
+	return nil
+}
+
+func (h *rpcHandler) getVMStatus(vm *kvmrun.VirtMachine) (string, error) {
+	vmi := vm.C
+	if vm.R != nil {
+		vmi = vm.R
+	}
+
+	// Trying to get the special status of instance.
+	// Exiting on success.
+	if st, err := vmi.Status(); err == nil {
+		switch st {
+		case "incoming", "inmigrate", "migrated", "paused":
+			return st, nil
+		}
+	} else {
+		return "", err
+	}
+
+	unit, err := h.sctl.GetUnit(vm.Name)
+	if err != nil {
+		return "", fmt.Errorf("systemd dbus request failed: %s", err)
+	}
+
+	switch unit.ActiveState {
+	case "active":
+		return unit.SubState, nil
+	case "deactivating":
+		return "shutdown", nil
+	case "failed":
+		return "crashed", nil
+	}
+
+	return unit.ActiveState, nil
+}
+
+func (h *rpcHandler) requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
 	getvm := func(vmname string, mon *qmp.Monitor) (*kvmrun.VirtMachine, error) {
 		vm, err := kvmrun.GetVirtMachine(vmname, mon)
 		switch err.(type) {
@@ -34,7 +95,7 @@ func requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
 	case *rpccommon.InstanceRequest:
 		vmname := v.(*rpccommon.InstanceRequest).Name
 
-		mon, ok := QPool.Get(vmname)
+		mon, ok := h.mon.Get(vmname)
 		if !ok {
 			// This means that virt.machine is not running.
 			// So turning off the "Live" flag.
@@ -48,7 +109,7 @@ func requestPreHandler(info *rpc.RequestInfo, v interface{}) error {
 		}
 
 		// Restrictions for moving virt.machines
-		if st, err := vm.Status(); err == nil {
+		if st, err := h.getVMStatus(vm); err == nil {
 			switch st {
 			case "inmigrate", "migrated":
 				switch info.Method {

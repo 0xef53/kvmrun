@@ -10,8 +10,7 @@ const (
 	WEBSOCKSPORT = 10700
 	NBDPORT      = 60000
 
-	VMCONFDIR = "/etc/kvmrun"
-	SVDATADIR = "/var/lib/supervise"
+	CONFDIR = "/etc/kvmrun"
 
 	VMNETINIT = "/usr/lib/kvmrun/netinit"
 
@@ -19,7 +18,7 @@ const (
 	CHROOTDIR  = "/var/lib/kvmrun/chroot"
 	KERNELSDIR = "/var/lib/kvmrun/kernels"
 	MODULESDIR = "/var/lib/kvmrun/modules"
-	LOGSDIR    = "/var/log/kvmrun"
+	LOGDIR     = "/var/log/kvmrun"
 )
 
 var (
@@ -92,6 +91,13 @@ type NotRunningError struct {
 
 func (e *NotRunningError) Error() string {
 	return "Not running: " + e.VMName
+}
+
+func IsNotRunningError(err error) bool {
+	if _, ok := err.(*NotRunningError); ok {
+		return true
+	}
+	return false
 }
 
 type NotFoundError struct {

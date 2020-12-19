@@ -7,7 +7,7 @@ import (
 	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
 )
 
-func (x *RPC) SetExternalKernel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
+func (h *rpcHandler) SetExternalKernel(r *http.Request, args *rpccommon.InstanceRequest, resp *struct{}) error {
 	var data *rpccommon.KernelParams
 
 	if err := json.Unmarshal(args.DataRaw, &data); err != nil {

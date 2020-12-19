@@ -85,8 +85,8 @@ The following steps illustrate how to run a virtual machine with a Debian as a g
 4. Create your first virtual machine:
 
     ```shell
-    $ kvmhelper create-conf --mem 2048 --cpu 2-4 alice
-    $ kvmhelper attach-disk alice /dev/loop0
+    $ vmm create-conf --mem 2048 --cpu 2-4 alice
+    $ vmm attach-disk alice /dev/loop0
     ```
 5. Run it:
 
@@ -97,7 +97,7 @@ The following steps illustrate how to run a virtual machine with a Debian as a g
 A list of all configured virtual machines can be seen as follows:
 
 ```shell
-$ kvmhelper list 
+$ vmm list
 Name                 PID      Mem(MiB)     CPUs     %CPU       State         Time
 alice              32531     2048/2048      2/4      ---         run          34s
 ```
@@ -105,7 +105,7 @@ alice              32531     2048/2048      2/4      ---         run          34
 Then you can activate the VNC to communicate with running virtual machine:
 
 ```shell
-$ kvmhelper set-vncpass alice 
+$ vmm set-vncpass alice 
 Password: ecb8cffac56426bf57a70cb9abbbbd16
 Display/Port: 1025/6925
 Websocket port: 11725

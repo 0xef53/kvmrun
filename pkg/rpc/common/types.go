@@ -16,16 +16,12 @@ type NewInstanceRequest struct {
 	CPUActual  int
 	CPUModel   string
 	CPUQuota   int
-	Launcher   string
-	Finisher   string
 	ExtraFiles map[string][]byte
 }
 
 type NewManifestInstanceRequest struct {
 	Name       string
 	Manifest   []byte
-	Launcher   string
-	Finisher   string
 	ExtraFiles map[string][]byte
 }
 
@@ -130,8 +126,15 @@ type VMNameRequest struct {
 	Name string
 }
 
-type DiskJobIDRequest struct {
-	JobID string
+type DiskJobRequest struct {
+	VMName   string
+	DiskName string
+}
+
+type VMShutdownRequest struct {
+	Name    string
+	Timeout time.Duration
+	Wait    bool
 }
 
 type CreateDisksRequest struct {
@@ -150,7 +153,7 @@ type DiskCopyingParams struct {
 	ClearBitmap bool
 }
 
-type MigrationStat struct {
+type MigrationTaskStat struct {
 	DstServer string
 	Status    string
 	Qemu      *StatInfo
@@ -158,7 +161,7 @@ type MigrationStat struct {
 	Desc      string
 }
 
-type DiskJobStat struct {
+type DiskCopyingTaskStat struct {
 	Status  string
 	QemuJob *StatInfo
 	Desc    string

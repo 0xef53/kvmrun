@@ -3,8 +3,10 @@ package kvmrun
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/0xef53/go-tuntap"
+	"strings"
 	"syscall"
+
+	"github.com/0xef53/go-tuntap"
 )
 
 var NetDrivers = DevDrivers{
@@ -27,14 +29,38 @@ func (iface *NetIface) QdevID() string {
 	return fmt.Sprintf("net_%s", iface.Ifname)
 }
 
-type NetIfaces []NetIface
+func (iface *NetIface) QemuCommandArgs() []string {
+	netdevOpts := []string{
+		"tap",
+		fmt.Sprintf("ifname=%s", iface.Ifname),
+		fmt.Sprintf("id=%s", iface.Ifname),
+		"vhost=on",
+		fmt.Sprintf("script=%s", VMNETINIT),
+		"downscript=no",
+	}
 
-// Clone returns a duplicate of a NetIfaces object (deep copy).
-func (nn NetIfaces) Clone() NetIfaces {
-	x := make(NetIfaces, 0, len(nn))
+	deviceOpts := []string{
+		iface.Driver,
+		fmt.Sprintf("netdev=%s", iface.Ifname),
+		fmt.Sprintf("id=%s", iface.QdevID()),
+		fmt.Sprintf("mac=%s", iface.HwAddr),
+	}
 
-	return append(x, nn...)
+	if NetDrivers.HotPluggable(iface.Driver) {
+		deviceOpts = append(deviceOpts, "bus=pci.0")
+		if iface.Addr != "" {
+			deviceOpts = append(deviceOpts, fmt.Sprintf("addr=%s", iface.Addr))
+		}
+	}
+
+	if iface.Bootindex > 0 {
+		deviceOpts = append(deviceOpts, fmt.Sprintf("bootindex=%d", iface.Bootindex))
+	}
+
+	return []string{"-netdev", strings.Join(netdevOpts, ","), "-device", strings.Join(deviceOpts, ",")}
 }
+
+type NetIfaces []NetIface
 
 // Get returns a pointer to an element with Ifname == ifname.
 func (nn NetIfaces) Get(ifname string) *NetIface {

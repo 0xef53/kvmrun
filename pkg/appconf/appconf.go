@@ -1,4 +1,4 @@
-package kcfg
+package appconf
 
 import (
 	"fmt"
@@ -18,8 +18,9 @@ type CommonParams struct {
 }
 
 type ServerParams struct {
-	Bindings  []string `gcfg:"listen"`
-	BindAddrs []net.IP `gcfg:"-"`
+	Bindings    []string `gcfg:"listen"`
+	BindAddrs   []string `gcfg:"-"`
+	BindIPAddrs []net.IP `gcfg:"-"`
 }
 
 // KvmrunConfig represents the Kvmrun configuration.
@@ -71,8 +72,16 @@ func NewConfig(p string) (*KvmrunConfig, error) {
 		}
 	}
 
+	cfg.Server.BindAddrs = make([]string, 0, len(ips))
+
 	for ip := range ips {
-		cfg.Server.BindAddrs = append(cfg.Server.BindAddrs, net.ParseIP(ip))
+		ipaddr := net.ParseIP(ip)
+		cfg.Server.BindIPAddrs = append(cfg.Server.BindIPAddrs, ipaddr)
+		if ipaddr.To4() != nil {
+			cfg.Server.BindAddrs = append(cfg.Server.BindAddrs, ipaddr.String()+":9393")
+		} else {
+			cfg.Server.BindAddrs = append(cfg.Server.BindAddrs, "["+ipaddr.String()+"]:9393")
+		}
 	}
 
 	return &cfg, nil
