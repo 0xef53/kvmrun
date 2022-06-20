@@ -9,7 +9,7 @@ set -eu
 # For more information:
 # https://github.com/0xef53/kvmrun/blob/master/scripts/README.md
 #
-# Dependencies: docker-ce, qemu-utils
+# Dependencies: fdisk, docker-ce, qemu-utils
 
 
 declare DOCKER_IMAGE_TAG=""

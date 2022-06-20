@@ -1,0 +1,343 @@
+syntax = "proto3";
+
+package kvmrun.api.services.machines.v1;
+
+import "google/protobuf/empty.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "types/types.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/machines/v1;machines";
+
+service MachineService {
+    rpc Create(CreateMachineRequest) returns (CreateMachineResponse) { }
+    rpc Delete(DeleteMachineRequest) returns (DeleteMachineResponse) { }
+
+    rpc Get(GetMachineRequest) returns (GetMachineResponse) { }
+    rpc GetEvents(GetMachineRequest) returns (GetEventsResponse) { }
+
+    rpc Start(StartMachineRequest) returns (google.protobuf.Empty) { }
+    rpc Stop(StopMachineRequest) returns (google.protobuf.Empty) { }
+    rpc Restart(RestartMachineRequest) returns (google.protobuf.Empty) { }
+    rpc Reset(RestartMachineRequest) returns (google.protobuf.Empty) { }
+
+    rpc List(ListMachinesRequest) returns (ListMachinesResponse) { }
+    rpc ListNames(ListMachinesRequest) returns (ListNamesResponse) { }
+
+    rpc SetMemLimits(SetMemLimitsRequest) returns (google.protobuf.Empty) { }
+    rpc SetCPULimits(SetCPULimitsRequest) returns (google.protobuf.Empty) { }
+    rpc SetCPUSockets(SetCPUSocketsRequest) returns (google.protobuf.Empty) { }
+    rpc SetCPUQuota(SetCPUQuotaRequest) returns (google.protobuf.Empty) { }
+    rpc SetCPUModel(SetCPUModelRequest) returns (google.protobuf.Empty) { }
+
+    rpc ActivateVNC(ActivateVNCRequest) returns (ActivateVNCResponse) { }
+
+    rpc AttachInputDevice(AttachInputDeviceRequest) returns (google.protobuf.Empty) { }
+    rpc DetachInputDevice(DetachInputDeviceRequest) returns (google.protobuf.Empty) { }
+
+    rpc AttachCdrom(AttachCdromRequest) returns (google.protobuf.Empty) { }
+    rpc DetachCdrom(DetachCdromRequest) returns (google.protobuf.Empty) { }
+    rpc ChangeCdromMedia(ChangeCdromMediaRequest) returns (google.protobuf.Empty) { }
+
+    rpc AttachDisk(AttachDiskRequest) returns (google.protobuf.Empty) { }
+    rpc DetachDisk(DetachDiskRequest) returns (google.protobuf.Empty) { }
+    rpc SetDiskLimits(SetDiskLimitsRequest) returns (google.protobuf.Empty) { }
+    rpc RemoveDiskBitmap(RemoveDiskBitmapRequest) returns (google.protobuf.Empty) { }
+    rpc ResizeQemuBlockdev(ResizeQemuBlockdevRequest) returns (google.protobuf.Empty) { }
+
+    rpc AttachNetIface(AttachNetIfaceRequest) returns (google.protobuf.Empty) { }
+    rpc DetachNetIface(DetachNetIfaceRequest) returns (google.protobuf.Empty) { }
+    rpc SetNetIfaceLinkState(SetNetIfaceLinkRequest) returns (google.protobuf.Empty) { }
+    rpc SetNetIfaceUpScript(SetNetIfaceScriptRequest) returns (google.protobuf.Empty) { }
+    rpc SetNetIfaceDownScript(SetNetIfaceScriptRequest) returns (google.protobuf.Empty) { }
+
+    rpc AttachChannel(AttachChannelRequest) returns (google.protobuf.Empty) { }
+    rpc DetachChannel(DetachChannelRequest) returns (google.protobuf.Empty) { }
+
+    rpc AttachCloudInitDrive(AttachCloudInitRequest) returns (google.protobuf.Empty) { }
+    rpc DetachCloudInitDrive(DetachCloudInitRequest) returns (google.protobuf.Empty) { }
+    rpc ChangeCloudInitDrive(ChangeCloudInitRequest) returns (google.protobuf.Empty) { }
+
+    rpc StartDiskBackupProcess(StartDiskBackupRequest) returns (StartBackupResponse) { }
+    rpc StartMigrationProcess(StartMigrationRequest) returns (StartMigrationResponse) { }
+
+    rpc SetExternalKernel(SetExternalKernelRequest) returns (google.protobuf.Empty) { }
+}
+
+message CreateMachineRequest {
+    string name = 1;
+    types.MachineOpts options = 2;
+    bool persistent = 3;
+    map<string, bytes> extra_files = 4;
+}
+
+message CreateMachineResponse {
+    types.Machine machine = 1;
+}
+
+message DeleteMachineRequest {
+    string name = 1;
+    bool force = 2;
+}
+
+message DeleteMachineResponse {
+    types.Machine machine = 1;
+}
+
+message GetMachineRequest {
+    string name = 1;
+}
+
+message GetMachineResponse {
+    types.Machine machine = 1;
+}
+
+message GetEventsResponse {
+    repeated types.MachineEvent events = 1;
+}
+
+message StartMachineRequest {
+    string name = 1;
+    int32 wait_interval = 2;
+}
+
+message StopMachineRequest {
+    string name = 1;
+    bool wait = 2;
+    bool force = 3;
+}
+
+message RestartMachineRequest {
+    string name = 1;
+    bool wait = 2;
+}
+
+message ListMachinesRequest {
+    repeated string names = 1;
+}
+
+message ListMachinesResponse {
+    repeated types.Machine machines = 1;
+}
+
+message ListNamesResponse {
+    repeated string machines = 1;
+}
+
+message SetMemLimitsRequest {
+    string name = 1;
+    int64 actual = 2;
+    int64 total = 3;
+    bool live = 100;
+}
+
+message SetCPULimitsRequest {
+    string name = 1;
+    int64 actual = 2;
+    int64 total = 3;
+    bool live = 100;
+}
+
+message SetCPUSocketsRequest {
+    string name = 1;
+    int32 sockets = 2;
+}
+
+message SetCPUQuotaRequest {
+    string name = 1;
+    int32 quota = 2;
+    bool live = 100;
+}
+
+message SetCPUModelRequest {
+    string name = 1;
+    string model = 2;
+}
+
+message ActivateVNCRequest {
+    string name = 1;
+    string password = 2;
+}
+
+message ActivateVNCResponse {
+    types.VNCRequisites requisites = 1;
+}
+
+message AttachInputDeviceRequest {
+    string name = 1;
+    types.InputDeviceType type = 2;
+}
+
+message DetachInputDeviceRequest {
+    string name = 1;
+    types.InputDeviceType type = 2;
+}
+
+message AttachCdromRequest {
+    string name = 1;
+    string device_name = 2;
+    string device_media = 3;
+    types.CdromDriver driver = 4;
+    bool read_only = 5;
+    int32 index = 6;
+    int32 bootindex = 7;
+    string proxy_command = 8;
+    map<string, string> proxy_envs = 9;
+    bool live = 100;
+}
+
+message DetachCdromRequest {
+    string name = 1;
+    string device_name = 2;
+    bool live = 100;
+}
+
+message ChangeCdromMediaRequest {
+    string name = 1;
+    string device_name = 2;
+    string device_media = 3;
+    string proxy_command = 4;
+    map<string, string> proxy_envs = 5;
+    bool live = 100;
+}
+
+message AttachDiskRequest {
+    string name = 1;
+    string disk_path = 2;
+    types.DiskDriver driver = 3;
+    int32 iops_rd = 4;
+    int32 iops_wr = 5;
+    int32 index = 6;
+    int32 bootindex = 7;
+    string proxy_command = 8;
+    map<string, string> proxy_envs = 9;
+    bool live = 100;
+}
+
+message DetachDiskRequest {
+    string name = 1;
+    string disk_name = 2;
+    bool live = 100;
+}
+
+message SetDiskLimitsRequest {
+    string name = 1;
+    string disk_name = 2;
+    int32 iops_rd = 3;
+    int32 iops_wr = 4;
+    bool live = 100;
+}
+
+message RemoveDiskBitmapRequest {
+    string name = 1;
+    string disk_name = 2;
+}
+
+message ResizeQemuBlockdevRequest {
+    string name = 1;
+    string disk_name = 2;
+}
+
+message AttachNetIfaceRequest {
+    string name = 1;
+    string ifname = 2;
+    types.NetIfaceDriver driver = 3;
+    string hw_addr = 4;
+    string ifup_script = 5;
+    string ifdown_script = 6;
+    bool live = 100;
+}
+
+message DetachNetIfaceRequest {
+    string name = 1;
+    string ifname = 2;
+    bool live = 100;
+}
+
+message SetNetIfaceScriptRequest {
+    string name = 1;
+    string ifname = 2;
+    string path = 3;
+}
+
+message SetNetIfaceLinkRequest {
+    string name = 1;
+    string ifname = 2;
+    types.NetIfaceLinkState state = 3;
+}
+
+message AttachChannelRequest {
+    message VirtioVSock {
+        uint32 context_id = 1 [(gogoproto.customname) = "ContextID"];
+    }
+    message VirtioSerialPort {
+        string port_id = 1 [(gogoproto.customname) = "PortID"];
+        string port_guest_name = 2;
+    }
+    string name = 1;
+    oneof channel {
+        VirtioVSock vsock = 2;
+        VirtioSerialPort serial_port = 3;
+    };
+    bool live = 100;
+}
+
+message DetachChannelRequest {
+    message VirtioVSock { }
+    message VirtioSerialPort {
+        string port_id = 1 [(gogoproto.customname) = "PortID"];
+    }
+    string name = 1;
+    oneof channel {
+        VirtioVSock vsock = 2;
+        VirtioSerialPort serial_port = 3;
+    };
+    bool live = 100;
+}
+
+message AttachCloudInitRequest {
+    string name = 1;
+    string path = 2;
+}
+
+message DetachCloudInitRequest {
+    string name = 1;
+}
+
+message ChangeCloudInitRequest {
+    string name = 1;
+    string path = 2;
+}
+
+message StartDiskBackupRequest {
+    string name = 1;
+    string disk_name = 2;
+    string target = 3;
+    bool incremental = 4;
+    bool clear_bitmap = 5;
+}
+
+message StartBackupResponse {
+    string task_key = 1;
+}
+
+message StartMigrationRequest {
+    string name = 1;
+    string dst_server = 2;
+    repeated string disks = 3;
+    types.MigrationOverrides overrides = 4;
+    bool create_disks = 5;
+    bool remove_after = 6;
+}
+
+message StartMigrationResponse {
+    string task_key = 1;
+}
+
+message SetExternalKernelRequest {
+    string name = 1;
+    string image = 2;
+    string initrd = 3;
+    string cmdline = 4;
+    string modiso = 5;
+    bool remove_conf = 6;
+}

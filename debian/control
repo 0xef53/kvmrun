@@ -7,9 +7,9 @@ Standards-Version: 3.9.4
 
 Package: kvmrun
 Architecture: any
-Depends: ${shlibs:Depends}, qemu-kvm (>= 1:2.5), qemu-kvm (<< 1:3.2), runit-systemd, socat
-Recommends: bash-completion, kvmrun-network, kvmrun-tools
-Description: Interface for running KVM virtual machines under runit supervisor
+Depends: ${shlibs:Depends}, qemu-kvm | qemu (>= 1:2.5), qemu-kvm | qemu (<< 1:5.1), socat
+Recommends: bash-completion, kvmrun-network, kvmrun-tools, kpartx
+Description: Interface for running and managing KVM virtual machines
  Kvmrun is a suite of tools that provide a command line interface
  for creating and managing virtual machines based on QEMU-KVM.
  .

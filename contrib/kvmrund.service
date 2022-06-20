@@ -6,6 +6,7 @@ ConditionFileNotEmpty=/etc/kvmrun/kvmrun.ini
 
 [Service]
 Restart=always
+Environment=DEBUG=true
 ExecStart=/usr/lib/kvmrun/kvmrund -config /etc/kvmrun/kvmrun.ini
 
 [Install]

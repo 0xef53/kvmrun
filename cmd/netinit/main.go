@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/0xef53/kvmrun/pkg/kvmrun"
+	"github.com/0xef53/kvmrun/kvmrun"
 )
 
 var (
@@ -46,9 +46,11 @@ func main() {
 	}
 
 	cmd := exec.Command(iface.Ifup, ifname)
+
 	cmd.Stdin = bytes.NewReader(c)
 	cmd.Stderr = os.Stdout
 	cmd.Stdout = os.Stdout
+
 	if err := cmd.Run(); err != nil {
 		Error.Fatalf("cannot initialize %s: %s\n", ifname, err)
 	}

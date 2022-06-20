@@ -1,0 +1,13 @@
+[Unit]
+Description=%I virt.machine running under the Kvmrun
+After=kvmrund.service network-online.target
+Requires=network-online.target
+
+[Service]
+WorkingDirectory=/etc/kvmrun/%i
+ExecStart=/usr/lib/kvmrun/launcher start
+ExecStop=/usr/lib/kvmrun/launcher stop
+ExecStopPost=/usr/lib/kvmrun/launcher cleanup
+
+[Install]
+WantedBy=multi-user.target

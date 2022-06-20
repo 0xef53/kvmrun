@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package kvmrun.api.services.network.v1;
+
+import "google/protobuf/empty.proto";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "types/types.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/network/v1;network";
+
+service NetworkService {
+    rpc ListEndPoints(ListEndPointsRequest) returns (ListEndPointsResponse) { }
+
+    rpc Configure(ConfigureRequest) returns (google.protobuf.Empty) { }
+    rpc Deconfigure(DeconfigureRequest) returns (google.protobuf.Empty) { }
+}
+
+message ListEndPointsRequest {
+    message Filter {
+        // ...
+    }
+    Filter filter = 1;
+}
+
+message ListEndPointsResponse {
+    repeated types.NetworkEndPoint end_points = 1;
+}
+
+message ConfigureRequest {
+    message VlanAttrs {
+        uint32 vlan_id = 1 [(gogoproto.customname) = "VlanID"];
+        uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
+        string parent_interface = 3;
+    }
+    message VxlanAttrs {
+        uint32 vni = 1 [(gogoproto.customname) = "VNI"];
+        uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
+        string bind_interface = 3;
+    }
+    message RouterAttrs {
+        repeated string ipnets = 1 [(gogoproto.customname) = "IPNets"];
+        uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
+    }
+    string link_name = 1;
+    oneof attrs {
+        VlanAttrs vlan = 2;
+        VxlanAttrs vxlan = 3;
+        RouterAttrs router = 4;
+    }
+}
+
+message DeconfigureRequest {
+    message VlanAttrs {
+        uint32 vlan_id = 1 [(gogoproto.customname) = "VlanID"];
+    }
+    message VxlanAttrs {
+        uint32 vni = 1 [(gogoproto.customname) = "VNI"];
+    }
+    message RouterAttrs {
+    }
+    string link_name = 1;
+    oneof attrs {
+        VlanAttrs vlan = 2;
+        VxlanAttrs vxlan = 3;
+        RouterAttrs router = 4;
+    }
+}
