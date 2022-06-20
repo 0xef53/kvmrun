@@ -2,196 +2,192 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/0xef53/kvmrun/internal/appconf"
+	"github.com/0xef53/kvmrun/internal/grpcserver"
+	"github.com/0xef53/kvmrun/internal/monitor"
+	"github.com/0xef53/kvmrun/internal/systemd"
+	"github.com/0xef53/kvmrun/internal/task"
+	"github.com/0xef53/kvmrun/kvmrun"
 
-	"github.com/0xef53/kvmrun/pkg/kcfg"
-	"github.com/0xef53/kvmrun/pkg/kvmrun"
-	rpcclient "github.com/0xef53/kvmrun/pkg/rpc/client"
-	rpccommon "github.com/0xef53/kvmrun/pkg/rpc/common"
-	rpcserver "github.com/0xef53/kvmrun/pkg/rpc/server"
-	"github.com/0xef53/kvmrun/pkg/runsv"
+	"github.com/0xef53/kvmrun/services"
+	_ "github.com/0xef53/kvmrun/services/machines"
+	_ "github.com/0xef53/kvmrun/services/network"
+	_ "github.com/0xef53/kvmrun/services/system"
+	_ "github.com/0xef53/kvmrun/services/tasks"
 
-	"github.com/gorilla/mux"
-	rpc "github.com/gorilla/rpc/v2"
-	jsonrpc "github.com/gorilla/rpc/v2/json2"
+	cg "github.com/0xef53/go-cgroups"
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 )
-
-var (
-	KConf *kcfg.KvmrunConfig
-
-	QPool *QMPPool
-	IPool *VMInitPool
-	MPool *MigrationPool
-	TPool *DiskJobPool
-
-	RPCClient *rpcclient.TlsClient
-
-	DebugWriter io.Writer = ioutil.Discard
-)
-
-func init() {
-	runsv.REPOSITORY = kvmrun.VMCONFDIR
-}
 
 func main() {
-	confFile := "/etc/kvmrun/kvmrun.ini"
+	log.SetFormatter(&log.TextFormatter{
+		DisableColors:    true,
+		DisableTimestamp: true,
+	})
 
-	flag.StringVar(&confFile, "config", confFile, "path to the config `file`")
-	flag.Parse()
-
-	if _, ok := os.LookupEnv("DEBUG"); ok {
-		DebugWriter = os.Stdout
+	app := cli.NewApp()
+	app.Usage = "GRPC/REST interface for managing virtual machines"
+	app.Action = run
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:    "config",
+			Usage:   "path to the configuration file",
+			EnvVars: []string{"KVMRUND_CONFIG"},
+			Value:   "/etc/kvmrun/kvmrun.ini",
+		},
+		&cli.BoolFlag{
+			Name:    "debug",
+			Usage:   "print debug information",
+			EnvVars: []string{"KVMRUND_DEBUG", "DEBUG"},
+		},
 	}
 
-	if c, err := kcfg.NewConfig(confFile); err == nil {
-		KConf = c
-	} else {
+	if err := app.Run(os.Args); err != nil {
 		log.Fatalln(err)
 	}
+}
 
-	QPool = NewQMPPool(kvmrun.QMPMONDIR)
-	IPool = NewVMInitPool()
-	MPool = NewMigrationPool()
-	TPool = NewDiskJobPool()
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-		log.Println(<-sigc)
-		cancel() // this prevents any new tasks
-		// TODO: take background tasks into account (wg?)
-	}()
-
-	// Secure client
-	if c, err := rpcclient.NewTlsClient("/rpc/v1", KConf.Common.ClientCrt, KConf.Common.ClientKey); err == nil {
-		RPCClient = c
-	} else {
-		log.Fatalln(err)
+func run(c *cli.Context) error {
+	if c.Bool("debug") {
+		log.SetLevel(log.DebugLevel)
 	}
 
-	// Server
-	rpcSrv := rpc.NewServer()
-	rpcSrv.RegisterCodec(jsonrpc.NewCodec(), "application/json")
-	rpcSrv.RegisterService(&RPC{}, "")
-	rpcSrv.RegisterValidateRequestFunc(requestPreHandler)
+	appConf, err := appconf.NewConfig(c.String("config"))
+	if err != nil {
+		return err
+	}
 
-	r := mux.NewRouter()
-	r.Handle("/rpc/v1", rpcSrv)
-	r.Use(logging)
+	if appConf.Common.TLSConfig == nil || appConf.Server.TLSConfig == nil {
+		return fmt.Errorf("both server and client TLS certificates must exist")
+	}
 
-	bindAddrs := make([]string, 0, len(KConf.Server.BindAddrs))
+	systemctl, err := systemd.NewManager()
+	if err != nil {
+		return err
+	}
 
-	for _, addr := range KConf.Server.BindAddrs {
-		if addr.To4() != nil {
-			bindAddrs = append(bindAddrs, addr.String()+":9393")
+	// Pool of background tasks
+	tasks := task.NewPool(3)
+
+	// Pool of all running virt.machines
+	mon := monitor.NewPool(kvmrun.QMPMONDIR)
+
+	inner := &services.ServiceServer{
+		AppConf:   appConf,
+		SystemCtl: systemctl,
+		Mon:       mon,
+		Tasks:     tasks,
+	}
+
+	for _, s := range services.Services() {
+		if x, ok := s.(interface{ Init(*services.ServiceServer) }); ok {
+			x.Init(inner)
 		} else {
-			bindAddrs = append(bindAddrs, "["+addr.String()+"]:9393")
+			return fmt.Errorf("invalid service interface: %T", s)
 		}
 	}
 
+	// Main server
+	srv := grpcserver.NewServer(&appConf.Server, services.Services())
+
 	// Try to re-create QMP pool for running virt.machines
-	if n, err := monitorReConnect(); err == nil {
-		log.Printf("Found %d running instances\n", n)
+	if n, err := monitorReConnect(systemctl, mon); err == nil {
+		if n == 1 {
+			log.Infof("Found %d running instance", n)
+		} else {
+			log.Infof("Found %d running instances", n)
+		}
 	} else {
-		log.Fatalln(err)
+		return err
 	}
 
-	group, ctx := errgroup.WithContext(ctx)
+	// This global cancel context is used by the graceful shutdown function
+	cancelCtx, cancel := context.WithCancel(context.Background())
 
-	group.Go(func() error {
-		return rpcserver.ServeUnixSocket(ctx, r, "@/run/kvmrund.sock")
-	})
-	group.Go(func() error {
-		return rpcserver.ServeTls(ctx, r, bindAddrs, KConf.Common.ServerCrt, KConf.Common.ServerKey)
-	})
+	// Signal handler
+	go func() {
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, syscall.SIGTERM, syscall.SIGINT)
+		defer signal.Stop(sigc)
 
-	if err := group.Wait(); err != nil {
-		log.Fatal(err)
-	}
+		s := <-sigc
+
+		log.WithField("signal", s).Info("Graceful shutdown initiated ...")
+
+		for {
+			n := len(tasks.List())
+
+			if n == 0 {
+				tasks.WaitAndClosePool()
+				cancel()
+				break
+			}
+
+			log.Warnf("Wait until all tasks finish (currently running: %d). Next attempt in 5 seconds", n)
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	// Run unix socket and tcp servers
+	return srv.ListenAndServe(cancelCtx)
 }
 
-func monitorReConnect() (int, error) {
-	var count int
+func monitorReConnect(systemctl *systemd.Manager, mon *monitor.Pool) (int, error) {
+	unit2vm := func(unitname string) string {
+		return strings.TrimSuffix(strings.TrimPrefix(unitname, "kvmrun@"), ".service")
+	}
 
-	vms, err := getVMNames()
+	var count int
+	var names []string
+
+	units, err := systemctl.GetAllUnits("kvmrun@*.service")
 	if err != nil {
 		return 0, err
 	}
 
-	for _, vmname := range vms {
-		st, err := runsv.GetState(vmname)
-		if err != nil {
-			return 0, err
-		}
-		if st == "run" {
-			if _, err := QPool.NewMonitor(vmname); err == nil {
+	for _, unit := range units {
+		if unit.ActiveState == "active" && unit.SubState == "running" {
+			if _, err := mon.NewMonitor(unit2vm(unit.Name)); err == nil {
+				names = append(names, unit2vm(unit.Name))
 				count++
 			} else {
-				log.Printf("Unable to connect to %s: %s\n", vmname, err)
+				log.Errorf("Unable to connect to %s: %s", unit2vm(unit.Name), err)
 			}
 		}
 	}
 
+	if cpuMP, err := cg.GetSubsystemMountpoint("cpu"); err == nil {
+		reEnableCPU := func(vmname string) error {
+			relpath := filepath.Join(kvmrun.CGROOTPATH, vmname)
+			pidfile := filepath.Join(kvmrun.CHROOTDIR, vmname, "pid")
+
+			pid, err := ioutil.ReadFile(pidfile)
+			if err != nil {
+				return err
+			}
+
+			return ioutil.WriteFile(filepath.Join(cpuMP, relpath, "tasks"), pid, 0644)
+		}
+
+		for _, vmname := range names {
+			if err := reEnableCPU(vmname); err != nil {
+				log.Errorf("Unable to re-add '%s' to the CPU control group: %s", vmname, err)
+			}
+		}
+	} else {
+		log.Errorf("Unable to initialize 'cpu' controller: %s", err)
+	}
+
 	return count, nil
-}
-
-func logging(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf(
-			"proto=%s method=%s remote-addr=%s endpoint=%s command=%s\n",
-			r.Proto,
-			r.Method,
-			r.RemoteAddr,
-			r.URL,
-			r.Header.Get("Method-Name"),
-		)
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-type RPC struct{}
-
-// ReleaseResources cleans all resources allocated for the virtual machine.
-// All background tasks will be gracefully interrupted.
-// This function should be called before the QEMU process begins to stop.
-func (x *RPC) ReleaseResources(r *http.Request, args *rpccommon.VMNameRequest, resp *struct{}) error {
-	IPool.Release(args.Name)
-	MPool.Release(args.Name)
-	QPool.CloseMonitor(args.Name)
-	return nil
-}
-
-type InterruptedError struct {
-	Err error
-}
-
-func (e *InterruptedError) Error() string {
-	if e.Err != nil {
-		return "Interrupted error: " + e.Err.Error()
-	}
-	return "Process was interrupted"
-}
-
-func NewInterruptedError(format string, a ...interface{}) error {
-	return &InterruptedError{fmt.Errorf(format, a...)}
-}
-
-func IsInterruptedError(err error) bool {
-	if _, ok := err.(*InterruptedError); ok {
-		return true
-	}
-	return false
 }

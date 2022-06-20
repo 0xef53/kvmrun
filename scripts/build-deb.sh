@@ -16,7 +16,8 @@ trap "chown -R $(stat --printf '%u:%g' debian) $RESULT_DIR" 0
 declare -r GIT_COMMIT_REV="$(git show -s --format=%h)"
 declare -r GIT_REMOTE_URL="$(git ls-remote --get-url)"
 
-declare -r VER="$(bin/kvmhelper version | awk '{print $NF}')"
+#declare -r VER="$(bin/vmm version | awk '{print $NF}')"
+declare -r VER="2"
 declare -r REVISION="git$(git rev-list HEAD --count).${GIT_COMMIT_REV}"
 
 declare -r TMPDIR="$(mktemp -d)"
@@ -45,3 +46,4 @@ dh_clean && dpkg-buildpackage -uc -us
 find ../ -maxdepth 1 -type f -name "*.deb" -exec mv -t "$RESULT_DIR" {} ";"
 
 exit 0
+

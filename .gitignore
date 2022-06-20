@@ -7,3 +7,4 @@ debian/*.debhelper.log
 debian/*.substvars
 debian/kvmrun-tools/
 debian/kvmrun/
+**/.*.sw[opn]

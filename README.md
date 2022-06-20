@@ -3,35 +3,44 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/0xef53/kvmrun)](https://goreportcard.com/report/github.com/0xef53/kvmrun)
 [![GitHub release](https://img.shields.io/github/release/0xef53/kvmrun.svg)](https://github.com/0xef53/kvmrun/releases/latest)
 
-Kvmrun is a suite of tools that provides a command line interface for creating and managing virtual machines based on QEMU-KVM.
+Kvmrun is a suite of tools that provides a command line and gRPC interface for creating and managing virtual machines based on QEMU-KVM.
 
 ## Features
 
-- create, edit, start and stop VMs via CLI
+- create, edit, start and stop VMs via CLI and gRPC
 - attach/detach one or more block/network devices without restarting VMs (hot-plug/unplug)
 - live migration with/without local storage or with a specified list of block devices
+- full and incremental block backups
 - access to the guest virtual console (hvc0)
 - run with external kernel/initrd and iso-file with modules (linux specific)
 - limit CPU resources via cgroups
 - limit IO operations via QEMU
-- configure network via custom ifup/ifdown scripts
+- configure network using custom ifup/ifdown scripts
 
 ## Concept & idea
 
-Kvmrun interacts very closely with the runit supervisor. Each virtual machine is formed as a separate service. Runit is responsible for starting and for correct completion of virtual machine by sending the approriate ACPI signal to the guest system kernel.
+Kvmrun uses Systemd to run virtual machines. Each QEMU process runs in its own personal chroot environment as an unprivileged user. Systemd is responsible for starting and for properly completion of virtual machines by invoking appropriate kvmrun's utils (start/stop/cleanup).
 
-Kvmrun runs each virtual machine in a separate chroot environment on behalf of an unprivileged user.
+The primary goal of Kvmrun is to simplify as much as possible the most popular actions such as hot-plug/unplug devices, hot reconfiguration, full or incremental block backup and live migration between the same type hosts. These are the most required things for hosting providers to organize cloud services.
 
-The primary goal of Kvmrun is to simplify as much as possible the most popular actions such as hot-plug/unplug devices, hot reconfiguration and live migration between the same type hosts. These are the most required things for a hosting provider to organize cloud services.
+## gRPC interface
 
-## Future plans
+Kvmrun provides API based on gRPC services. All exposed functions are defined in `.proto` files under `api` directory.
 
-* qcow2 images support
-* incremental backup of block devices
+Communication with the API server is possible using two interfaces -- secure TCP port `9393` or unsecure abstract UNIX socket `@/run/kvmrund.sock`.
+
+## Supported configurations
+
+Kvmrun can work with all versions of QEMU starting from 3.1.x. Below are the tested configurations:
+
+- Debian 10 and QEMU 3.x/5.x
+- Debian 11 and QEMU 5.x/6.x
+- Ubuntu 20.04 LTS and QEMU 4.x
+- Ubuntu 22.04 LTS and QEMU 6.x
 
 # Installation
 
-Only Debian/Ubuntu distributions are currently supported.
+Currently there are packages only for Debian/Ubuntu based distributions. Otherwise build from source should be used.
 
 ### From pre-built package
 
@@ -65,50 +74,58 @@ $ cd kvmrun
 $ make && make install
 ```
 
+Generate the certificates and run the server:
+
+```shell
+$ /usr/lib/kvmrun/gencert
+$ systemctl enable kvmrund.service
+$ systemctl start kvmrund.service
+```
+
 ## Quick start
 
 The following steps illustrate how to run a virtual machine with a Debian as a guest.
 
-1. Install package using instructions from the prevoious step. QEMU-KVM and Runit will be installed by dependency.
-2. Create a bootable image with a guest OS using `scripts/mk-debian-image`. This script uses the appropriate docker image as a basis. In this case -- `debian:stretch-slim`. See [here](scripts/) for more information.
+1. Install Kvmrun using instructions from the previous step. Don't forget to install QEMU in case Kvmrun was built from source.
+2. Create a bootable image with a guest OS using `scripts/mk-debian-image`. This script uses the appropriate docker image as a basis. In this case -- `debian:bullseye-slim`. See [here](scripts/) for more information.
 
     ```shell
-    $ mk-debian-image -t stretch-slim
+    $ /usr/share/kvmrun/mk-debian-image -t bullseye-slim
     ```
 
 3. Wrap the resulting image file in a loop device:
 
     ```shell
-    $ losetup -f --show debian-stretch-slim.img
+    $ losetup -f --show debian-bullseye-slim.img
     /dev/loop0
     ```
 4. Create your first virtual machine:
 
     ```shell
-    $ kvmhelper create-conf --mem 2048 --cpu 2-4 alice
-    $ kvmhelper attach-disk alice /dev/loop0
+    $ vmm create-conf --mem 2048 --cpu 2-4 alice
+    $ vmm storage attach alice /dev/loop0
     ```
 5. Run it:
 
     ```shell
-    $ sv u alice
+    $ vmm start alice
     ```
 
 A list of all configured virtual machines can be seen as follows:
 
 ```shell
-$ kvmhelper list 
+$ vmm list
 Name                 PID      Mem(MiB)     CPUs     %CPU       State         Time
-alice              32531     2048/2048      2/4      ---         run          34s
+alice              32531     2048/2048      2/4      ---     running          34s
 ```
 
-Then you can activate the VNC to communicate with running virtual machine:
+Then you can activate the VNC to communicate with the running virtual machine:
 
 ```shell
-$ kvmhelper set-vncpass alice 
-Password: ecb8cffac56426bf57a70cb9abbbbd16
-Display/Port: 1025/6925
-Websocket port: 11725
+$ vmm vnc activate alice
+Password: ofKajev5
+Display/Port: 1024/6924
+Websocket port: 11724
 ```
 
 The VNC server will listen on `127.0.0.2`. It's convenient to use SSH to forward the connection to the host server with VNC. Something like this:

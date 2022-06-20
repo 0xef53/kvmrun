@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package kvmrun.api.services.tasks.v1;
+
+import "google/protobuf/empty.proto";
+import "types/types.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/tasks/v1;tasks";
+
+service TaskService {
+    rpc Get(GetTaskRequest) returns (GetTaskResponse) { }
+    rpc List(google.protobuf.Empty) returns (ListTasksResponse) { }
+    rpc ListKeys(google.protobuf.Empty) returns (ListKeysResponse) { }
+    rpc Cancel(CancelTaskRequest) returns (google.protobuf.Empty) { }
+}
+
+message GetTaskRequest {
+    string key = 1;
+}
+
+message GetTaskResponse {
+    types.TaskInfo task = 1;
+}
+
+message ListTasksResponse {
+    repeated types.TaskInfo tasks = 1;
+}
+
+message ListKeysResponse {
+    repeated string tasks = 1;
+}
+
+message CancelTaskRequest {
+    string key = 1;
+}

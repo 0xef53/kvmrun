@@ -11,4 +11,4 @@ Some useful scripts
 
     All these actions are performed in Docker containers.
 
-    Dependencies: `docker-ce`, `qemu-utils`
+    Dependencies: `fdisk`, `docker-ce`, `qemu-utils`
