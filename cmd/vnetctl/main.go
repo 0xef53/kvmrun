@@ -63,7 +63,7 @@ func main() {
 	}
 
 	app.Commands = []*cli.Command{
-		&cli.Command{
+		{
 			Name:     "version",
 			Usage:    "print the version information",
 			Category: "Other",

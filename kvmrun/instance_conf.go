@@ -70,7 +70,7 @@ func GetInstanceConf(vmname string) (Instance, error) {
 
 	vmc.MachineType = strings.TrimSpace(strings.ToLower(vmc.MachineType))
 
-	for idx, _ := range vmc.Disks {
+	for idx := range vmc.Disks {
 		b, err := NewDiskBackend(vmc.Disks[idx].Path)
 		if err != nil {
 			return nil, err
@@ -568,7 +568,7 @@ func GetIncomingConf(vmname string) (Instance, error) {
 		return nil, err
 	}
 
-	for idx, _ := range c.Disks {
+	for idx := range c.Disks {
 		b, err := NewDiskBackend(c.Disks[idx].Path)
 		if err != nil {
 			return nil, err
@@ -603,7 +603,7 @@ func GetStartupConf(vmname string) (Instance, error) {
 		return nil, err
 	}
 
-	for idx, _ := range c.Disks {
+	for idx := range c.Disks {
 		b, err := NewDiskBackend(c.Disks[idx].Path)
 		if err != nil {
 			return nil, err

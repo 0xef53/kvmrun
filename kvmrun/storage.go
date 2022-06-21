@@ -68,7 +68,7 @@ type DiskPool []Disk
 
 // Get returns a pointer to an element with Path == p.
 func (p DiskPool) Get(dpath string) *Disk {
-	for k, _ := range p {
+	for k := range p {
 		if p[k].Path == dpath || p[k].BaseName() == dpath {
 			return &p[k]
 		}

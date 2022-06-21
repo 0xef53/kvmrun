@@ -32,7 +32,7 @@ type NetifPool []NetIface
 
 // Get returns a pointer to an element with Ifname == ifname.
 func (p NetifPool) Get(ifname string) *NetIface {
-	for k, _ := range p {
+	for k := range p {
 		if p[k].Ifname == ifname {
 			return &p[k]
 		}

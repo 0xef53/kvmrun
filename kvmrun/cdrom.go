@@ -60,7 +60,7 @@ type CDPool []Cdrom
 
 // Get returns a pointer to an element with Path == p.
 func (p CDPool) Get(name string) *Cdrom {
-	for k, _ := range p {
+	for k := range p {
 		if p[k].Name == name {
 			return &p[k]
 		}

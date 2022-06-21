@@ -65,7 +65,7 @@ func main() {
 		backupCommands,
 		migrationCommands,
 		// other actions
-		&cli.Command{
+		{
 			Name:     "version",
 			Usage:    "print the version information",
 			Category: "Other",

@@ -224,8 +224,8 @@ func (t *DiskBackupTask) copy() error {
 				t.Logger.Debugf("copy(): run QMP transaction: block-dirty-bitmap-clear + drive-backup (src=%s, dst=%s", t.srcDisk.BaseName(), t.dstDisk.Path)
 
 				commands := []qmp.Command{
-					qmp.Command{"block-dirty-bitmap-clear", &bitmapArgs},
-					qmp.Command{"drive-backup", &backupArgs},
+					{"block-dirty-bitmap-clear", &bitmapArgs},
+					{"drive-backup", &backupArgs},
 				}
 				if err := t.Mon.RunTransaction(t.req.Name, commands, nil); err != nil {
 					return err
@@ -246,8 +246,8 @@ func (t *DiskBackupTask) copy() error {
 			t.Logger.Debugf("copy(): run QMP transaction: block-dirty-bitmap-add + drive-backup (src=%s, dst=%s", t.srcDisk.BaseName(), t.dstDisk.Path)
 
 			commands := []qmp.Command{
-				qmp.Command{"block-dirty-bitmap-add", bitmapArgs},
-				qmp.Command{"drive-backup", &backupArgs},
+				{"block-dirty-bitmap-add", bitmapArgs},
+				{"drive-backup", &backupArgs},
 			}
 			if err := t.Mon.RunTransaction(t.req.Name, commands, nil); err != nil {
 				return err

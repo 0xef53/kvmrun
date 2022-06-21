@@ -12,7 +12,7 @@ type InputPool []InputDevice
 
 // Get returns a pointer to an element with Type == t.
 func (p InputPool) Get(t string) *InputDevice {
-	for k, _ := range p {
+	for k := range p {
 		if p[k].Type == t {
 			return &p[k]
 		}

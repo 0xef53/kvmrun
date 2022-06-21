@@ -364,11 +364,11 @@ func (t *MachineMigrationTask) migrateVMState(ctx context.Context, allDisksReady
 		Capabilities []qemu_types.MigrationCapabilityStatus `json:"capabilities"`
 	}{
 		Capabilities: []qemu_types.MigrationCapabilityStatus{
-			qemu_types.MigrationCapabilityStatus{"xbzrle", true},
-			qemu_types.MigrationCapabilityStatus{"auto-converge", true},
-			qemu_types.MigrationCapabilityStatus{"compress", false},
-			qemu_types.MigrationCapabilityStatus{"block", false},
-			qemu_types.MigrationCapabilityStatus{"dirty-bitmaps", true},
+			{"xbzrle", true},
+			{"auto-converge", true},
+			{"compress", false},
+			{"block", false},
+			{"dirty-bitmaps", true},
 		},
 	}
 	if err := t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-capabilities", &capsArgs}, nil); err != nil {
@@ -689,13 +689,13 @@ func (t *MachineMigrationTask) newIncomingRequest() (*s_pb.StartIncomingMachineR
 				return nil, err
 			}
 
-			for idx, _ := range tmp.C.Disks {
+			for idx := range tmp.C.Disks {
 				if ovrd, ok := t.req.Overrides.Disks[tmp.C.Disks[idx].Path]; ok {
 					tmp.C.Disks[idx].Path = ovrd
 				}
 			}
 
-			for idx, _ := range tmp.R.Disks {
+			for idx := range tmp.R.Disks {
 				if ovrd, ok := t.req.Overrides.Disks[tmp.R.Disks[idx].Path]; ok {
 					tmp.R.Disks[idx].Path = ovrd
 				}

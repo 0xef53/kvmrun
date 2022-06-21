@@ -14,7 +14,7 @@ type ProxyPool []Proxy
 
 // Get returns a pointer to an element with Path == fullpath.
 func (p ProxyPool) Get(fullpath string) *Proxy {
-	for k, _ := range p {
+	for k := range p {
 		if p[k].Path == fullpath {
 			return &p[k]
 		}
