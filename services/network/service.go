@@ -75,6 +75,9 @@ func (s *ServiceServer) Configure(ctx context.Context, req *pb.ConfigureRequest)
 		case *pb.ConfigureRequest_Router:
 			attrs := network.RouterDeviceAttrs{}
 			return network.ConfigureRouter(req.LinkName, &attrs)
+		case *pb.ConfigureRequest_Bridge:
+			attrs := network.BridgeDeviceAttrs{Ifname: v.Bridge.Ifname, MTU: v.Bridge.MTU}
+			return network.ConfigureBridgePort(req.LinkName, &attrs)
 		}
 
 		return grpc_status.Errorf(grpc_codes.Unimplemented, "unknown network scheme")
@@ -105,6 +108,8 @@ func (s *ServiceServer) Deconfigure(ctx context.Context, req *pb.DeconfigureRequ
 			return network.DeconfigureVxlanPort(req.LinkName, v.Vxlan.VNI)
 		case *pb.DeconfigureRequest_Router:
 			return network.DeconfigureRouter(req.LinkName)
+		case *pb.DeconfigureRequest_Bridge:
+			return network.DeconfigureBridgePort(req.LinkName, v.Bridge.Ifname)
 		}
 
 		return grpc_status.Errorf(grpc_codes.Unimplemented, "unknown network scheme")

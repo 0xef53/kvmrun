@@ -168,6 +168,7 @@ type ConfigureRequest struct {
 	//	*ConfigureRequest_Vlan
 	//	*ConfigureRequest_Vxlan
 	//	*ConfigureRequest_Router
+	//	*ConfigureRequest_Bridge
 	Attrs                isConfigureRequest_Attrs `protobuf_oneof:"attrs"`
 	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
 	XXX_unrecognized     []byte                   `json:"-"`
@@ -222,10 +223,14 @@ type ConfigureRequest_Vxlan struct {
 type ConfigureRequest_Router struct {
 	Router *ConfigureRequest_RouterAttrs `protobuf:"bytes,4,opt,name=router,proto3,oneof" json:"router,omitempty"`
 }
+type ConfigureRequest_Bridge struct {
+	Bridge *ConfigureRequest_BridgeAttrs `protobuf:"bytes,5,opt,name=bridge,proto3,oneof" json:"bridge,omitempty"`
+}
 
 func (*ConfigureRequest_Vlan) isConfigureRequest_Attrs()   {}
 func (*ConfigureRequest_Vxlan) isConfigureRequest_Attrs()  {}
 func (*ConfigureRequest_Router) isConfigureRequest_Attrs() {}
+func (*ConfigureRequest_Bridge) isConfigureRequest_Attrs() {}
 
 func (m *ConfigureRequest) GetAttrs() isConfigureRequest_Attrs {
 	if m != nil {
@@ -262,12 +267,20 @@ func (m *ConfigureRequest) GetRouter() *ConfigureRequest_RouterAttrs {
 	return nil
 }
 
+func (m *ConfigureRequest) GetBridge() *ConfigureRequest_BridgeAttrs {
+	if x, ok := m.GetAttrs().(*ConfigureRequest_Bridge); ok {
+		return x.Bridge
+	}
+	return nil
+}
+
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*ConfigureRequest) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*ConfigureRequest_Vlan)(nil),
 		(*ConfigureRequest_Vxlan)(nil),
 		(*ConfigureRequest_Router)(nil),
+		(*ConfigureRequest_Bridge)(nil),
 	}
 }
 
@@ -452,12 +465,68 @@ func (m *ConfigureRequest_RouterAttrs) GetMTU() uint32 {
 	return 0
 }
 
+type ConfigureRequest_BridgeAttrs struct {
+	Ifname               string   `protobuf:"bytes,1,opt,name=ifname,proto3" json:"ifname,omitempty"`
+	MTU                  uint32   `protobuf:"varint,2,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ConfigureRequest_BridgeAttrs) Reset()         { *m = ConfigureRequest_BridgeAttrs{} }
+func (m *ConfigureRequest_BridgeAttrs) String() string { return proto.CompactTextString(m) }
+func (*ConfigureRequest_BridgeAttrs) ProtoMessage()    {}
+func (*ConfigureRequest_BridgeAttrs) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3ffef3a485992dba, []int{2, 3}
+}
+func (m *ConfigureRequest_BridgeAttrs) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ConfigureRequest_BridgeAttrs) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ConfigureRequest_BridgeAttrs.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ConfigureRequest_BridgeAttrs) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConfigureRequest_BridgeAttrs.Merge(m, src)
+}
+func (m *ConfigureRequest_BridgeAttrs) XXX_Size() int {
+	return m.Size()
+}
+func (m *ConfigureRequest_BridgeAttrs) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConfigureRequest_BridgeAttrs.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ConfigureRequest_BridgeAttrs proto.InternalMessageInfo
+
+func (m *ConfigureRequest_BridgeAttrs) GetIfname() string {
+	if m != nil {
+		return m.Ifname
+	}
+	return ""
+}
+
+func (m *ConfigureRequest_BridgeAttrs) GetMTU() uint32 {
+	if m != nil {
+		return m.MTU
+	}
+	return 0
+}
+
 type DeconfigureRequest struct {
 	LinkName string `protobuf:"bytes,1,opt,name=link_name,json=linkName,proto3" json:"link_name,omitempty"`
 	// Types that are valid to be assigned to Attrs:
 	//	*DeconfigureRequest_Vlan
 	//	*DeconfigureRequest_Vxlan
 	//	*DeconfigureRequest_Router
+	//	*DeconfigureRequest_Bridge
 	Attrs                isDeconfigureRequest_Attrs `protobuf_oneof:"attrs"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
@@ -512,10 +581,14 @@ type DeconfigureRequest_Vxlan struct {
 type DeconfigureRequest_Router struct {
 	Router *DeconfigureRequest_RouterAttrs `protobuf:"bytes,4,opt,name=router,proto3,oneof" json:"router,omitempty"`
 }
+type DeconfigureRequest_Bridge struct {
+	Bridge *DeconfigureRequest_BridgeAttrs `protobuf:"bytes,5,opt,name=bridge,proto3,oneof" json:"bridge,omitempty"`
+}
 
 func (*DeconfigureRequest_Vlan) isDeconfigureRequest_Attrs()   {}
 func (*DeconfigureRequest_Vxlan) isDeconfigureRequest_Attrs()  {}
 func (*DeconfigureRequest_Router) isDeconfigureRequest_Attrs() {}
+func (*DeconfigureRequest_Bridge) isDeconfigureRequest_Attrs() {}
 
 func (m *DeconfigureRequest) GetAttrs() isDeconfigureRequest_Attrs {
 	if m != nil {
@@ -552,12 +625,20 @@ func (m *DeconfigureRequest) GetRouter() *DeconfigureRequest_RouterAttrs {
 	return nil
 }
 
+func (m *DeconfigureRequest) GetBridge() *DeconfigureRequest_BridgeAttrs {
+	if x, ok := m.GetAttrs().(*DeconfigureRequest_Bridge); ok {
+		return x.Bridge
+	}
+	return nil
+}
+
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*DeconfigureRequest) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*DeconfigureRequest_Vlan)(nil),
 		(*DeconfigureRequest_Vxlan)(nil),
 		(*DeconfigureRequest_Router)(nil),
+		(*DeconfigureRequest_Bridge)(nil),
 	}
 }
 
@@ -694,6 +775,53 @@ func (m *DeconfigureRequest_RouterAttrs) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_DeconfigureRequest_RouterAttrs proto.InternalMessageInfo
 
+type DeconfigureRequest_BridgeAttrs struct {
+	Ifname               string   `protobuf:"bytes,1,opt,name=ifname,proto3" json:"ifname,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *DeconfigureRequest_BridgeAttrs) Reset()         { *m = DeconfigureRequest_BridgeAttrs{} }
+func (m *DeconfigureRequest_BridgeAttrs) String() string { return proto.CompactTextString(m) }
+func (*DeconfigureRequest_BridgeAttrs) ProtoMessage()    {}
+func (*DeconfigureRequest_BridgeAttrs) Descriptor() ([]byte, []int) {
+	return fileDescriptor_3ffef3a485992dba, []int{3, 3}
+}
+func (m *DeconfigureRequest_BridgeAttrs) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeconfigureRequest_BridgeAttrs) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_DeconfigureRequest_BridgeAttrs.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *DeconfigureRequest_BridgeAttrs) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeconfigureRequest_BridgeAttrs.Merge(m, src)
+}
+func (m *DeconfigureRequest_BridgeAttrs) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeconfigureRequest_BridgeAttrs) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeconfigureRequest_BridgeAttrs.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeconfigureRequest_BridgeAttrs proto.InternalMessageInfo
+
+func (m *DeconfigureRequest_BridgeAttrs) GetIfname() string {
+	if m != nil {
+		return m.Ifname
+	}
+	return ""
+}
+
 func init() {
 	proto.RegisterType((*ListEndPointsRequest)(nil), "kvmrun.api.services.network.v1.ListEndPointsRequest")
 	proto.RegisterType((*ListEndPointsRequest_Filter)(nil), "kvmrun.api.services.network.v1.ListEndPointsRequest.Filter")
@@ -702,58 +830,63 @@ func init() {
 	proto.RegisterType((*ConfigureRequest_VlanAttrs)(nil), "kvmrun.api.services.network.v1.ConfigureRequest.VlanAttrs")
 	proto.RegisterType((*ConfigureRequest_VxlanAttrs)(nil), "kvmrun.api.services.network.v1.ConfigureRequest.VxlanAttrs")
 	proto.RegisterType((*ConfigureRequest_RouterAttrs)(nil), "kvmrun.api.services.network.v1.ConfigureRequest.RouterAttrs")
+	proto.RegisterType((*ConfigureRequest_BridgeAttrs)(nil), "kvmrun.api.services.network.v1.ConfigureRequest.BridgeAttrs")
 	proto.RegisterType((*DeconfigureRequest)(nil), "kvmrun.api.services.network.v1.DeconfigureRequest")
 	proto.RegisterType((*DeconfigureRequest_VlanAttrs)(nil), "kvmrun.api.services.network.v1.DeconfigureRequest.VlanAttrs")
 	proto.RegisterType((*DeconfigureRequest_VxlanAttrs)(nil), "kvmrun.api.services.network.v1.DeconfigureRequest.VxlanAttrs")
 	proto.RegisterType((*DeconfigureRequest_RouterAttrs)(nil), "kvmrun.api.services.network.v1.DeconfigureRequest.RouterAttrs")
+	proto.RegisterType((*DeconfigureRequest_BridgeAttrs)(nil), "kvmrun.api.services.network.v1.DeconfigureRequest.BridgeAttrs")
 }
 
 func init() { proto.RegisterFile("services/network/v1/network.proto", fileDescriptor_3ffef3a485992dba) }
 
 var fileDescriptor_3ffef3a485992dba = []byte{
-	// 658 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x95, 0xdd, 0x4e, 0x13, 0x41,
-	0x14, 0xc7, 0x29, 0x85, 0x85, 0x3d, 0x4d, 0x11, 0x27, 0x6a, 0x70, 0x49, 0x0a, 0xac, 0x31, 0xe2,
-	0x85, 0xbb, 0x50, 0x24, 0x31, 0xa2, 0x46, 0x2b, 0x10, 0x9b, 0x60, 0x43, 0x06, 0xc1, 0xaf, 0x8b,
-	0x66, 0xdb, 0x4e, 0xeb, 0x84, 0x76, 0x66, 0xdd, 0x9d, 0x5d, 0xe1, 0xc6, 0xf7, 0xf1, 0x45, 0x8c,
-	0x97, 0x3e, 0x01, 0x31, 0xbd, 0xf2, 0x31, 0xcc, 0xcc, 0xec, 0x42, 0x0b, 0x15, 0x68, 0x6f, 0x9a,
-	0xe9, 0x99, 0x73, 0x7e, 0x67, 0xce, 0x9c, 0xff, 0x9e, 0x81, 0xa5, 0x90, 0x04, 0x31, 0xad, 0x93,
-	0xd0, 0x65, 0x44, 0x7c, 0xe3, 0xc1, 0xa1, 0x1b, 0xaf, 0xa6, 0x4b, 0xc7, 0x0f, 0xb8, 0xe0, 0xa8,
-	0x70, 0x18, 0x77, 0x82, 0x88, 0x39, 0x9e, 0x4f, 0x9d, 0xd4, 0xdb, 0x49, 0x5d, 0xe2, 0x55, 0x6b,
-	0xbe, 0xc5, 0x79, 0xab, 0x4d, 0x5c, 0xe5, 0x5d, 0x8b, 0x9a, 0x2e, 0xe9, 0xf8, 0xe2, 0x58, 0x07,
-	0x5b, 0x8f, 0x5a, 0x54, 0x7c, 0x89, 0x6a, 0x4e, 0x9d, 0x77, 0xdc, 0x16, 0x6f, 0xf1, 0x33, 0x2f,
-	0xf9, 0x4f, 0xfd, 0x51, 0xab, 0xc4, 0xfd, 0xa6, 0x38, 0xf6, 0x49, 0xe8, 0xaa, 0x5f, 0x6d, 0xb2,
-	0x23, 0xb8, 0xb5, 0x43, 0x43, 0xb1, 0xc5, 0x1a, 0xbb, 0x9c, 0x32, 0x11, 0x62, 0xf2, 0x35, 0x22,
-	0xa1, 0x40, 0x7b, 0x60, 0x34, 0x69, 0x5b, 0x90, 0x60, 0x2e, 0xb3, 0x98, 0x59, 0xce, 0x15, 0x37,
-	0x9c, 0xcb, 0xcf, 0xe9, 0x0c, 0xa2, 0x38, 0xdb, 0x0a, 0x81, 0x13, 0x94, 0x35, 0x0d, 0x86, 0xb6,
-	0xd8, 0x1f, 0xe1, 0xf6, 0xb9, 0x80, 0xd0, 0xe7, 0x2c, 0x24, 0xe8, 0x25, 0x00, 0x61, 0x8d, 0xaa,
-	0xaf, 0xac, 0x73, 0x99, 0xc5, 0xec, 0x72, 0xae, 0xb8, 0xd4, 0x9b, 0x5b, 0x1f, 0xbe, 0xa2, 0x13,
-	0xa7, 0xf1, 0xd8, 0x24, 0x29, 0xc9, 0xfe, 0x3b, 0x01, 0xb3, 0xaf, 0x39, 0x6b, 0xd2, 0x56, 0x14,
-	0x90, 0xb4, 0x9c, 0x79, 0x30, 0xdb, 0x94, 0x1d, 0x56, 0x99, 0xd7, 0x21, 0xaa, 0x22, 0x13, 0x4f,
-	0x4b, 0x43, 0xc5, 0xeb, 0x10, 0xb4, 0x0b, 0x13, 0x71, 0xdb, 0x63, 0x73, 0xe3, 0xaa, 0xd2, 0xa7,
-	0x57, 0x55, 0x7a, 0x1e, 0xee, 0x1c, 0xb4, 0x3d, 0xf6, 0x4a, 0x88, 0x20, 0x7c, 0x33, 0x86, 0x15,
-	0x09, 0xed, 0xc1, 0x64, 0x7c, 0x24, 0x91, 0xd9, 0xeb, 0x5d, 0xde, 0x45, 0xe4, 0x51, 0x0f, 0x53,
-	0xb3, 0xd0, 0x01, 0x18, 0x01, 0x8f, 0x64, 0x4b, 0x26, 0x14, 0xf5, 0xd9, 0xd0, 0x54, 0xac, 0xc2,
-	0x53, 0x6c, 0x42, 0xb3, 0x62, 0x30, 0x4f, 0x2b, 0x40, 0xf7, 0x60, 0x4a, 0x56, 0x50, 0xa5, 0x0d,
-	0x75, 0x4d, 0xf9, 0x12, 0x74, 0x4f, 0x16, 0x0c, 0xb9, 0x5f, 0xde, 0xc4, 0x86, 0xdc, 0x2a, 0x37,
-	0xd0, 0x5d, 0xc8, 0x76, 0x44, 0xa4, 0xee, 0x2b, 0x5f, 0x9a, 0xea, 0x9e, 0x2c, 0x64, 0xdf, 0xbe,
-	0xdb, 0xc7, 0xd2, 0x86, 0x1e, 0xc2, 0xac, 0xef, 0x05, 0x84, 0x89, 0x2a, 0x65, 0x82, 0x04, 0x4d,
-	0xaf, 0x4e, 0xd4, 0x25, 0x98, 0xf8, 0x86, 0xb6, 0x97, 0x53, 0xb3, 0x45, 0x01, 0xce, 0xca, 0x94,
-	0xcc, 0x98, 0xd1, 0x24, 0xa9, 0x62, 0x1e, 0x54, 0xca, 0x58, 0xda, 0x2e, 0x4b, 0x77, 0x1f, 0x66,
-	0x6a, 0x94, 0x35, 0x2e, 0x24, 0xcb, 0x4b, 0xeb, 0x59, 0xaa, 0x1d, 0xc8, 0xf5, 0xd4, 0x8e, 0x6c,
-	0x30, 0xa8, 0xcf, 0x48, 0x22, 0x30, 0x53, 0xd7, 0x58, 0xde, 0xad, 0x10, 0x11, 0xe2, 0x64, 0xe7,
-	0x92, 0xa4, 0xa5, 0x29, 0x98, 0xf4, 0x24, 0xc7, 0xfe, 0x91, 0x05, 0xb4, 0x49, 0xea, 0x43, 0x89,
-	0x0d, 0xf7, 0x89, 0xed, 0xca, 0x1e, 0x5e, 0xc4, 0x0f, 0x90, 0xdb, 0x7e, 0xbf, 0xdc, 0x9e, 0x8f,
-	0x02, 0x1d, 0x20, 0xb8, 0x0f, 0xe7, 0x04, 0xf7, 0x62, 0x04, 0xee, 0x60, 0xc9, 0xad, 0x0c, 0x2b,
-	0x39, 0xeb, 0xc1, 0x35, 0xc5, 0x62, 0xe5, 0xfb, 0x5a, 0x7d, 0xda, 0xab, 0xe2, 0xcf, 0x71, 0x98,
-	0x49, 0xa6, 0xc6, 0x9e, 0x3e, 0x3a, 0xfa, 0x0e, 0xf9, 0xbe, 0x21, 0x84, 0x1e, 0x8f, 0x32, 0xe4,
-	0xac, 0xf5, 0x21, 0xa3, 0xf4, 0xa4, 0xb3, 0xc7, 0xd0, 0x7b, 0x30, 0x4f, 0x3f, 0x51, 0xb4, 0x32,
-	0xec, 0xd7, 0x6c, 0xdd, 0x71, 0xf4, 0xd3, 0xe0, 0xa4, 0x43, 0xdf, 0xd9, 0x92, 0x4f, 0x83, 0x3d,
-	0x86, 0x3e, 0x43, 0xae, 0xa7, 0x15, 0xa8, 0x38, 0x7c, 0xdf, 0xfe, 0x0f, 0x2f, 0x6d, 0xff, 0xea,
-	0x16, 0x32, 0xbf, 0xbb, 0x85, 0xcc, 0x9f, 0x6e, 0x21, 0xf3, 0xe9, 0x49, 0xcf, 0x0b, 0xb4, 0x72,
-	0x44, 0x9a, 0xeb, 0x6b, 0xae, 0x4e, 0xe6, 0x7a, 0x3e, 0x75, 0x07, 0x3c, 0x7f, 0x1b, 0xc9, 0xb2,
-	0x66, 0x28, 0xf2, 0xda, 0xbf, 0x00, 0x00, 0x00, 0xff, 0xff, 0xed, 0x90, 0xaa, 0xb3, 0x24, 0x07,
-	0x00, 0x00,
+	// 705 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x96, 0x51, 0x4f, 0x13, 0x41,
+	0x10, 0xc7, 0x29, 0x85, 0x83, 0x4e, 0x53, 0xc4, 0x8d, 0x92, 0x7a, 0x24, 0x05, 0xce, 0x10, 0xf1,
+	0xc1, 0x3b, 0x28, 0x92, 0x18, 0x51, 0x83, 0x15, 0x88, 0x4d, 0xb0, 0x21, 0x87, 0x20, 0xea, 0x43,
+	0x73, 0x6d, 0xb7, 0xe7, 0x86, 0x76, 0xef, 0xbc, 0xdb, 0x3b, 0xe1, 0xc5, 0x07, 0x3f, 0x8e, 0x1f,
+	0xc4, 0xf8, 0xe8, 0x27, 0x20, 0xa6, 0x9f, 0xc4, 0xec, 0xee, 0x5d, 0xb9, 0x96, 0x5a, 0x68, 0x5f,
+	0x9a, 0xdd, 0xd9, 0x9d, 0xdf, 0xdc, 0xcc, 0xce, 0x7f, 0xb7, 0xb0, 0xe2, 0x63, 0x2f, 0x24, 0x75,
+	0xec, 0x1b, 0x14, 0xb3, 0x6f, 0x8e, 0x77, 0x66, 0x84, 0x1b, 0xf1, 0x50, 0x77, 0x3d, 0x87, 0x39,
+	0xa8, 0x70, 0x16, 0xb6, 0xbd, 0x80, 0xea, 0x96, 0x4b, 0xf4, 0x78, 0xb7, 0x1e, 0x6f, 0x09, 0x37,
+	0xd4, 0x45, 0xdb, 0x71, 0xec, 0x16, 0x36, 0xc4, 0xee, 0x5a, 0xd0, 0x34, 0x70, 0xdb, 0x65, 0x17,
+	0xd2, 0x59, 0x7d, 0x62, 0x13, 0xf6, 0x25, 0xa8, 0xe9, 0x75, 0xa7, 0x6d, 0xd8, 0x8e, 0xed, 0x5c,
+	0xed, 0xe2, 0x33, 0x31, 0x11, 0xa3, 0x68, 0xfb, 0x5d, 0x76, 0xe1, 0x62, 0xdf, 0x10, 0xbf, 0xd2,
+	0xa4, 0x05, 0x70, 0xef, 0x80, 0xf8, 0x6c, 0x8f, 0x36, 0x0e, 0x1d, 0x42, 0x99, 0x6f, 0xe2, 0xaf,
+	0x01, 0xf6, 0x19, 0x3a, 0x02, 0xa5, 0x49, 0x5a, 0x0c, 0x7b, 0xf9, 0xd4, 0x72, 0x6a, 0x2d, 0x5b,
+	0xdc, 0xd6, 0x87, 0x7f, 0xa7, 0x3e, 0x88, 0xa2, 0xef, 0x0b, 0x84, 0x19, 0xa1, 0xd4, 0x59, 0x50,
+	0xa4, 0x45, 0xfb, 0x08, 0xf7, 0xfb, 0x1c, 0x7c, 0xd7, 0xa1, 0x3e, 0x46, 0x3b, 0x00, 0x98, 0x36,
+	0xaa, 0xae, 0xb0, 0xe6, 0x53, 0xcb, 0xe9, 0xb5, 0x6c, 0x71, 0x25, 0x19, 0x5b, 0x7e, 0x7c, 0x45,
+	0x06, 0x8e, 0xfd, 0xcd, 0x0c, 0x8e, 0x49, 0xda, 0x0f, 0x05, 0xe6, 0xdf, 0x38, 0xb4, 0x49, 0xec,
+	0xc0, 0xc3, 0x71, 0x3a, 0x8b, 0x90, 0x69, 0x11, 0x7a, 0x56, 0xa5, 0x56, 0x1b, 0x8b, 0x8c, 0x32,
+	0xe6, 0x2c, 0x37, 0x54, 0xac, 0x36, 0x46, 0x87, 0x30, 0x15, 0xb6, 0x2c, 0x9a, 0x9f, 0x14, 0x99,
+	0x3e, 0xbf, 0x29, 0xd3, 0x7e, 0xb8, 0x7e, 0xd2, 0xb2, 0xe8, 0x6b, 0xc6, 0x3c, 0xff, 0xed, 0x84,
+	0x29, 0x48, 0xe8, 0x08, 0xa6, 0xc3, 0x73, 0x8e, 0x4c, 0xdf, 0xae, 0x78, 0xd7, 0x91, 0xe7, 0x09,
+	0xa6, 0x64, 0xa1, 0x13, 0x50, 0x3c, 0x27, 0xe0, 0x47, 0x32, 0x25, 0xa8, 0x2f, 0x46, 0xa6, 0x9a,
+	0xc2, 0x3d, 0xc6, 0x46, 0x34, 0xce, 0xad, 0x79, 0xa4, 0x61, 0xe3, 0xfc, 0xf4, 0x98, 0xdc, 0x92,
+	0x70, 0xef, 0x72, 0x25, 0x4d, 0x0d, 0x21, 0xd3, 0xad, 0x0c, 0x7a, 0x08, 0x33, 0xbc, 0x32, 0x55,
+	0xd2, 0x10, 0xe5, 0xcf, 0x95, 0xa0, 0x73, 0xb9, 0xa4, 0xf0, 0xf5, 0xf2, 0xae, 0xa9, 0xf0, 0xa5,
+	0x72, 0x03, 0x3d, 0x80, 0x74, 0x9b, 0x05, 0xe2, 0x1c, 0x72, 0xa5, 0x99, 0xce, 0xe5, 0x52, 0xfa,
+	0xdd, 0xfb, 0x63, 0x93, 0xdb, 0xd0, 0x63, 0x98, 0x77, 0x2d, 0x0f, 0x53, 0x56, 0x25, 0x94, 0x61,
+	0xaf, 0x69, 0xd5, 0xb1, 0x28, 0x6e, 0xc6, 0xbc, 0x23, 0xed, 0xe5, 0xd8, 0xac, 0x12, 0x80, 0xab,
+	0xf2, 0x71, 0x66, 0x48, 0x49, 0x14, 0x54, 0x30, 0x4f, 0x2a, 0x65, 0x93, 0xdb, 0x86, 0x85, 0x5b,
+	0x85, 0xb9, 0x1a, 0xa1, 0x8d, 0x6b, 0xc1, 0x72, 0xdc, 0x7a, 0x15, 0xea, 0x00, 0xb2, 0x89, 0x9a,
+	0x22, 0x0d, 0x14, 0xe2, 0x52, 0x1c, 0x35, 0x6e, 0x46, 0xe6, 0x58, 0x3e, 0xac, 0x60, 0xe6, 0x9b,
+	0xd1, 0xca, 0x90, 0xa0, 0xea, 0x0e, 0x64, 0x13, 0x95, 0x44, 0x0b, 0xa0, 0x90, 0x66, 0xa2, 0x61,
+	0xa3, 0xd9, 0x10, 0x42, 0x69, 0x06, 0xa6, 0x2d, 0xee, 0xab, 0xfd, 0x9c, 0x02, 0xb4, 0x8b, 0xeb,
+	0x23, 0xc9, 0xc0, 0xec, 0x91, 0xc1, 0x8d, 0x5d, 0x70, 0x1d, 0x3f, 0x40, 0x08, 0xc7, 0xbd, 0x42,
+	0x78, 0x39, 0x0e, 0x74, 0x80, 0x14, 0x4e, 0xfb, 0xa4, 0xf0, 0x6a, 0x0c, 0xee, 0x60, 0x31, 0x9c,
+	0xf6, 0x89, 0x61, 0x1c, 0xf2, 0x60, 0x39, 0xac, 0x8f, 0x2a, 0x07, 0xf5, 0xd1, 0x2d, 0x1b, 0x59,
+	0xcd, 0xf5, 0xb4, 0xa1, 0xba, 0x7a, 0xab, 0x3e, 0xea, 0x36, 0x4b, 0xf1, 0xd7, 0x24, 0xcc, 0x45,
+	0x17, 0xea, 0x91, 0xcc, 0x10, 0x7d, 0x87, 0x5c, 0xcf, 0xfd, 0x8c, 0x9e, 0x8e, 0x73, 0xff, 0xab,
+	0x5b, 0x23, 0x7a, 0xc9, 0x47, 0x40, 0x9b, 0x40, 0x1f, 0x20, 0xd3, 0xbd, 0x65, 0xd0, 0xfa, 0xa8,
+	0x17, 0x92, 0xba, 0xa0, 0xcb, 0x57, 0x53, 0x8f, 0xdf, 0x43, 0x7d, 0x8f, 0xbf, 0x9a, 0xda, 0x04,
+	0xfa, 0x0c, 0xd9, 0xc4, 0x89, 0xa1, 0xe2, 0xe8, 0xc7, 0xfb, 0x7f, 0x78, 0x69, 0xff, 0x77, 0xa7,
+	0x90, 0xfa, 0xd3, 0x29, 0xa4, 0xfe, 0x76, 0x0a, 0xa9, 0x4f, 0xcf, 0x12, 0x8f, 0xf3, 0xfa, 0x39,
+	0x6e, 0x6e, 0x6d, 0x1a, 0x32, 0x98, 0x61, 0xb9, 0xc4, 0x18, 0xf0, 0xcf, 0x60, 0x3b, 0x1a, 0xd6,
+	0x14, 0x41, 0xde, 0xfc, 0x17, 0x00, 0x00, 0xff, 0xff, 0x48, 0x47, 0x8c, 0x7f, 0x3f, 0x08, 0x00,
+	0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1121,6 +1254,27 @@ func (m *ConfigureRequest_Router) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	}
 	return len(dAtA) - i, nil
 }
+func (m *ConfigureRequest_Bridge) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ConfigureRequest_Bridge) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.Bridge != nil {
+		{
+			size, err := m.Bridge.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintNetwork(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
+	return len(dAtA) - i, nil
+}
 func (m *ConfigureRequest_VlanAttrs) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1250,6 +1404,45 @@ func (m *ConfigureRequest_RouterAttrs) MarshalToSizedBuffer(dAtA []byte) (int, e
 	return len(dAtA) - i, nil
 }
 
+func (m *ConfigureRequest_BridgeAttrs) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ConfigureRequest_BridgeAttrs) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ConfigureRequest_BridgeAttrs) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.MTU != 0 {
+		i = encodeVarintNetwork(dAtA, i, uint64(m.MTU))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.Ifname) > 0 {
+		i -= len(m.Ifname)
+		copy(dAtA[i:], m.Ifname)
+		i = encodeVarintNetwork(dAtA, i, uint64(len(m.Ifname)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *DeconfigureRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1356,6 +1549,27 @@ func (m *DeconfigureRequest_Router) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	}
 	return len(dAtA) - i, nil
 }
+func (m *DeconfigureRequest_Bridge) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeconfigureRequest_Bridge) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.Bridge != nil {
+		{
+			size, err := m.Bridge.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintNetwork(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
+	return len(dAtA) - i, nil
+}
 func (m *DeconfigureRequest_VlanAttrs) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1443,6 +1657,40 @@ func (m *DeconfigureRequest_RouterAttrs) MarshalToSizedBuffer(dAtA []byte) (int,
 	if m.XXX_unrecognized != nil {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *DeconfigureRequest_BridgeAttrs) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeconfigureRequest_BridgeAttrs) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeconfigureRequest_BridgeAttrs) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.Ifname) > 0 {
+		i -= len(m.Ifname)
+		copy(dAtA[i:], m.Ifname)
+		i = encodeVarintNetwork(dAtA, i, uint64(len(m.Ifname)))
+		i--
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -1559,6 +1807,18 @@ func (m *ConfigureRequest_Router) Size() (n int) {
 	}
 	return n
 }
+func (m *ConfigureRequest_Bridge) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Bridge != nil {
+		l = m.Bridge.Size()
+		n += 1 + l + sovNetwork(uint64(l))
+	}
+	return n
+}
 func (m *ConfigureRequest_VlanAttrs) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1624,6 +1884,25 @@ func (m *ConfigureRequest_RouterAttrs) Size() (n int) {
 	return n
 }
 
+func (m *ConfigureRequest_BridgeAttrs) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Ifname)
+	if l > 0 {
+		n += 1 + l + sovNetwork(uint64(l))
+	}
+	if m.MTU != 0 {
+		n += 1 + sovNetwork(uint64(m.MTU))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *DeconfigureRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1679,6 +1958,18 @@ func (m *DeconfigureRequest_Router) Size() (n int) {
 	}
 	return n
 }
+func (m *DeconfigureRequest_Bridge) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Bridge != nil {
+		l = m.Bridge.Size()
+		n += 1 + l + sovNetwork(uint64(l))
+	}
+	return n
+}
 func (m *DeconfigureRequest_VlanAttrs) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1715,6 +2006,22 @@ func (m *DeconfigureRequest_RouterAttrs) Size() (n int) {
 	}
 	var l int
 	_ = l
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DeconfigureRequest_BridgeAttrs) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Ifname)
+	if l > 0 {
+		n += 1 + l + sovNetwork(uint64(l))
+	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
 	}
@@ -2116,6 +2423,41 @@ func (m *ConfigureRequest) Unmarshal(dAtA []byte) error {
 			}
 			m.Attrs = &ConfigureRequest_Router{v}
 			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bridge", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowNetwork
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &ConfigureRequest_BridgeAttrs{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Attrs = &ConfigureRequest_Bridge{v}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipNetwork(dAtA[iNdEx:])
@@ -2482,6 +2824,108 @@ func (m *ConfigureRequest_RouterAttrs) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *ConfigureRequest_BridgeAttrs) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowNetwork
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BridgeAttrs: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BridgeAttrs: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ifname", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowNetwork
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ifname = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MTU", wireType)
+			}
+			m.MTU = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowNetwork
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MTU |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipNetwork(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *DeconfigureRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2647,6 +3091,41 @@ func (m *DeconfigureRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			m.Attrs = &DeconfigureRequest_Router{v}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Bridge", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowNetwork
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &DeconfigureRequest_BridgeAttrs{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Attrs = &DeconfigureRequest_Bridge{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2839,6 +3318,89 @@ func (m *DeconfigureRequest_RouterAttrs) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: RouterAttrs: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipNetwork(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeconfigureRequest_BridgeAttrs) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowNetwork
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: BridgeAttrs: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: BridgeAttrs: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ifname", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowNetwork
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthNetwork
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ifname = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipNetwork(dAtA[iNdEx:])

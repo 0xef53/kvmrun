@@ -41,11 +41,16 @@ message ConfigureRequest {
         repeated string ipnets = 1 [(gogoproto.customname) = "IPNets"];
         uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
     }
+    message BridgeAttrs {
+        string ifname = 1;
+        uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
+    }
     string link_name = 1;
     oneof attrs {
         VlanAttrs vlan = 2;
         VxlanAttrs vxlan = 3;
         RouterAttrs router = 4;
+        BridgeAttrs bridge = 5;
     }
 }
 
@@ -58,10 +63,14 @@ message DeconfigureRequest {
     }
     message RouterAttrs {
     }
+    message BridgeAttrs {
+        string ifname = 1;
+    }
     string link_name = 1;
     oneof attrs {
         VlanAttrs vlan = 2;
         VxlanAttrs vxlan = 3;
         RouterAttrs router = 4;
+        BridgeAttrs bridge = 5;
     }
 }

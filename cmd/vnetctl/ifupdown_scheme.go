@@ -70,6 +70,14 @@ func GetNetworkScheme(linkname string, configs ...string) (Scheme, error) {
 					}
 
 					return &routerScheme{linkname, &opts}, nil
+				case "bridge":
+					opts := bridgeSchemeOptions{}
+
+					if err := json.Unmarshal(b, &opts); err != nil {
+						return nil, err
+					}
+
+					return &bridgeScheme{linkname, &opts}, nil
 				}
 			}
 		}
