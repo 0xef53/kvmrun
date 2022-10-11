@@ -12,6 +12,9 @@ type Instance interface {
 	Status() (InstanceState, error)
 	GetMachineType() *QemuMachine
 	SetMachineType(string) error
+	GetFirmwareImage() string
+	SetFirmwareImage(string) error
+	RemoveFirmwareConf() error
 	IsIncoming() bool
 
 	Save() error
@@ -88,7 +91,8 @@ type InstanceProperties struct {
 	name string `json:"-"`
 	uid  int    `json:"-"`
 
-	MachineType string `json:"machine_type,omitempty"`
+	MachineType string       `json:"machine_type,omitempty"`
+	Firmware    QemuFirmware `json:"firmware,omitempty"`
 
 	Mem         Memory         `json:"memory"`
 	CPU         Processor      `json:"cpu"`
@@ -132,6 +136,10 @@ func (p InstanceProperties) GetMachineType() *QemuMachine {
 	}
 
 	return &QemuMachine{name: p.MachineType, Chipset: QEMU_CHIPSET_UNKNOWN}
+}
+
+func (p InstanceProperties) GetFirmwareImage() string {
+	return p.Firmware.Image
 }
 
 func (p InstanceProperties) GetActualCPUs() int {

@@ -47,6 +47,7 @@ func main() {
 		cmdInspect,
 		memoryCommands,
 		cpuCommands,
+		bootCommands,
 		inputsCommands,
 		cdromCommands,
 		storageCommands,

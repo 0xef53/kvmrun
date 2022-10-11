@@ -83,6 +83,7 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 
 	var gr errgroup.Group
 
+	gr.Go(func() error { return inner.initFirmware() })
 	gr.Go(func() error { return inner.initCPU() })
 	gr.Go(func() error { return inner.initMemory() })
 	gr.Go(func() error { return inner.initInputDevices() })
@@ -190,6 +191,12 @@ func (r *InstanceQemu) initMachine() error {
 
 	// E.g.: 21101 is 2.11.1
 	r.qemuVer = QemuVersion(ver.Qemu.Major*10000 + ver.Qemu.Minor*100 + ver.Qemu.Micro)
+
+	return nil
+}
+
+func (r *InstanceQemu) initFirmware() error {
+	r.Firmware.Image = r.startupConf.GetFirmwareImage()
 
 	return nil
 }
@@ -392,7 +399,15 @@ func (r *InstanceQemu) SetCPUQuota(quota int) error {
 	return nil
 }
 
-func (r InstanceQemu) SetMachineType(t string) error {
+func (r InstanceQemu) SetMachineType(_ string) error {
+	return ErrNotImplemented
+}
+
+func (r InstanceQemu) SetFirmwareImage(_ string) error {
+	return ErrNotImplemented
+}
+
+func (r *InstanceQemu) RemoveFirmwareConf() error {
 	return ErrNotImplemented
 }
 

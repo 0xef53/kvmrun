@@ -23,6 +23,8 @@ service MachineService {
     rpc List(ListMachinesRequest) returns (ListMachinesResponse) { }
     rpc ListNames(ListMachinesRequest) returns (ListNamesResponse) { }
 
+    rpc SetFirmware(SetFirmwareRequest) returns (google.protobuf.Empty) { }
+
     rpc SetMemLimits(SetMemLimitsRequest) returns (google.protobuf.Empty) { }
     rpc SetCPULimits(SetCPULimitsRequest) returns (google.protobuf.Empty) { }
     rpc SetCPUSockets(SetCPUSocketsRequest) returns (google.protobuf.Empty) { }
@@ -121,6 +123,12 @@ message ListMachinesResponse {
 
 message ListNamesResponse {
     repeated string machines = 1;
+}
+
+message SetFirmwareRequest {
+    string name = 1;
+    string image = 2;
+    bool remove_conf = 3;
 }
 
 message SetMemLimitsRequest {

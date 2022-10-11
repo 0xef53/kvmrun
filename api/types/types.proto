@@ -7,6 +7,9 @@ import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 option go_package = "github.com/0xef53/kvmrun/api/types;types";
 
 message MachineOpts {
+    message Firmware {
+        string image = 1;
+    }
     message Memory {
         int64 actual = 1;
         int64 total = 2;
@@ -63,16 +66,17 @@ message MachineOpts {
         map<string, string> envs = 3;
     }
     string machine_type = 1;
-    Memory memory = 2;
-    CPU cpu = 3 [(gogoproto.customname) = "CPU"];
-    repeated InputDevice inputs = 4;
-    repeated Cdrom cdrom = 5;
-    repeated Disk storage = 6;
-    repeated NetIface network = 7;
-    VirtioVSock vsock_device = 8 [(gogoproto.customname) = "VSockDev"];
-    CloudInit cloudinit_drive = 9 [(gogoproto.customname) = "CIDrive"];
-    Kernel kernel = 10;
-    repeated BackendProxy proxy = 11;
+    Firmware firmware = 2;
+    Memory memory = 3;
+    CPU cpu = 4 [(gogoproto.customname) = "CPU"];
+    repeated InputDevice inputs = 5;
+    repeated Cdrom cdrom = 6;
+    repeated Disk storage = 7;
+    repeated NetIface network = 8;
+    VirtioVSock vsock_device = 9 [(gogoproto.customname) = "VSockDev"];
+    CloudInit cloudinit_drive = 10 [(gogoproto.customname) = "CIDrive"];
+    Kernel kernel = 11;
+    repeated BackendProxy proxy = 12;
 }
 
 message Machine {

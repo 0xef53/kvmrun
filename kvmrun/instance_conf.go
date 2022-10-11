@@ -180,6 +180,20 @@ func (c *InstanceConf) SetMachineType(t string) error {
 	return nil
 }
 
+func (c *InstanceConf) SetFirmwareImage(p string) error {
+	if len(p) > 0 {
+		c.Firmware.Image = p
+	}
+
+	return nil
+}
+
+func (c *InstanceConf) RemoveFirmwareConf() error {
+	c.Firmware.Image = ""
+
+	return nil
+}
+
 func (c *InstanceConf) SetActualMem(s int) error {
 	if s < 1 {
 		return fmt.Errorf("invalid memory size: cannot be less than 1")

@@ -140,6 +140,11 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	// Disable default devices
 	args = append(args, "-nodefaults", "-no-user-config")
 
+	// Firmware
+	if p := b.vmconf.GetFirmwareImage(); len(p) > 0 {
+		args = append(args, "-bios", p)
+	}
+
 	// Memory
 	args = append(args, "-m", fmt.Sprintf("%dM", b.vmconf.GetTotalMem()))
 

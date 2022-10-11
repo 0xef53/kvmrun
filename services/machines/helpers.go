@@ -92,6 +92,12 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 			}
 		}
 
+		if p := vmi.GetFirmwareImage(); len(p) != 0 {
+			opts.Firmware = &pb_types.MachineOpts_Firmware{
+				Image: p,
+			}
+		}
+
 		vsock := vmi.GetVSockDevice()
 
 		if vsock != nil {

@@ -145,6 +145,22 @@ func (s *ServiceServer) MachineDownFile(vmname string) string {
 	return filepath.Join(filepath.Join(kvmrun.CONFDIR, vmname, "down"))
 }
 
+func (s *ServiceServer) LookForFile(basename string, dirs ...string) (string, string, error) {
+	for _, d := range dirs {
+		fullname := filepath.Join(d, basename)
+		switch _, err := os.Stat(fullname); {
+		case err == nil:
+			return d, filepath.Clean(fullname), nil
+		case os.IsNotExist(err):
+			continue
+		default:
+			return "", "", err
+		}
+	}
+
+	return "", "", fmt.Errorf("unable to find: %s", basename)
+}
+
 func (s *ServiceServer) newContext(ctx context.Context) context.Context {
 	var tag string
 

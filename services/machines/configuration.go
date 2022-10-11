@@ -17,6 +17,7 @@ import (
 	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
 	pb_types "github.com/0xef53/kvmrun/api/types"
 
+	empty "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
@@ -57,6 +58,21 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 		vmc.SetActualCPUs(int(req.Options.CPU.Actual))
 		vmc.SetCPUQuota(int(req.Options.CPU.Quota))
 		vmc.SetCPUModel(req.Options.CPU.Model)
+
+		// TODO: should be validated before
+		if req.Options.Firmware != nil {
+			switch req.Options.Firmware.Image {
+			case "bios", "legacy":
+				req.Options.Firmware.Image = ""
+			case "efi", "uefi":
+				if _, fname, err := s.LookForFile("OVMF.fd", "/usr/share/ovmf", "/usr/share/qemu"); err == nil {
+					req.Options.Firmware.Image = fname
+				} else {
+					return err
+				}
+			}
+			vmc.SetFirmwareImage(req.Options.Firmware.Image)
+		}
 
 		if err := vmc.Save(); err != nil {
 			return err
@@ -245,4 +261,56 @@ func (s *ServiceServer) ListNames(ctx context.Context, req *pb.ListMachinesReque
 	}
 
 	return &pb.ListNamesResponse{Machines: names}, nil
+}
+
+func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequest) (*empty.Empty, error) {
+	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
+		vm, err := s.GetMachine(req.Name)
+		if err != nil {
+			return err
+		}
+
+		switch req.Image {
+		case "bios", "legacy":
+			// For now just remove the whole section
+			req.RemoveConf = true
+		case "efi", "uefi":
+			// Try to find the OVMF.fd file
+			_, fname, err := s.LookForFile("OVMF.fd", "/usr/share/ovmf", "/usr/share/qemu")
+			if err != nil {
+				return err
+			}
+
+			req.Image = fname
+		}
+
+		if req.RemoveConf {
+			if err := vm.C.RemoveFirmwareConf(); err != nil {
+				return err
+			}
+			return vm.C.Save()
+		}
+
+		if fi, err := os.Stat(req.Image); err == nil {
+			if fi.IsDir() {
+				return grpc_status.Errorf(grpc_codes.InvalidArgument, "not a file: %s", req.Image)
+			}
+		} else {
+			if os.IsNotExist(err) {
+				return grpc_status.Errorf(grpc_codes.InvalidArgument, "not found: %s", req.Image)
+			}
+		}
+
+		if err := vm.C.SetFirmwareImage(req.Image); err != nil {
+			return err
+		}
+
+		return vm.C.Save()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(empty.Empty), nil
 }
