@@ -19,3 +19,5 @@ deploy:
 notifications:
   email:
     - sergey@divpro.ru
+
+# Added comment - 
