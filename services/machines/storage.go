@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
+	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend"
 
@@ -27,7 +28,7 @@ func (s *ServiceServer) AttachDisk(ctx context.Context, req *pb.AttachDiskReques
 	d.Bootindex = uint(req.Bootindex)
 
 	if len(req.ProxyCommand) > 0 {
-		if v, err := resolveExecutable(req.ProxyCommand); err == nil {
+		if v, err := helpers.ResolveExecutable(req.ProxyCommand); err == nil {
 			req.ProxyCommand = v
 		} else {
 			return nil, err

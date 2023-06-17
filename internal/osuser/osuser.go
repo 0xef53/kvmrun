@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/0xef53/kvmrun/internal/flock"
 )
 
 const (
@@ -86,7 +88,7 @@ func getVacantUid() (int, error) {
 
 // CreateUser creates a new user with the first vacant UID.
 func CreateUser(name string) (int, error) {
-	lock, err := NewLocker(lockfileName)
+	lock, err := flock.NewLocker(lockfileName)
 	if err != nil {
 		return -1, err
 	}

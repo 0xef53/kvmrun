@@ -157,3 +157,12 @@ func (p *Pool) FindBlockJobCompletedEvent(vmname, device string, after uint64) (
 
 	return m.FindBlockJobCompletedEvent(device, after)
 }
+
+func (p *Pool) WaitMachineResumeStateEvent(vmname string, ctx context.Context, after uint64) (*qmp.Event, error) {
+	m, err := p.getMonitor(vmname)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.WaitMachineResumeStateEvent(ctx, after)
+}

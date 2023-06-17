@@ -2,21 +2,27 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/ps"
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
 	"github.com/0xef53/kvmrun/internal/task"
+	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/services"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
 
 	qmp "github.com/0xef53/go-qmp/v2"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -81,6 +87,8 @@ func (t *QemuInstanceRegistrationTask) Main() error {
 		group.Go(func() error { return t.initBalloon(ctx) })
 	}
 
+	group.Go(func() error { return t.initNetworkSecondStage(ctx) })
+
 	return group.Wait()
 }
 
@@ -114,7 +122,7 @@ func (t *QemuInstanceRegistrationTask) waitForQemuSystem() error {
 }
 
 func (t *QemuInstanceRegistrationTask) initBalloon(ctx context.Context) error {
-	t.Logger.Debug("Request the memory balloon driver")
+	t.Logger.Info("[memory] Start the memory balloon configuring")
 
 	errTryAgainLater := errors.New("attempt failed: try again later")
 
@@ -167,10 +175,80 @@ func (t *QemuInstanceRegistrationTask) initBalloon(ctx context.Context) error {
 	}()
 
 	if err == nil {
-		t.Logger.Infof("Actual memory size is set to %d MB", t.req.MemActual>>20)
+		t.Logger.Infof("[memory] Actual memory size is set to %d MB", t.req.MemActual>>20)
 
 	} else {
-		t.Logger.Errorf("Failed to set actual memory size via virtio_balloon: %s", err)
+		t.Logger.Errorf("[memory] Failed to set actual memory size via virtio_balloon: %s", err)
+	}
+
+	return nil
+}
+
+func (t *QemuInstanceRegistrationTask) initNetworkSecondStage(ctx context.Context) error {
+	t.Logger.Info("[network] Start the second stage network configuring")
+
+	ts := time.Now()
+
+	var st qemu_types.StatusInfo
+
+	if err := t.Mon.Run(t.req.Name, qmp.Command{"query-status", nil}, &st); err != nil {
+		return err
+	}
+
+	if !st.Running {
+		t.Logger.Infof("[network] Wait for machine emulation to be running. Current status is %s", st.Status)
+
+		if _, err := t.Mon.WaitMachineResumeStateEvent(t.req.Name, ctx, uint64(ts.Unix())); err != nil {
+			return err
+		}
+	}
+
+	cfg := struct {
+		Ifaces []kvmrun.NetIface `json:"network"`
+	}{}
+
+	if b, err := ioutil.ReadFile(filepath.Join(kvmrun.CONFDIR, t.req.Name, "config")); err == nil {
+		if err := json.Unmarshal(b, &cfg); err != nil {
+			return err
+		}
+	} else {
+		if os.IsNotExist(err) {
+			return &kvmrun.NotFoundError{t.req.Name}
+		} else {
+			return err
+		}
+	}
+
+	isSupported := func(binary string) bool {
+		if err := exec.Command(binary, "--test-second-stage-feature").Run(); err != nil {
+			return false
+		}
+		return true
+	}
+
+	for _, netif := range cfg.Ifaces {
+		if len(netif.Ifup) == 0 {
+			continue
+		}
+
+		t.Logger.Infof("[network] Start IFUP-script for interface %s", netif.Ifname)
+
+		if _, err := helpers.ResolveExecutable(netif.Ifup); err == nil {
+			if isSupported(netif.Ifup) {
+				ifupCmd := exec.Command(netif.Ifup, "--second-stage", netif.Ifname)
+
+				ifupCmd.Dir = filepath.Join(kvmrun.CONFDIR, t.req.Name)
+
+				ifupCmd.Stdout = t.Logger.WriterLevel(log.InfoLevel)
+				ifupCmd.Stderr = t.Logger.WriterLevel(log.ErrorLevel)
+
+				if err := ifupCmd.Run(); err != nil {
+					t.Logger.Errorf("[network] IFUP-script for interface %s failed: %s", netif.Ifname, err)
+				}
+			}
+		} else {
+			t.Logger.Errorf("[network] Unable to run IFUP-script for interface %s: %s", netif.Ifname, err)
+		}
 	}
 
 	return nil

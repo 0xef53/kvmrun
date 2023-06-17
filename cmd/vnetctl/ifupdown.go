@@ -8,36 +8,62 @@ import (
 	pb "github.com/0xef53/kvmrun/api/services/network/v1"
 	"github.com/0xef53/kvmrun/internal/grpcclient"
 
+	"github.com/urfave/cli/v2"
 	"github.com/vishvananda/netlink"
 )
 
 func ifupdownMain() error {
-	if len(os.Args) != 2 {
-		return fmt.Errorf("usage: %s IFNAME", progname)
+	app := cli.NewApp()
+
+	app.Name = progname
+	app.Usage = "interface for management virtual networks"
+	app.HideHelpCommand = true
+
+	app.Action = func(c *cli.Context) error {
+		if c.IsSet("test-second-stage-feature") {
+			return nil
+		}
+
+		ifname := strings.TrimSpace(c.Args().First())
+
+		// Unix socket client
+		conn, err := grpcclient.NewConn(kvmrundSock, nil, true)
+		if err != nil {
+			return fmt.Errorf("grpc dial error: %s", err)
+		}
+		defer conn.Close()
+
+		client := pb.NewNetworkServiceClient(conn)
+
+		switch progname {
+		case "ifup":
+			return ifup(client, ifname, c.Bool("second-stage"))
+		case "ifdown":
+			return ifdown(client, ifname)
+		}
+
+		return nil
 	}
 
-	ifname := strings.TrimSpace(os.Args[1])
-
-	// Unix socket client
-	conn, err := grpcclient.NewConn(kvmrundSock, nil, true)
-	if err != nil {
-		return fmt.Errorf("grpc dial error: %s", err)
+	app.Flags = []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "second-stage",
+			EnvVars: []string{"SECOND_STAGE"},
+		},
+		&cli.BoolFlag{
+			Name:    "test-second-stage-feature",
+			EnvVars: []string{"TEST_SECOND_STAGE_FEATURE"},
+		},
 	}
-	defer conn.Close()
 
-	client := pb.NewNetworkServiceClient(conn)
-
-	switch progname {
-	case "ifup":
-		return ifup(client, ifname)
-	case "ifdown":
-		return ifdown(client, ifname)
+	if err := app.Run(os.Args); err != nil {
+		exitWithError(err)
 	}
 
 	return nil
 }
 
-func ifup(client pb.NetworkServiceClient, ifname string) error {
+func ifup(client pb.NetworkServiceClient, ifname string, secondStage bool) error {
 	if _, err := netlink.LinkByName(ifname); err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return fmt.Errorf("netlink: link not found: %s", ifname)
@@ -55,7 +81,7 @@ func ifup(client pb.NetworkServiceClient, ifname string) error {
 		return err
 	}
 
-	return scheme.Configure(client)
+	return scheme.Configure(client, secondStage)
 }
 
 func ifdown(client pb.NetworkServiceClient, ifname string) error {

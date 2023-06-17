@@ -12,6 +12,8 @@ github.com/0xef53/go-qmp/v2 v2.0.2 h1:UwrFUZ0d/GV18weX+MusYqC6V+xvBqehAReleKhEoo
 github.com/0xef53/go-qmp/v2 v2.0.2/go.mod h1:kqJLp1jcRUdsFE9WPBhPGy6r+/NOT4O7MyPImF9wD8A=
 github.com/0xef53/go-qmp/v2 v2.0.3 h1:uNekXTuNmeultc8df0a9wlJ3R0dkddrcYnj221VgGDs=
 github.com/0xef53/go-qmp/v2 v2.0.3/go.mod h1:kqJLp1jcRUdsFE9WPBhPGy6r+/NOT4O7MyPImF9wD8A=
+github.com/0xef53/go-qmp/v2 v2.0.4 h1:RQ9EnnAgT4NPvS8ARbAzWuMoiJ59B66Vr6Bg+OZ63A0=
+github.com/0xef53/go-qmp/v2 v2.0.4/go.mod h1:kqJLp1jcRUdsFE9WPBhPGy6r+/NOT4O7MyPImF9wD8A=
 github.com/0xef53/go-tuntap v1.0.0 h1:eHBjnHuHZ3WC3xpkwXnudmglFNNP85Py5UE5/80uo84=
 github.com/0xef53/go-tuntap v1.0.0/go.mod h1:e7cu6pCO/DfyQnb9NtNvR0dYk1Ti8/GA+KrCp4tYLHM=
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=

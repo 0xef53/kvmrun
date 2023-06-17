@@ -1,4 +1,4 @@
-package osuser
+package flock
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ErrAcquireLock = errors.New("Could not acquire lock")
+	ErrAcquireLock = errors.New("could not acquire lock")
 )
 
 // FileLocker is the structure that wraps exclusive file locking functionality.

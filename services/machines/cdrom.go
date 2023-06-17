@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
+	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/kvmrun"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
@@ -23,7 +24,7 @@ func (s *ServiceServer) AttachCdrom(ctx context.Context, req *pb.AttachCdromRequ
 	cdrom.Bootindex = uint(req.Bootindex)
 
 	if len(req.ProxyCommand) > 0 {
-		if v, err := resolveExecutable(req.ProxyCommand); err == nil {
+		if v, err := helpers.ResolveExecutable(req.ProxyCommand); err == nil {
 			req.ProxyCommand = v
 		} else {
 			return nil, err
@@ -158,7 +159,7 @@ func (s *ServiceServer) DetachCdrom(ctx context.Context, req *pb.DetachCdromRequ
 
 func (s *ServiceServer) ChangeCdromMedia(ctx context.Context, req *pb.ChangeCdromMediaRequest) (*empty.Empty, error) {
 	if len(req.ProxyCommand) > 0 {
-		if v, err := resolveExecutable(req.ProxyCommand); err == nil {
+		if v, err := helpers.ResolveExecutable(req.ProxyCommand); err == nil {
 			req.ProxyCommand = v
 		} else {
 			return nil, err

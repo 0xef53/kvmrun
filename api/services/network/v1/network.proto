@@ -38,8 +38,13 @@ message ConfigureRequest {
         string bind_interface = 3;
     }
     message RouterAttrs {
-        repeated string ipnets = 1 [(gogoproto.customname) = "IPNets"];
+        repeated string addrs = 1;
         uint32 mtu = 2 [(gogoproto.customname) = "MTU"];
+        string bind_interface = 3;
+        string default_gateway = 4;
+        uint32 in_limit = 5;
+        uint32 out_limit = 6;
+        string machine_name = 100;
     }
     message BridgeAttrs {
         string ifname = 1;
@@ -52,6 +57,7 @@ message ConfigureRequest {
         RouterAttrs router = 4;
         BridgeAttrs bridge = 5;
     }
+    bool second_stage = 100;
 }
 
 message DeconfigureRequest {
@@ -62,6 +68,7 @@ message DeconfigureRequest {
         uint32 vni = 1 [(gogoproto.customname) = "VNI"];
     }
     message RouterAttrs {
+        string bind_interface = 1;
     }
     message BridgeAttrs {
         string ifname = 1;

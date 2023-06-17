@@ -1,9 +1,6 @@
 package machines
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	qmp "github.com/0xef53/go-qmp/v2"
@@ -146,21 +143,4 @@ func stringSliceContains(slice []string, value string) bool {
 	}
 
 	return false
-}
-
-func resolveExecutable(fname string) (string, error) {
-	st, err := os.Stat(fname)
-	if err != nil {
-		return "", err
-	}
-
-	if !st.Mode().IsRegular() {
-		return "", fmt.Errorf("not a file: %s", fname)
-	}
-
-	if st.Mode()&0100 == 0 {
-		return "", fmt.Errorf("not executable by root: %s", fname)
-	}
-
-	return filepath.Abs(fname)
 }

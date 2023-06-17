@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	pb "github.com/0xef53/kvmrun/api/services/network/v1"
@@ -13,7 +15,7 @@ import (
 var errSchemeNotFound = errors.New("scheme not found")
 
 type Scheme interface {
-	Configure(pb.NetworkServiceClient) error
+	Configure(pb.NetworkServiceClient, bool) error
 	Deconfigure(pb.NetworkServiceClient) error
 }
 
@@ -64,6 +66,15 @@ func GetNetworkScheme(linkname string, configs ...string) (Scheme, error) {
 					return &vxlanScheme{linkname, &opts}, nil
 				case "routed":
 					opts := routerSchemeOptions{}
+
+					/*
+						TODO: cgroup classid dirty hack. Fix it.
+					*/
+					if cwd, err := os.Getwd(); err == nil {
+						opts.MachineName = filepath.Base(cwd)
+					} else {
+						return nil, fmt.Errorf("unable to determine machine name: %s", err)
+					}
 
 					if err := json.Unmarshal(b, &opts); err != nil {
 						return nil, err

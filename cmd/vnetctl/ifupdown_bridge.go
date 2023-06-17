@@ -16,7 +16,7 @@ type bridgeScheme struct {
 	opts     *bridgeSchemeOptions
 }
 
-func (sc *bridgeScheme) Configure(client pb.NetworkServiceClient) error {
+func (sc *bridgeScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
 	req := pb.ConfigureRequest{
 		LinkName: sc.linkname,
 		Attrs: &pb.ConfigureRequest_Bridge{
@@ -25,6 +25,7 @@ func (sc *bridgeScheme) Configure(client pb.NetworkServiceClient) error {
 				MTU:    sc.opts.MTU,
 			},
 		},
+		SecondStage: secondStage,
 	}
 
 	if _, err := client.Configure(context.Background(), &req); err != nil {

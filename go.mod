@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	github.com/0xef53/go-cgroups v1.0.4 // indirect
-	github.com/0xef53/go-qmp/v2 v2.0.3
+	github.com/0xef53/go-qmp/v2 v2.0.4
 	github.com/0xef53/go-tuntap v1.0.0
 	github.com/coreos/go-systemd/v22 v22.0.0
 	github.com/gogo/protobuf v1.3.1

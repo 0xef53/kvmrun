@@ -17,7 +17,7 @@ type vxlanScheme struct {
 	opts     *vxlanSchemeOptions
 }
 
-func (sc *vxlanScheme) Configure(client pb.NetworkServiceClient) error {
+func (sc *vxlanScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
 	req := pb.ConfigureRequest{
 		LinkName: sc.linkname,
 		Attrs: &pb.ConfigureRequest_Vxlan{
@@ -27,6 +27,7 @@ func (sc *vxlanScheme) Configure(client pb.NetworkServiceClient) error {
 				BindInterface: sc.opts.BindInterface,
 			},
 		},
+		SecondStage: secondStage,
 	}
 
 	if _, err := client.Configure(context.Background(), &req); err != nil {

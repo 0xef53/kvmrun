@@ -51,7 +51,7 @@ func (s *ServiceServer) Configure(ctx context.Context, req *pb.ConfigureRequest)
 		switch v := req.Attrs.(type) {
 		case *pb.ConfigureRequest_Vlan:
 			attrs := network.VlanDeviceAttrs{VlanID: v.Vlan.VlanID}
-			return network.ConfigureVlanPort(req.LinkName, &attrs)
+			return network.ConfigureVlanPort(req.LinkName, &attrs, req.SecondStage)
 		case *pb.ConfigureRequest_Vxlan:
 			if len(v.Vxlan.BindInterface) == 0 {
 				return fmt.Errorf("empty vxlan.bind_interface value")
@@ -71,13 +71,22 @@ func (s *ServiceServer) Configure(ctx context.Context, req *pb.ConfigureRequest)
 				Local: ips[0],
 			}
 
-			return network.ConfigureVxlanPort(req.LinkName, &attrs)
+			return network.ConfigureVxlanPort(req.LinkName, &attrs, req.SecondStage)
 		case *pb.ConfigureRequest_Router:
-			attrs := network.RouterDeviceAttrs{}
-			return network.ConfigureRouter(req.LinkName, &attrs)
+			attrs := network.RouterDeviceAttrs{
+				Addrs:          v.Router.Addrs,
+				MTU:            v.Router.MTU,
+				BindInterface:  v.Router.BindInterface,
+				DefaultGateway: v.Router.DefaultGateway,
+				InLimit:        v.Router.InLimit,
+				OutLimit:       v.Router.OutLimit,
+				MachineName:    v.Router.MachineName,
+			}
+
+			return network.ConfigureRouter(req.LinkName, &attrs, req.SecondStage)
 		case *pb.ConfigureRequest_Bridge:
 			attrs := network.BridgeDeviceAttrs{Ifname: v.Bridge.Ifname, MTU: v.Bridge.MTU}
-			return network.ConfigureBridgePort(req.LinkName, &attrs)
+			return network.ConfigureBridgePort(req.LinkName, &attrs, req.SecondStage)
 		}
 
 		return grpc_status.Errorf(grpc_codes.Unimplemented, "unknown network scheme")
@@ -107,7 +116,7 @@ func (s *ServiceServer) Deconfigure(ctx context.Context, req *pb.DeconfigureRequ
 		case *pb.DeconfigureRequest_Vxlan:
 			return network.DeconfigureVxlanPort(req.LinkName, v.Vxlan.VNI)
 		case *pb.DeconfigureRequest_Router:
-			return network.DeconfigureRouter(req.LinkName)
+			return network.DeconfigureRouter(req.LinkName, v.Router.BindInterface)
 		case *pb.DeconfigureRequest_Bridge:
 			return network.DeconfigureBridgePort(req.LinkName, v.Bridge.Ifname)
 		}

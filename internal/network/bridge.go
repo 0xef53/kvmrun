@@ -11,7 +11,12 @@ type BridgeDeviceAttrs struct {
 	MTU    uint32
 }
 
-func ConfigureBridgePort(linkname string, attrs *BridgeDeviceAttrs) error {
+func ConfigureBridgePort(linkname string, attrs *BridgeDeviceAttrs, secondStage bool) error {
+	if secondStage {
+		// no second stage for this scheme
+		return nil
+	}
+
 	brLink, err := netlink.LinkByName(attrs.Ifname)
 
 	switch err.(type) {

@@ -13,7 +13,12 @@ type VxlanDeviceAttrs struct {
 	Local net.IP
 }
 
-func ConfigureVxlanPort(linkname string, attrs *VxlanDeviceAttrs) error {
+func ConfigureVxlanPort(linkname string, attrs *VxlanDeviceAttrs, secondStage bool) error {
+	if secondStage {
+		// no second stage for this scheme
+		return nil
+	}
+
 	vxName := fmt.Sprintf("vxlan_%d", attrs.VNI)
 	brName := fmt.Sprintf("xbr_%d", attrs.VNI)
 

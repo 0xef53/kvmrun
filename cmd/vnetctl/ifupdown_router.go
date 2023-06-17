@@ -7,7 +7,13 @@ import (
 )
 
 type routerSchemeOptions struct {
-	MTU uint32 `json:"mtu"`
+	Addrs          []string `json:"ips"`
+	MTU            uint32   `json:"mtu"`
+	BindInterface  string   `json:"bind_interface"`
+	DefaultGateway string   `json:"default_gateway"`
+	InLimit        uint32   `json:"bwlim_in"`
+	OutLimit       uint32   `json:"bwlim_out"`
+	MachineName    string
 }
 
 type routerScheme struct {
@@ -15,14 +21,21 @@ type routerScheme struct {
 	opts     *routerSchemeOptions
 }
 
-func (sc *routerScheme) Configure(client pb.NetworkServiceClient) error {
+func (sc *routerScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
 	req := pb.ConfigureRequest{
 		LinkName: sc.linkname,
 		Attrs: &pb.ConfigureRequest_Router{
 			Router: &pb.ConfigureRequest_RouterAttrs{
-				MTU: sc.opts.MTU,
+				Addrs:          sc.opts.Addrs,
+				MTU:            sc.opts.MTU,
+				BindInterface:  sc.opts.BindInterface,
+				DefaultGateway: sc.opts.DefaultGateway,
+				InLimit:        sc.opts.InLimit,
+				OutLimit:       sc.opts.OutLimit,
+				MachineName:    sc.opts.MachineName,
 			},
 		},
+		SecondStage: secondStage,
 	}
 
 	if _, err := client.Configure(context.Background(), &req); err != nil {
@@ -38,7 +51,9 @@ func (sc *routerScheme) Deconfigure(client pb.NetworkServiceClient) error {
 	req := pb.DeconfigureRequest{
 		LinkName: sc.linkname,
 		Attrs: &pb.DeconfigureRequest_Router{
-			Router: &pb.DeconfigureRequest_RouterAttrs{},
+			Router: &pb.DeconfigureRequest_RouterAttrs{
+				BindInterface: sc.opts.BindInterface,
+			},
 		},
 	}
 

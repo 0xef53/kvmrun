@@ -16,7 +16,7 @@ type vlanScheme struct {
 	opts     *vlanSchemeOptions
 }
 
-func (sc *vlanScheme) Configure(client pb.NetworkServiceClient) error {
+func (sc *vlanScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
 	req := pb.ConfigureRequest{
 		LinkName: sc.linkname,
 		Attrs: &pb.ConfigureRequest_Vlan{
@@ -25,6 +25,7 @@ func (sc *vlanScheme) Configure(client pb.NetworkServiceClient) error {
 				MTU:    sc.opts.MTU,
 			},
 		},
+		SecondStage: secondStage,
 	}
 
 	if _, err := client.Configure(context.Background(), &req); err != nil {
