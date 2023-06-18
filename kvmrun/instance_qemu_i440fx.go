@@ -678,19 +678,19 @@ func (r *InstanceQemu_i440fx) RemoveNetIface(ifname string) error {
 	}
 
 	// Remove the backend
-	if err := r.mon.Run(qmp.Command{"netdev_del", &qemu_types.StrID{iface.Ifname}}, nil); err != nil {
+	if err := r.mon.Run(qmp.Command{"netdev_del", &qemu_types.StrID{ifname}}, nil); err != nil {
 		return err
 	}
 
-	if err := r.NetIfaces.Remove(iface.Ifname); err != nil {
+	if err := r.NetIfaces.Remove(ifname); err != nil {
 		return err
 	}
 
-	if err := DelTapInterface(iface.Ifname); err != nil {
+	if err := DelTapInterface(ifname); err != nil {
 		return fmt.Errorf("cannot remove the tap interface: %s", err)
 	}
 
-	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", iface.Ifname)
+	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", ifname)
 	if err := os.Remove(ifaceConf); err != nil && !os.IsNotExist(err) {
 		return err
 	}
