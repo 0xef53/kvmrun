@@ -26,6 +26,7 @@ func (s *ServiceServer) AttachNetIface(ctx context.Context, req *pb.AttachNetIfa
 		Ifname: req.Ifname,
 		Driver: strings.ReplaceAll(strings.ToLower(req.Driver.String()), "_", "-"),
 		HwAddr: req.HwAddr,
+		Queues: int(req.Queues),
 		Ifup:   req.IfupScript,
 		Ifdown: req.IfdownScript,
 	}
@@ -144,6 +145,27 @@ func (s *ServiceServer) SetNetIfaceDownScript(ctx context.Context, req *pb.SetNe
 		}
 
 		if err := vm.C.SetNetIfaceDownScript(req.Ifname, req.Path); err != nil {
+			return err
+		}
+
+		return vm.C.Save()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(empty.Empty), nil
+}
+
+func (s *ServiceServer) SetNetIfaceQueues(ctx context.Context, req *pb.SetNetIfaceQueuesRequest) (*empty.Empty, error) {
+	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
+		vm, err := s.GetMachine(req.Name)
+		if err != nil {
+			return err
+		}
+
+		if err := vm.C.SetNetIfaceQueues(req.Ifname, int(req.Queues)); err != nil {
 			return err
 		}
 

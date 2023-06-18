@@ -124,6 +124,15 @@ func (b *qemuCommandLine_i440fx) ifaceArgs(iface *NetIface) []string {
 		deviceOpts = append(deviceOpts, fmt.Sprintf("bootindex=%d", iface.Bootindex))
 	}
 
+	// Enable multi-queue on virtio-net-pci interface
+	if iface.Driver == "virtio-net-pci" && iface.Queues > 1 {
+		// "iface.Queues" -- is the number of queue pairs.
+		backendOpts = append(backendOpts, fmt.Sprintf("queues=%d", 2*iface.Queues))
+		// "iface.Queues" count vectors for TX (transmit) queues, the same for RX (receive) queues,
+		// one for configuration purposes, and one for possible VQ (vector quantization) control.
+		deviceOpts = append(deviceOpts, fmt.Sprintf("mq=on,vectors=%d", 2*iface.Queues+2))
+	}
+
 	return []string{"-netdev", strings.Join(backendOpts, ","), "-device", strings.Join(deviceOpts, ",")}
 }
 

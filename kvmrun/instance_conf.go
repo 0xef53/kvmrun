@@ -425,6 +425,21 @@ func (c *InstanceConf) RemoveNetIface(ifname string) error {
 	return c.NetIfaces.Remove(ifname)
 }
 
+func (c *InstanceConf) SetNetIfaceQueues(ifname string, queues int) error {
+	if queues == 1 {
+		return fmt.Errorf("invalid queues value: must be greater than 1")
+	}
+
+	n := c.NetIfaces.Get(ifname)
+	if n == nil {
+		return &NotConnectedError{"instance_conf", ifname}
+	}
+
+	n.Queues = queues
+
+	return nil
+}
+
 func (c *InstanceConf) SetNetIfaceUpScript(ifname, scriptPath string) error {
 	if _, err := os.Stat(scriptPath); err != nil {
 		return fmt.Errorf("file not found: %s", scriptPath)

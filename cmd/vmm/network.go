@@ -33,6 +33,7 @@ var cmdNetworkAttach = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.GenericFlag{Name: "driver", Value: flag_types.DefaultNetIfaceDriver(), Usage: "network device driver `name`"},
 		&cli.GenericFlag{Name: "hwaddr", Value: new(flag_types.NetIfaceHwAddr), Usage: "hardware `address` of a network interface"},
+		&cli.UintFlag{Name: "queues", DefaultText: "not set", Usage: "`number` of RX/TX queue pairs (0 - not set)"},
 		&cli.StringFlag{Name: "ifup-script", Usage: "`script` to configure network on the host side after a machine starts"},
 		&cli.StringFlag{Name: "ifdown-script", Usage: "`script` to destroy network on the host side after a machine stops"},
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
@@ -48,6 +49,7 @@ func attachNetworkInterface(ctx context.Context, vmname string, c *cli.Context, 
 		Ifname:       c.Args().Tail()[0],
 		Driver:       c.Generic("driver").(*flag_types.NetIfaceDriver).Value(),
 		HwAddr:       c.Generic("hwaddr").(*flag_types.NetIfaceHwAddr).String(),
+		Queues:       uint32(c.Uint("queues")),
 		IfupScript:   c.String("ifup-script"),
 		IfdownScript: c.String("ifdown-script"),
 		Live:         c.Bool("live"),
@@ -89,6 +91,7 @@ var cmdNetworkSet = &cli.Command{
 	ArgsUsage: "VMNAME IFNAME",
 	HideHelp:  true,
 	Flags: []cli.Flag{
+		&cli.UintFlag{Name: "queues", DefaultText: "not set", Usage: "`number` of RX/TX queue pairs (0 - not set)"},
 		&cli.StringFlag{Name: "ifup-script", Usage: "`script` to configure network on the host side after a machine starts"},
 		&cli.StringFlag{Name: "ifdown-script", Usage: "`script` to destroy network on the host side after a machine stops"},
 		&cli.GenericFlag{Name: "link-state", Value: new(flag_types.NetIfaceLinkState), DefaultText: "not set", Usage: "interface link `state` (up or down)"},
@@ -100,6 +103,18 @@ var cmdNetworkSet = &cli.Command{
 
 func setNetworkParameters(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
 	client := pb.NewMachineServiceClient(conn)
+
+	if c.IsSet("queues") {
+		req := pb.SetNetIfaceQueuesRequest{
+			Name:   vmname,
+			Ifname: c.Args().Tail()[0],
+			Queues: uint32(c.Uint("queues")),
+		}
+
+		if _, err := client.SetNetIfaceQueues(ctx, &req); err != nil {
+			return err
+		}
+	}
 
 	if c.IsSet("ifup-script") {
 		req := pb.SetNetIfaceScriptRequest{

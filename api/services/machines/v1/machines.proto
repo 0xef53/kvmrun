@@ -51,6 +51,7 @@ service MachineService {
     rpc SetNetIfaceLinkState(SetNetIfaceLinkRequest) returns (google.protobuf.Empty) { }
     rpc SetNetIfaceUpScript(SetNetIfaceScriptRequest) returns (google.protobuf.Empty) { }
     rpc SetNetIfaceDownScript(SetNetIfaceScriptRequest) returns (google.protobuf.Empty) { }
+    rpc SetNetIfaceQueues(SetNetIfaceQueuesRequest) returns (google.protobuf.Empty) { }
 
     rpc AttachChannel(AttachChannelRequest) returns (google.protobuf.Empty) { }
     rpc DetachChannel(DetachChannelRequest) returns (google.protobuf.Empty) { }
@@ -252,6 +253,7 @@ message AttachNetIfaceRequest {
     string hw_addr = 4;
     string ifup_script = 5;
     string ifdown_script = 6;
+    uint32 queues = 7;
     bool live = 100;
 }
 
@@ -271,6 +273,12 @@ message SetNetIfaceLinkRequest {
     string name = 1;
     string ifname = 2;
     types.NetIfaceLinkState state = 3;
+}
+
+message SetNetIfaceQueuesRequest {
+    string name = 1;
+    string ifname = 2;
+    uint32 queues = 3;
 }
 
 message AttachChannelRequest {

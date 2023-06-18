@@ -564,6 +564,23 @@ func (r *InstanceQemu_i440fx) initNetwork() error {
 			return err
 		}
 
+		var mq bool
+		var vectors uint32
+
+		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "mq"}}, &mq); err == nil {
+			if mq {
+				err = r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "vectors"}}, &vectors)
+				if err != nil {
+					return err
+				}
+				if vectors > 4 {
+					netif.Queues = int(vectors-2) / 2
+				}
+			}
+		} else {
+			return err
+		}
+
 		// QdevId -- is a string with prefix 'net_'
 		// E.g: net_alice
 		netif.Ifname = dev.QdevID[4:]
@@ -623,12 +640,24 @@ func (r *InstanceQemu_i440fx) AppendNetIface(iface NetIface) error {
 		Mac:    iface.HwAddr,
 	}
 
-	if err := AddTapInterface(iface.Ifname, r.uid); err != nil {
+	// Enable multi-queue on virtio-net-pci interface
+	if iface.Driver == "virtio-net-pci" && iface.Queues > 1 {
+		// "iface.Queues" -- is the number of queue pairs.
+		hostOpts.Queues = 2 * iface.Queues
+
+		// "iface.Queues" count vectors for TX (transmit) queues, the same for RX (receive) queues,
+		// one for configuration purposes, and one for possible VQ (vector quantization) control.
+		opts.MQ = true
+		opts.Vectors = 2*iface.Queues + 2
+	}
+
+	if err := AddTapInterface(iface.Ifname, r.uid, opts.MQ); err != nil {
 		return err
 	}
 	if err := SetInterfaceUp(iface.Ifname); err != nil {
 		return err
 	}
+
 	if err := r.mon.Run(qmp.Command{"netdev_add", &hostOpts}, nil); err != nil {
 		return err
 	}
