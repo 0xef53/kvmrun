@@ -743,6 +743,10 @@ func (r *InstanceQemu) RemoveNetIface(_ string) error {
 	return ErrNotImplemented
 }
 
+func (r *InstanceQemu) SetNetIfaceQueues(_ string, _ int) error {
+	return ErrNotImplemented
+}
+
 func (r *InstanceQemu) SetNetIfaceUpScript(_, _ string) error {
 	return ErrNotImplemented
 }

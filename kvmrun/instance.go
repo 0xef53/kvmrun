@@ -62,6 +62,7 @@ type Instance interface {
 	GetNetIfaces() NetifPool
 	AppendNetIface(NetIface) error
 	RemoveNetIface(string) error
+	SetNetIfaceQueues(string, int) error
 	SetNetIfaceUpScript(string, string) error
 	SetNetIfaceDownScript(string, string) error
 	SetNetIfaceLinkUp(string) error

@@ -45,6 +45,7 @@ message MachineOpts {
         string ifup = 4;
         string ifdown = 5;
         string addr = 6;
+        uint32 queues = 7;
     }
     message VirtioVSock {
         bool auto = 1;

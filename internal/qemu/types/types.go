@@ -60,6 +60,7 @@ type NetdevTapOptions struct {
 	ID         string `json:"id"`
 	Ifname     string `json:"ifname"`
 	Vhost      bool   `json:"vhost"`
+	Queues     int    `json:"queues,omitempty"`
 	Script     string `json:"script"`
 	Downscript string `json:"downscript"`
 }
@@ -204,6 +205,8 @@ type DeviceOptions struct {
 	Drive        string `json:"drive,omitempty"`
 	Netdev       string `json:"netdev,omitempty"`
 	Mac          string `json:"mac,omitempty"`
+	MQ           bool   `json:"mq,omitempty"`
+	Vectors      int    `json:"vectors,omitempty"`
 	Bootindex    int    `json:"bootindex,omitempty"`
 	Chardev      string `json:"chardev,omitempty"`
 	Name         string `json:"name,omitempty"`

@@ -3,9 +3,9 @@ package kvmrun
 import (
 	"crypto/rand"
 	"fmt"
-	"syscall"
 
 	"github.com/0xef53/go-tuntap"
+	"github.com/vishvananda/netlink"
 )
 
 var NetDrivers = DevDrivers{
@@ -18,6 +18,7 @@ type NetIface struct {
 	Ifname    string `json:"ifname"`
 	Driver    string `json:"driver"`
 	HwAddr    string `json:"hwaddr"`
+	Queues    int    `json:"queues"`
 	Addr      string `json:"addr,omitempty"`
 	Bootindex int    `json:"bootindex,omitempty"`
 	Ifup      string `json:"ifup,omitempty"`
@@ -99,32 +100,57 @@ func (p *NetifPool) RemoveN(idx int) error {
 }
 
 // AddTapInterface creates a new tap interface with Name == ifname and owner == uid.
-func AddTapInterface(ifname string, uid int) error {
+func AddTapInterface(ifname string, uid int, mq bool) error {
 	// Linux supports multiqueue tuntap from version 3.8
 	// https://www.kernel.org/doc/Documentation/networking/tuntap.txt
 	// (3.3 Multiqueue tuntap interface)
-	flags := syscall.IFF_NO_PI | syscall.IFF_ONE_QUEUE
+
+	link := &netlink.Tuntap{
+		LinkAttrs: netlink.LinkAttrs{Name: ifname},
+		Mode:      netlink.TUNTAP_MODE_TAP,
+		Flags:     netlink.TUNTAP_TUN_EXCL | netlink.TUNTAP_NO_PI,
+		Owner:     1024,
+	}
+
+	if mq {
+		link.Flags |= netlink.TUNTAP_MULTI_QUEUE
+	} else {
+		link.Flags |= netlink.TUNTAP_ONE_QUEUE
+	}
 
 	features, err := tuntap.GetFeatures()
 	if err != nil {
 		return err
 	}
 
-	if (features & syscall.IFF_VNET_HDR) != 0 {
-		flags |= syscall.IFF_VNET_HDR
+	if (features & uint16(netlink.TUNTAP_VNET_HDR)) != 0 {
+		link.Flags |= netlink.TUNTAP_VNET_HDR
 	}
 
-	return tuntap.AddTapInterface(ifname, uid, -1, uint16(flags), true)
+	return netlink.LinkAdd(link)
 }
 
 // DelTapInterface destroys an existing tap interface with Name == ifname.
 func DelTapInterface(ifname string) error {
-	return tuntap.DelTapInterface(ifname)
+	link, err := netlink.LinkByName(ifname)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			return nil
+		}
+		return fmt.Errorf("netlink: %s", err)
+	}
+
+	return netlink.LinkDel(link)
 }
 
 // SetInterfaceUp changes the state of a given interface to UP.
 func SetInterfaceUp(ifname string) error {
-	return tuntap.SetInterfaceUp(ifname)
+	link := &netlink.Tuntap{
+		LinkAttrs: netlink.LinkAttrs{Name: ifname},
+		Mode:      netlink.TUNTAP_MODE_TAP,
+	}
+
+	return netlink.LinkSetUp(link)
 }
 
 // GenHwAddr generates a random hardware address with Linux KVM prefix 54:52:00.

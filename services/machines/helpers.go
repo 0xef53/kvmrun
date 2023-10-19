@@ -74,6 +74,7 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Ifname: n.Ifname,
 				Driver: n.Driver,
 				HwAddr: n.HwAddr,
+				Queues: uint32(n.Queues),
 				Ifup:   n.Ifup,
 				Ifdown: n.Ifdown,
 				Addr:   n.Addr,
