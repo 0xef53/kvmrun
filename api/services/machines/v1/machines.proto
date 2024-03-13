@@ -31,6 +31,9 @@ service MachineService {
     rpc SetCPUQuota(SetCPUQuotaRequest) returns (google.protobuf.Empty) { }
     rpc SetCPUModel(SetCPUModelRequest) returns (google.protobuf.Empty) { }
 
+    rpc AttachHostPCIDevice(AttachHostPCIDeviceRequest) returns (google.protobuf.Empty) { }
+    rpc DetachHostPCIDevice(DetachHostPCIDeviceRequest) returns (google.protobuf.Empty) { }
+
     rpc ActivateVNC(ActivateVNCRequest) returns (ActivateVNCResponse) { }
 
     rpc AttachInputDevice(AttachInputDeviceRequest) returns (google.protobuf.Empty) { }
@@ -160,6 +163,19 @@ message SetCPUQuotaRequest {
 message SetCPUModelRequest {
     string name = 1;
     string model = 2;
+}
+
+message AttachHostPCIDeviceRequest {
+    string name = 1;
+    string addr = 2;
+    bool multifunction = 3;
+    bool primary_gpu = 4 [(gogoproto.customname) = "PrimaryGPU"];
+    bool strict_mode = 90;
+}
+
+message DetachHostPCIDeviceRequest {
+    string name = 1;
+    string addr = 2;
 }
 
 message ActivateVNCRequest {

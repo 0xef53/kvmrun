@@ -76,6 +76,28 @@ func (l *launcher) Start() error {
 		return nil
 	}
 
+	// Check all the PCI devices and detach them from the host
+	if devs := vmconf.GetHostPCIDevices(); len(devs) > 0 {
+		if err := loadVfioModule(); err != nil {
+			return err
+		}
+		for _, pcidev := range devs {
+			if inuse, err := pcidev.Backend.IsEnabled(); err == nil {
+				if inuse {
+					return fmt.Errorf("unable to work with open PCI device: %s", pcidev.Backend.String())
+				}
+			} else {
+				return fmt.Errorf("failed to check PCI device %s: %w", pcidev.Backend.String(), err)
+			}
+
+			if err := pcidev.Backend.AssignDriver("vfio-pci"); err == nil {
+				Info.Printf("PCI device has been detached from the host: %s\n", pcidev.Backend.String())
+			} else {
+				return fmt.Errorf("failed to detach PCI device %s: %w", pcidev.Backend.String(), err)
+			}
+		}
+	}
+
 	// Start proxy servers for disk backends
 	if len(vmconf.GetProxyServers()) > 0 {
 		if _, err := l.client.StartDiskBackendProxy(l.ctx, &pb.DiskBackendProxyRequest{Name: l.vmname}); err != nil {
@@ -357,6 +379,19 @@ func enableCgroupCPU(vmconf kvmrun.Instance) error {
 	cgconf.CpuQuota = (cgconf.CpuPeriod * int64(vmconf.GetCPUQuota())) / 100
 	if err := cpuGroup.Set(&cgconf); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func loadVfioModule() error {
+	if _, err := os.Stat("/sys/bus/pci/drivers/vfio-pci"); err == nil {
+		return nil
+	}
+
+	// Try to load anyway
+	if _, err := exec.Command("modprobe", "vfio-pci").CombinedOutput(); err != nil {
+		return fmt.Errorf("could not load vfio-pci module: modprobe failed with %s", err)
 	}
 
 	return nil

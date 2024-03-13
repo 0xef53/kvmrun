@@ -136,6 +136,47 @@ func (b *qemuCommandLine_i440fx) ifaceArgs(iface *NetIface) []string {
 	return []string{"-netdev", strings.Join(backendOpts, ","), "-device", strings.Join(deviceOpts, ",")}
 }
 
+func (b *qemuCommandLine_i440fx) hostpciArgs(num int, dev *HostPCI, fns ...uint8) []string {
+	hexprefix := dev.Backend.Prefix()
+
+	opts := func(fn uint8) []string {
+		v := []string{
+			"vfio=pci",
+			fmt.Sprintf("host=%s.%x", hexprefix, fn),
+			"bus=pci.1",
+		}
+		if dev.Multifunction {
+			v = append(v, fmt.Sprintf("id=hostpci%d.%d", num, fn))
+			v = append(v, fmt.Sprintf("addr=0x%x.0x%x", num, fn))
+		} else {
+			v = append(v, fmt.Sprintf("id=hostpci%d", num))
+			v = append(v, fmt.Sprintf("addr=0x%x", num))
+		}
+		if fn == 0 {
+			if dev.PrimaryGPU {
+				v = append(v, "x-vga=on")
+			}
+			if dev.Multifunction {
+				v = append(v, "multifunction=on")
+			}
+		}
+		return v
+	}
+
+	args := make([]string, 0, 2*len(fns))
+
+	switch n := len(fns); {
+	case n > 1:
+		for _, fn := range fns {
+			args = append(args, "-device", strings.Join(opts(fn), ","))
+		}
+	case n == 1:
+		args = append(args, "-device", strings.Join(opts(fns[0]), ","))
+	}
+
+	return args
+}
+
 func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args := make([]string, 0, 96)
 
@@ -184,8 +225,34 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args = append(args, "-chardev", fmt.Sprintf("socket,id=virtcon,path=%s.virtcon,server,nowait", filepath.Join(QMPMONDIR, b.vmconf.Name())))
 	args = append(args, "-device", "virtconsole,chardev=virtcon,name=console.0")
 
+	var hasPrimaryGPU bool
+
+	// PCI passthrough
+	if devs := b.vmconf.GetHostPCIDevices(); len(devs) > 1 {
+		// Dedicated PCI bus
+		args = append(args, "-device", "pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x7")
+		for num, pcidev := range devs {
+			if pcidev.Multifunction {
+				fns, err := pcidev.Backend.GetAllFunctions()
+				if err != nil {
+					return nil, fmt.Errorf("unable to get all functions: %w", err)
+				}
+				args = append(args, b.hostpciArgs(num, &pcidev, fns...)...)
+			} else {
+				args = append(args, b.hostpciArgs(num, &pcidev, pcidev.Backend.Function())...)
+			}
+			if pcidev.PrimaryGPU {
+				hasPrimaryGPU = true
+			}
+		}
+	}
+
 	// VGA
-	args = append(args, "-vga", "cirrus")
+	if hasPrimaryGPU {
+		args = append(args, "-vga", "none", "-nographic")
+	} else {
+		args = append(args, "-vga", "cirrus")
+	}
 
 	// Input devices
 	for _, dev := range b.vmconf.GetInputDevices() {

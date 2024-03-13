@@ -76,7 +76,7 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 
 	switch t := inner.GetMachineType(); t.Chipset {
 	case QEMU_CHIPSET_I440FX:
-		vmi = &InstanceQemu_i440fx{&inner}
+		vmi = &InstanceQemu_i440fx{InstanceQemu: &inner}
 	default:
 		return nil, fmt.Errorf("unsupported machine type: %s", t)
 	}
@@ -86,6 +86,7 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 	gr.Go(func() error { return inner.initFirmware() })
 	gr.Go(func() error { return inner.initCPU() })
 	gr.Go(func() error { return inner.initMemory() })
+	gr.Go(func() error { return inner.initHostPCIDevices() })
 	gr.Go(func() error { return inner.initInputDevices() })
 	gr.Go(func() error { return inner.initVSockDevice() })
 	gr.Go(func() error { return inner.initCloudInitDrive() })
@@ -444,6 +445,20 @@ func (r *InstanceQemu) SetActualMem(s int) error {
 }
 
 func (r *InstanceQemu) SetTotalMem(_ int) error {
+	return ErrNotImplemented
+}
+
+func (r *InstanceQemu) initHostPCIDevices() error {
+	r.HostPCIDevices = r.startupConf.GetHostPCIDevices()
+
+	return nil
+}
+
+func (r *InstanceQemu) AppendHostPCI(_ HostPCI) error {
+	return ErrNotImplemented
+}
+
+func (r *InstanceQemu) RemoveHostPCI(_ string) error {
 	return ErrNotImplemented
 }
 

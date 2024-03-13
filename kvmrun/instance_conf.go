@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/0xef53/kvmrun/internal/pci"
 )
 
 // InstanceConf represents a virtual machine configuration
@@ -69,6 +71,15 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	}
 
 	vmc.MachineType = strings.TrimSpace(strings.ToLower(vmc.MachineType))
+
+	for idx := range vmc.HostPCIDevices {
+		b, err := pci.NewDevice(vmc.HostPCIDevices[idx].Addr)
+		if err != nil {
+			return nil, err
+		}
+		vmc.HostPCIDevices[idx].Backend = b
+		vmc.HostPCIDevices[idx].Addr = b.String()
+	}
 
 	for idx := range vmc.Disks {
 		b, err := NewDiskBackend(vmc.Disks[idx].Path)
@@ -218,6 +229,29 @@ func (c *InstanceConf) SetTotalMem(s int) error {
 	c.Mem.Total = s
 
 	return nil
+}
+
+func (c *InstanceConf) AppendHostPCI(d HostPCI) error {
+	if c.HostPCIDevices.Exists(d.Addr) {
+		return &AlreadyConnectedError{"instance_conf", d.Addr}
+	}
+
+	c.HostPCIDevices.Append(&d)
+
+	return nil
+}
+
+func (c *InstanceConf) RemoveHostPCI(hexaddr string) error {
+	addr, err := pci.AddressFromHex(hexaddr)
+	if err != nil {
+		return err
+	}
+
+	if c.HostPCIDevices.Exists(addr.String()) {
+		return c.HostPCIDevices.Remove(addr.String())
+	}
+
+	return &NotConnectedError{"instance_conf", addr.String()}
 }
 
 func (c *InstanceConf) AppendInputDevice(d InputDevice) error {

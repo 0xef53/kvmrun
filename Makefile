@@ -55,7 +55,7 @@ $(binaries):
 	@echo "##########################"
 	@echo
 	install -d bin
-	docker run --rm -i $(DOCKER_BUILD_ARGS) golang:latest
+	docker run --rm -i $(DOCKER_BUILD_ARGS) golang:1.18-buster
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"
