@@ -48,6 +48,7 @@ func main() {
 		memoryCommands,
 		cpuCommands,
 		bootCommands,
+		hostpciCommands,
 		inputsCommands,
 		cdromCommands,
 		storageCommands,

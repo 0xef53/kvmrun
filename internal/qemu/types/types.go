@@ -170,7 +170,7 @@ type ChardevBackend struct {
 	Data ChardevSocket `json:"data"`
 }
 
-//  ChardevSocket describes a (stream) socket character device.
+// ChardevSocket describes a (stream) socket character device.
 type ChardevSocket struct {
 	Addr   SocketAddressLegacy `json:"addr"`
 	Server bool                `json:"server"`

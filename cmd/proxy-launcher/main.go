@@ -128,7 +128,7 @@ func run(c *cli.Context) error {
 		<-sigc
 
 		if ok, err := daemon.SdNotify(false, daemon.SdNotifyReady); !ok {
-			Error.Println("unable to send systemd notify: %s", err)
+			Error.Printf("unable to send systemd notify: %s\n", err)
 		}
 	}()
 

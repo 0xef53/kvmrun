@@ -115,7 +115,7 @@ func (p *DiskPool) Remove(dpath string) error {
 		}
 	}
 
-	return fmt.Errorf("disk not found: %s", p)
+	return fmt.Errorf("disk not found: %s", dpath)
 }
 
 // RemoveN removes an element with Index == idx from the list.

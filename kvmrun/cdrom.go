@@ -107,7 +107,7 @@ func (p *CDPool) Remove(name string) error {
 		}
 	}
 
-	return fmt.Errorf("device not found: %s", p)
+	return fmt.Errorf("device not found: %s", name)
 }
 
 // RemoveN removes an element with Index == idx from the list.
