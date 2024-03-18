@@ -78,7 +78,7 @@ func GetInstanceConf(vmname string) (Instance, error) {
 			return nil, err
 		}
 		vmc.HostPCIDevices[idx].Backend = b
-		vmc.HostPCIDevices[idx].Addr = b.String()
+		vmc.HostPCIDevices[idx].Addr = b.String() // normalizing
 	}
 
 	for idx := range vmc.Disks {
@@ -664,6 +664,15 @@ func GetStartupConf(vmname string) (Instance, error) {
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, err
+	}
+
+	for idx := range c.HostPCIDevices {
+		b, err := pci.NewDevice(c.HostPCIDevices[idx].Addr)
+		if err != nil {
+			return nil, err
+		}
+		c.HostPCIDevices[idx].Backend = b
+		c.HostPCIDevices[idx].Addr = b.String() // normalizing
 	}
 
 	for idx := range c.Disks {

@@ -141,7 +141,7 @@ func (b *qemuCommandLine_i440fx) hostpciArgs(num int, dev *HostPCI, fns ...uint8
 
 	opts := func(fn uint8) []string {
 		v := []string{
-			"vfio=pci",
+			"vfio-pci",
 			fmt.Sprintf("host=%s.%x", hexprefix, fn),
 			"bus=pci.1",
 		}
@@ -228,11 +228,18 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	var hasPrimaryGPU bool
 
 	// PCI passthrough
-	if devs := b.vmconf.GetHostPCIDevices(); len(devs) > 1 {
+	if devs := b.vmconf.GetHostPCIDevices(); len(devs) > 0 {
 		// Dedicated PCI bus
 		args = append(args, "-device", "pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x7")
 		for num, pcidev := range devs {
 			if pcidev.Multifunction {
+				if ok, err := pcidev.Backend.HasMultifunctionFeature(); err == nil {
+					if !ok {
+						return nil, fmt.Errorf("multifunction is not supported: %s", pcidev.Backend.String())
+					}
+				} else {
+					return nil, fmt.Errorf("failed to check multifunction feature for %s: %w", pcidev.Backend.String(), err)
+				}
 				fns, err := pcidev.Backend.GetAllFunctions()
 				if err != nil {
 					return nil, fmt.Errorf("unable to get all functions: %w", err)

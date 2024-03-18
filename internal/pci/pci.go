@@ -152,9 +152,13 @@ func (d *Device) GetAllFunctions() ([]uint8, error) {
 		return nil, fmt.Errorf("non general device: %s", d.addr.String())
 	}
 
+	functions := make([]uint8, 0, 7)
+
+	functions = append(functions, 0)
+
 	if ok, err := d.HasMultifunctionFeature(); err == nil {
 		if !ok {
-			return nil, fmt.Errorf("multifunction is not supported: %s", d.addr.String())
+			return functions, nil
 		}
 	} else {
 		return nil, err
@@ -167,11 +171,9 @@ func (d *Device) GetAllFunctions() ([]uint8, error) {
 
 	prefix := d.addr.Prefix()
 
-	functions := make([]uint8, 0, 7)
-
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), "consumer:pci:"+prefix) {
-			if addr, err := AddressFromHex(strings.TrimPrefix(f.Name(), "consumer:pci:"+prefix)); err == nil {
+			if addr, err := AddressFromHex(strings.TrimPrefix(f.Name(), "consumer:pci:")); err == nil {
 				functions = append(functions, addr.Function)
 			} else {
 				return nil, fmt.Errorf("unexpected: %w", err)
@@ -180,6 +182,41 @@ func (d *Device) GetAllFunctions() ([]uint8, error) {
 	}
 
 	return functions, nil
+}
+
+func (d *Device) GetConsumers() ([]*Device, error) {
+	if d.addr.Function != 0 {
+		return nil, fmt.Errorf("non general device: %s", d.addr.String())
+	}
+
+	if ok, err := d.HasMultifunctionFeature(); err == nil {
+		if !ok {
+			return nil, nil
+		}
+	} else {
+		return nil, err
+	}
+
+	devices := make([]*Device, 0, 0)
+
+	files, err := os.ReadDir(d.FullPath())
+	if err != nil {
+		return nil, err
+	}
+
+	prefix := d.addr.Prefix()
+
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), "consumer:pci:"+prefix) {
+			if d, err := NewDevice(strings.TrimPrefix(f.Name(), "consumer:pci:")); err == nil {
+				devices = append(devices, d)
+			} else {
+				return nil, fmt.Errorf("unexpected: %w", err)
+			}
+		}
+	}
+
+	return devices, nil
 }
 
 func (d *Device) GetCurrentDriver() (string, error) {
@@ -194,6 +231,24 @@ func (d *Device) GetCurrentDriver() (string, error) {
 	return filepath.Base(s), nil
 }
 
+func (d *Device) GetVendorNumber() (string, error) {
+	data, err := os.ReadFile(filepath.Join(d.FullPath(), "vendor"))
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(data)), nil
+}
+
+func (d *Device) GetDeviceNumber() (string, error) {
+	data, err := os.ReadFile(filepath.Join(d.FullPath(), "device"))
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(data)), nil
+}
+
 func (d *Device) AssignDriver(n string) error {
 	if n = strings.TrimSpace(n); len(n) == 0 {
 		return fmt.Errorf("empty driver name")
@@ -201,7 +256,17 @@ func (d *Device) AssignDriver(n string) error {
 
 	driver, err := d.GetCurrentDriver()
 	if err != nil {
-		return fmt.Errorf("cannot determine the current driver: %w", err)
+		return fmt.Errorf("failed to get the current driver: %w", err)
+	}
+
+	vendor, err := d.GetVendorNumber()
+	if err != nil {
+		return fmt.Errorf("failed to get the vendor number: %w", err)
+	}
+
+	device, err := d.GetDeviceNumber()
+	if err != nil {
+		return fmt.Errorf("failed to get the device number: %w", err)
 	}
 
 	if driver == n {
@@ -213,8 +278,8 @@ func (d *Device) AssignDriver(n string) error {
 			return fmt.Errorf("failed to unbind: %w", err)
 		}
 	}
-
-	if err := os.WriteFile(filepath.Join("/sys/bus/pci/drivers", n, "new_id"), []byte(d.String()), 0200); err != nil {
+	fmt.Printf(vendor + " " + device + "\n")
+	if err := os.WriteFile(filepath.Join("/sys/bus/pci/drivers", n, "new_id"), []byte(vendor+" "+device+"\n"), 0200); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("failed to assign driver: is %s loaded?", n)
 		}
