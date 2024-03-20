@@ -21,11 +21,6 @@ message MachineOpts {
         string model = 4;
         int64 quota = 5;
     }
-    message HostPCI {
-        string addr = 1;
-        bool multifunction = 2;
-        bool primary_gpu = 3 [(gogoproto.customname) = "PrimaryGPU"];
-    }
     message InputDevice {
         string type = 1;
     }
@@ -71,19 +66,24 @@ message MachineOpts {
         string command = 2;
         map<string, string> envs = 3;
     }
+    message HostPCI {
+        string addr = 1;
+        bool multifunction = 2;
+        bool primary_gpu = 3 [(gogoproto.customname) = "PrimaryGPU"];
+    }
     string machine_type = 1;
     Firmware firmware = 2;
     Memory memory = 3;
     CPU cpu = 4 [(gogoproto.customname) = "CPU"];
-    repeated HostPCI hostpci = 5  [(gogoproto.customname) = "HostPCIDevices"];
-    repeated InputDevice inputs = 6;
-    repeated Cdrom cdrom = 7;
-    repeated Disk storage = 8;
-    repeated NetIface network = 9;
-    VirtioVSock vsock_device = 10 [(gogoproto.customname) = "VSockDev"];
-    CloudInit cloudinit_drive = 11 [(gogoproto.customname) = "CIDrive"];
-    Kernel kernel = 12;
-    repeated BackendProxy proxy = 13;
+    repeated InputDevice inputs = 5;
+    repeated Cdrom cdrom = 6;
+    repeated Disk storage = 7;
+    repeated NetIface network = 8;
+    VirtioVSock vsock_device = 9 [(gogoproto.customname) = "VSockDev"];
+    CloudInit cloudinit_drive = 10 [(gogoproto.customname) = "CIDrive"];
+    Kernel kernel = 11;
+    repeated BackendProxy proxy = 12;
+    repeated HostPCI hostpci = 20  [(gogoproto.customname) = "HostPCIDevices"];
 }
 
 message Machine {
