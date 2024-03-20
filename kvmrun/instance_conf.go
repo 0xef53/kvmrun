@@ -254,6 +254,28 @@ func (c *InstanceConf) RemoveHostPCI(hexaddr string) error {
 	return &NotConnectedError{"instance_conf", addr.String()}
 }
 
+func (c *InstanceConf) SetHostPCIMultifunctionOption(hexaddr string, enabled bool) error {
+	d := c.HostPCIDevices.Get(hexaddr)
+	if d == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	d.Multifunction = enabled
+
+	return nil
+}
+
+func (c *InstanceConf) SetHostPCIPrimaryGPUOption(hexaddr string, enabled bool) error {
+	d := c.HostPCIDevices.Get(hexaddr)
+	if d == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	d.PrimaryGPU = enabled
+
+	return nil
+}
+
 func (c *InstanceConf) AppendInputDevice(d InputDevice) error {
 	if c.Inputs.Exists(d.Type) {
 		return &AlreadyConnectedError{"instance_conf", d.Type}

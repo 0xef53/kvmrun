@@ -462,6 +462,14 @@ func (r *InstanceQemu) RemoveHostPCI(_ string) error {
 	return ErrNotImplemented
 }
 
+func (r *InstanceQemu) SetHostPCIMultifunctionOption(_ string, _ bool) error {
+	return ErrNotImplemented
+}
+
+func (r *InstanceQemu) SetHostPCIPrimaryGPUOption(_ string, _ bool) error {
+	return ErrNotImplemented
+}
+
 func (r *InstanceQemu) initInputDevices() error {
 	r.Inputs = r.startupConf.GetInputDevices()
 

@@ -38,6 +38,8 @@ type Instance interface {
 	GetHostPCIDevices() HostPCIPool
 	AppendHostPCI(HostPCI) error
 	RemoveHostPCI(string) error
+	SetHostPCIMultifunctionOption(string, bool) error
+	SetHostPCIPrimaryGPUOption(string, bool) error
 
 	GetInputDevices() InputPool
 	AppendInputDevice(InputDevice) error

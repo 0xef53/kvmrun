@@ -75,3 +75,45 @@ func (s *ServiceServer) DetachHostPCIDevice(ctx context.Context, req *pb.DetachH
 
 	return new(empty.Empty), nil
 }
+
+func (s *ServiceServer) SetHostPCIMultifunctionOption(ctx context.Context, req *pb.SetHostPCIMultifunctionOptionRequest) (*empty.Empty, error) {
+	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
+		vm, err := s.GetMachine(req.Name)
+		if err != nil {
+			return err
+		}
+
+		if err := vm.C.SetHostPCIMultifunctionOption(req.Addr, req.Enabled); err != nil {
+			return err
+		}
+
+		return vm.C.Save()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(empty.Empty), nil
+}
+
+func (s *ServiceServer) SetHostPCIPrimaryGPUOption(ctx context.Context, req *pb.SetHostPCIPrimaryGPUOptionRequest) (*empty.Empty, error) {
+	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
+		vm, err := s.GetMachine(req.Name)
+		if err != nil {
+			return err
+		}
+
+		if err := vm.C.SetHostPCIPrimaryGPUOption(req.Addr, req.Enabled); err != nil {
+			return err
+		}
+
+		return vm.C.Save()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return new(empty.Empty), nil
+}
