@@ -11,18 +11,18 @@ type HostPCI struct {
 	PrimaryGPU    bool   `json:"primary_gpu"`
 	Multifunction bool   `json:"multifunction"`
 
-	Backend *pci.Device `json:"-"`
+	BackendAddr *pci.Address `json:"-"`
 }
 
 func NewHostPCI(hexaddr string) (*HostPCI, error) {
-	b, err := pci.NewDevice(hexaddr)
+	addr, err := pci.AddressFromHex(hexaddr)
 	if err != nil {
 		return nil, err
 	}
 
 	return &HostPCI{
-		Addr:    b.String(), // normalized addr
-		Backend: b,
+		Addr:        addr.String(), // normalized addr
+		BackendAddr: addr,
 	}, nil
 }
 

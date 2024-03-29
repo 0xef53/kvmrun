@@ -220,3 +220,19 @@ message NetworkEndPoint {
         IPFabric ipfabric_attrs = 5 [(gogoproto.customname) = "IPFabricAttrs"];
     }
 }
+
+message PCIDevice {
+    string addr = 1;
+    string driver = 2;
+    bool enabled = 3;
+    bool multifunction = 4;
+    uint32 class = 11;
+    uint32 vendor = 12;
+    uint32 device = 13;
+    string class_name = 21;
+    string subclass_name = 22;
+    string vendor_name = 23;
+    string device_name = 24;
+    bool reserved = 91;
+    string holder = 92;
+}

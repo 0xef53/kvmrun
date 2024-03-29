@@ -2,10 +2,10 @@ package machines
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"errors"
 
 	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
+	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/kvmrun"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
@@ -15,19 +15,22 @@ import (
 )
 
 func (s *ServiceServer) AttachHostPCIDevice(ctx context.Context, req *pb.AttachHostPCIDeviceRequest) (*empty.Empty, error) {
-	pcidev, err := kvmrun.NewHostPCI(req.Addr)
+	hpci, err := kvmrun.NewHostPCI(req.Addr)
 	if err != nil {
 		return nil, err
 	}
 
 	if req.StrictMode {
-		if _, err := os.Stat(filepath.Join(pcidev.Backend.FullPath(), "config")); err != nil {
-			return nil, grpc_status.Errorf(grpc_codes.NotFound, "PCI device not found: %s", pcidev.Addr)
+		if _, err := pci.LookupDevice(hpci.Addr); err != nil {
+			if errors.Is(err, pci.ErrDeviceNotFound) {
+				return nil, grpc_status.Errorf(grpc_codes.NotFound, err.Error())
+			}
+			return nil, err
 		}
 	}
 
-	pcidev.Multifunction = req.Multifunction
-	pcidev.PrimaryGPU = req.PrimaryGPU
+	hpci.Multifunction = req.Multifunction
+	hpci.PrimaryGPU = req.PrimaryGPU
 
 	err = s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
 		vm, err := s.GetMachine(req.Name)
@@ -35,7 +38,7 @@ func (s *ServiceServer) AttachHostPCIDevice(ctx context.Context, req *pb.AttachH
 			return err
 		}
 
-		if err := vm.C.AppendHostPCI(*pcidev); err != nil && !kvmrun.IsAlreadyConnectedError(err) {
+		if err := vm.C.AppendHostPCI(*hpci); err != nil && !kvmrun.IsAlreadyConnectedError(err) {
 			return err
 		}
 
@@ -51,7 +54,7 @@ func (s *ServiceServer) AttachHostPCIDevice(ctx context.Context, req *pb.AttachH
 
 func (s *ServiceServer) DetachHostPCIDevice(ctx context.Context, req *pb.DetachHostPCIDeviceRequest) (*empty.Empty, error) {
 	// Validate PCI address format
-	pcidev, err := kvmrun.NewHostPCI(req.Addr)
+	hpci, err := kvmrun.NewHostPCI(req.Addr)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +65,7 @@ func (s *ServiceServer) DetachHostPCIDevice(ctx context.Context, req *pb.DetachH
 			return err
 		}
 
-		if err := vm.C.RemoveHostPCI(pcidev.Backend.String()); err != nil && !kvmrun.IsNotConnectedError(err) {
+		if err := vm.C.RemoveHostPCI(hpci.BackendAddr.String()); err != nil && !kvmrun.IsNotConnectedError(err) {
 			return err
 		}
 

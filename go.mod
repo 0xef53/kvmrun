@@ -1,6 +1,6 @@
 module github.com/0xef53/kvmrun
 
-go 1.14
+go 1.16
 
 require (
 	github.com/0xef53/go-cgroups v1.0.4 // indirect
@@ -16,7 +16,7 @@ require (
 	github.com/sirupsen/logrus v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vishvananda/netlink v1.1.0 // indirect
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/sync v0.6.0
 	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
 	google.golang.org/grpc v1.38.0
 	gopkg.in/gcfg.v1 v1.2.3

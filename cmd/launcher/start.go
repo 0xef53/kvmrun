@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
 
@@ -81,39 +82,32 @@ func (l *launcher) Start() error {
 		if err := loadVfioModule(); err != nil {
 			return err
 		}
-		for _, pcidev := range devs {
-			if inuse, err := pcidev.Backend.IsEnabled(); err == nil {
-				if inuse {
-					if driver, err := pcidev.Backend.GetCurrentDriver(); err == nil {
-						if driver == "vfio-pci" {
-							return fmt.Errorf("unable to work with open PCI device: %s", pcidev.Backend.String())
-						}
-					} else {
-						return fmt.Errorf("failed to check PCI device %s: %w", pcidev.Backend.String(), err)
-					}
+
+		for _, hpci := range devs {
+			pcidev, err := pci.LookupDevice(hpci.BackendAddr.String())
+			if err != nil {
+				return err
+			}
+
+			if pcidev.Enabled() {
+				if pcidev.CurrentDriver() == "vfio-pci" {
+					return fmt.Errorf("unable to work with open PCI device: %s", pcidev.String())
 				}
-			} else {
-				return fmt.Errorf("failed to check PCI device %s: %w", pcidev.Backend.String(), err)
 			}
 
 			// Switch to the "vfio-pci" driver this device and all its child devices
 			// (all devices within the iommu_group are bound to their vfio bus driver)
-			if err := pcidev.Backend.AssignDriver("vfio-pci"); err == nil {
-				Info.Printf("PCI device has been detached from the host: %s\n", pcidev.Backend.String())
+			if err := pcidev.AssignDriver("vfio-pci"); err == nil {
+				Info.Printf("PCI device has been detached from the host: %s\n", pcidev.String())
 			} else {
-				return fmt.Errorf("failed to detach PCI device %s: %w", pcidev.Backend.String(), err)
+				return fmt.Errorf("failed to detach PCI device %s: %w", pcidev.String(), err)
 			}
 
-			consumers, err := pcidev.Backend.GetConsumers()
-			if err != nil {
-				return fmt.Errorf("failed to get consumers of %s: %w", pcidev.Backend.String(), err)
-			}
-
-			for _, c := range consumers {
-				if err := c.AssignDriver("vfio-pci"); err == nil {
-					Info.Printf("PCI device has been detached from the host: %s\n", c.String())
+			for _, sub := range pcidev.Subdevices() {
+				if err := sub.AssignDriver("vfio-pci"); err == nil {
+					Info.Printf("PCI device has been detached from the host: %s\n", sub.String())
 				} else {
-					return fmt.Errorf("failed to detach PCI device %s: %w", c.String(), err)
+					return fmt.Errorf("failed to detach PCI device %s: %w", sub.String(), err)
 				}
 			}
 		}
