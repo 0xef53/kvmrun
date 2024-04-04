@@ -136,10 +136,14 @@ func (db *DB) FindProduct(hexvendor, hexdevice string) (*Product, bool) {
 func Load() (*DB, error) {
 	var store Store
 
-	if v, err := lookFor("pci.ids"); err == nil {
-		store = Dir(v)
-	} else {
+	if os.Getenv("USE_EMBEDDED_PCIDB") == "1" {
 		store = embedStore
+	} else {
+		if v, err := lookFor("pci.ids"); err == nil {
+			store = Dir(v)
+		} else {
+			store = embedStore
+		}
 	}
 
 	db := new(DB)
