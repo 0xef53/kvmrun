@@ -102,7 +102,25 @@ func (t *IncomingMachineTask) BeforeStart(resp interface{}) error {
 		return err
 	}
 
-	// TODO: set migration capabilities
+	/*
+		t.Logger.Debug("Set migration capabilities")
+
+		capsArgs := struct {
+			Capabilities []qemu_types.MigrationCapabilityStatus `json:"capabilities"`
+		}{
+			Capabilities: []qemu_types.MigrationCapabilityStatus{
+				{"xbzrle", true},
+				{"auto-converge", true},
+				{"compress", false},
+				{"block", false},
+				{"dirty-bitmaps", true},
+				{"late-block-activate", true},
+			},
+		}
+		if err := t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-capabilities", &capsArgs}, nil); err != nil {
+			return err
+		}
+	*/
 
 	t.requisites.IncomingPort = int32(kvmrun.FIRST_INCOMING_PORT + vmconf.Uid())
 	t.requisites.NBDPort = int32(kvmrun.FIRST_NBD_PORT + vmconf.Uid())
