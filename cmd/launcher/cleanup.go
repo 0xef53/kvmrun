@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
 	"github.com/0xef53/kvmrun/kvmrun"
+	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 )
 
 func (l *launcher) Cleanup() error {
@@ -56,6 +58,44 @@ func (l *launcher) Cleanup() error {
 	} else {
 		if !os.IsNotExist(err) {
 			Error.Println("cleanup: failed to deconfigure network interfaces:", err)
+		}
+	}
+
+	// EFI vars: in case the machine turns off for the first time after migration to this host
+	err := func() error {
+		vmconf, err := kvmrun.GetStartupConf(l.vmname)
+		if err != nil {
+			return fmt.Errorf("unable to load startup config: %w", err)
+		}
+
+		if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
+			if inner, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
+				if _, ok := inner.DiskBackend.(*file.Device); ok {
+					src, err := os.Open(filepath.Join(chrootDir, fwflash.Path))
+					if err != nil {
+						return err
+					}
+					defer src.Close()
+					dst, err := os.Create(fwflash.Path)
+					if err != nil {
+						return err
+					}
+					defer dst.Close()
+					if _, err := io.Copy(dst, src); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return nil
+	}()
+
+	if err == nil {
+		Info.Println("cleanup: firmware flash image has been successfully copied to the confdir")
+	} else {
+		if !os.IsNotExist(err) {
+			Error.Println("cleanup: failed to copy firmware flash image into the confdir:", err)
 		}
 	}
 

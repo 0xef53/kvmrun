@@ -9,6 +9,7 @@ option go_package = "github.com/0xef53/kvmrun/api/types;types";
 message MachineOpts {
     message Firmware {
         string image = 1;
+        string flash = 2;
     }
     message Memory {
         int64 actual = 1;

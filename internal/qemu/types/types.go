@@ -248,13 +248,14 @@ type MigrationInfo struct {
 
 // DriveMirrorOptions is a set of parameters for setting up a new mirroring process.
 type DriveMirrorOptions struct {
-	JobID  string `json:"job-id"`
-	Device string `json:"device"`
-	Target string `json:"target"`
-	Format string `json:"format"`
-	Sync   string `json:"sync"`
-	Mode   string `json:"mode"`
-	Speed  uint64 `json:"speed,omitempty"`
+	JobID    string `json:"job-id"`
+	Device   string `json:"device"`
+	Target   string `json:"target"`
+	Format   string `json:"format"`
+	Sync     string `json:"sync"`
+	Mode     string `json:"mode"`
+	CopyMode string `json:"copy-mode,omitempty"`
+	Speed    uint64 `json:"speed,omitempty"`
 }
 
 // DriveBackupOptions is a set of parameters for setting up a new drive backup process.

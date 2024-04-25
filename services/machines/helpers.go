@@ -90,9 +90,12 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 			}
 		}
 
-		if p := vmi.GetFirmwareImage(); len(p) != 0 {
+		if fwimage := vmi.GetFirmwareImage(); len(fwimage) != 0 {
 			opts.Firmware = &pb_types.MachineOpts_Firmware{
-				Image: p,
+				Image: fwimage,
+			}
+			if fwflash := vmi.GetFirmwareFlash(); fwflash != nil {
+				opts.Firmware.Flash = fwflash.Path
 			}
 		}
 

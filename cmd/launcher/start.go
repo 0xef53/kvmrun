@@ -16,6 +16,8 @@ import (
 	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
+	"github.com/0xef53/kvmrun/kvmrun/backend/block"
+	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 
 	cg "github.com/0xef53/go-cgroups"
 )
@@ -329,6 +331,34 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 			return err
 		}
 		return nil
+	}
+
+	// EFI vars image (actually this is only necessary during the incoming migration)
+	if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
+		if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
+			if v, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
+				switch v.DiskBackend.(type) {
+				case *block.Device:
+					if err := os.MkdirAll(filepath.Join(vmChrootDir, filepath.Dir(fwflash.Path)), 0755); err != nil {
+						return err
+					}
+					stat := syscall.Stat_t{}
+					if err := syscall.Stat(fwflash.Path, &stat); err != nil {
+						return fmt.Errorf("stat %s: %w", fwflash.Path, err)
+					}
+					if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
+						return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
+					}
+				case *file.Device:
+					if err := copyFileContent(fwflash.Path); err != nil {
+						return err
+					}
+				}
+				if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.Uid(), 0); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	err := func() error {

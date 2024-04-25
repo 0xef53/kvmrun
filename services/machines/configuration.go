@@ -3,12 +3,14 @@ package machines
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/0xef53/kvmrun/internal/osuser"
@@ -32,23 +34,100 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 
 	var mproto *pb_types.Machine
 
-	err := s.RunFuncTask(ctx, req.Name+"::", func(l *log.Entry) error {
-		vmdir := filepath.Join(kvmrun.CONFDIR, req.Name)
-		vmlogdir := filepath.Join(kvmrun.LOGDIR, req.Name)
+	vmdir := filepath.Join(kvmrun.CONFDIR, req.Name)
+	vmlogdir := filepath.Join(kvmrun.LOGDIR, req.Name)
 
+	if req.Options.Firmware != nil {
+		req.Options.Firmware.Image = strings.TrimSpace(req.Options.Firmware.Image)
+		req.Options.Firmware.Flash = strings.TrimSpace(req.Options.Firmware.Flash)
+	}
+
+	err := s.RunFuncTask(ctx, req.Name+"::", func(l *log.Entry) error {
 		if _, err := os.Stat(filepath.Join(vmdir, "config")); err == nil {
 			return grpc_status.Errorf(grpc_codes.AlreadyExists, "already exists: %s", req.Name)
 		}
+
+		var success bool
 
 		for _, d := range []string{vmdir, vmlogdir} {
 			if err := os.MkdirAll(d, 0755); err != nil {
 				return err
 			}
 		}
+		defer func() {
+			if !success {
+				for _, d := range []string{vmdir, vmlogdir} {
+					os.RemoveAll(d)
+				}
+			}
+		}()
+
+		if req.Options.Firmware != nil {
+			if len(req.Options.Firmware.Flash) > 0 {
+				if fi, err := os.Stat(req.Options.Firmware.Flash); err == nil {
+					if fi.IsDir() {
+						return fmt.Errorf("not a file: %s", req.Options.Firmware.Flash)
+					}
+				} else {
+					if os.IsNotExist(err) {
+						return err
+					}
+					req.Options.Firmware.Flash = ""
+				}
+			}
+
+			switch req.Options.Firmware.Image {
+			case "bios", "legacy":
+				req.Options.Firmware.Image = ""
+				req.Options.Firmware.Flash = ""
+			case "efi", "uefi", "ovmf":
+				// Try to find the OVMF_CODE.fd file
+				_, fname, err := s.LookForFile("OVMF_CODE.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+				if err != nil {
+					return err
+				}
+				req.Options.Firmware.Image = fname
+
+				if len(req.Options.Firmware.Flash) == 0 {
+					err := func() error {
+						_, fname, err := s.LookForFile("OVMF_VARS.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+						if err != nil {
+							return err
+						}
+
+						src, err := os.Open(fname)
+						if err != nil {
+							return err
+						}
+						defer src.Close()
+
+						dst, err := os.OpenFile(filepath.Join(vmdir, "config_efivars"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)
+						if err != nil {
+							return err
+						}
+						defer dst.Close()
+
+						if _, err := io.Copy(dst, src); err != nil {
+							return err
+						}
+
+						return nil
+					}()
+
+					if err != nil && !os.IsExist(err) {
+						return err
+					}
+
+					req.Options.Firmware.Flash = filepath.Join(vmdir, "config_efivars")
+				}
+			}
+		}
 
 		if _, err := osuser.CreateUser(req.Name); err != nil {
 			return err
 		}
+
+		success = true
 
 		vmc := kvmrun.NewInstanceConf(req.Name)
 
@@ -59,19 +138,9 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 		vmc.SetCPUQuota(int(req.Options.CPU.Quota))
 		vmc.SetCPUModel(req.Options.CPU.Model)
 
-		// TODO: should be validated before
 		if req.Options.Firmware != nil {
-			switch req.Options.Firmware.Image {
-			case "bios", "legacy":
-				req.Options.Firmware.Image = ""
-			case "efi", "uefi":
-				if _, fname, err := s.LookForFile("OVMF.fd", "/usr/share/ovmf", "/usr/share/qemu"); err == nil {
-					req.Options.Firmware.Image = fname
-				} else {
-					return err
-				}
-			}
 			vmc.SetFirmwareImage(req.Options.Firmware.Image)
+			vmc.SetFirmwareFlash(req.Options.Firmware.Flash)
 		}
 
 		if err := vmc.Save(); err != nil {
@@ -264,24 +333,15 @@ func (s *ServiceServer) ListNames(ctx context.Context, req *pb.ListMachinesReque
 }
 
 func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequest) (*empty.Empty, error) {
+	req.Image = strings.TrimSpace(req.Image)
+	req.Flash = strings.TrimSpace(req.Flash)
+
+	vmdir := filepath.Join(kvmrun.CONFDIR, req.Name)
+
 	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
 		vm, err := s.GetMachine(req.Name)
 		if err != nil {
 			return err
-		}
-
-		switch req.Image {
-		case "bios", "legacy":
-			// For now just remove the whole section
-			req.RemoveConf = true
-		case "efi", "uefi":
-			// Try to find the OVMF.fd file
-			_, fname, err := s.LookForFile("OVMF.fd", "/usr/share/ovmf", "/usr/share/qemu")
-			if err != nil {
-				return err
-			}
-
-			req.Image = fname
 		}
 
 		if req.RemoveConf {
@@ -291,19 +351,67 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 			return vm.C.Save()
 		}
 
-		if fi, err := os.Stat(req.Image); err == nil {
-			if fi.IsDir() {
-				return grpc_status.Errorf(grpc_codes.InvalidArgument, "not a file: %s", req.Image)
-			}
-		} else {
-			if os.IsNotExist(err) {
-				return grpc_status.Errorf(grpc_codes.InvalidArgument, "not found: %s", req.Image)
+		if len(req.Flash) > 0 {
+			if fi, err := os.Stat(req.Flash); err == nil {
+				if fi.IsDir() {
+					return fmt.Errorf("not a file: %s", req.Flash)
+				}
+			} else {
+				if os.IsNotExist(err) {
+					return err
+				}
+				req.Flash = ""
 			}
 		}
 
-		if err := vm.C.SetFirmwareImage(req.Image); err != nil {
-			return err
+		switch req.Image {
+		case "bios", "legacy":
+			req.Image = ""
+			req.Flash = ""
+		case "efi", "uefi", "ovmf":
+			// Try to find the OVMF_CODE.fd file
+			_, fname, err := s.LookForFile("OVMF_CODE.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+			if err != nil {
+				return err
+			}
+			req.Image = fname
+
+			if len(req.Flash) == 0 {
+				err := func() error {
+					_, fname, err := s.LookForFile("OVMF_VARS.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+					if err != nil {
+						return err
+					}
+
+					src, err := os.Open(fname)
+					if err != nil {
+						return err
+					}
+					defer src.Close()
+
+					dst, err := os.OpenFile(filepath.Join(vmdir, "config_efivars"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)
+					if err != nil {
+						return err
+					}
+					defer dst.Close()
+
+					if _, err := io.Copy(dst, src); err != nil {
+						return err
+					}
+
+					return nil
+				}()
+
+				if err != nil && !os.IsExist(err) {
+					return err
+				}
+
+				req.Flash = filepath.Join(vmdir, "config_efivars")
+			}
 		}
+
+		vm.C.SetFirmwareImage(req.Image)
+		vm.C.SetFirmwareFlash(req.Flash)
 
 		return vm.C.Save()
 	})

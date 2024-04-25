@@ -148,8 +148,11 @@ func (s *ServiceServer) MachineDownFile(vmname string) string {
 func (s *ServiceServer) LookForFile(basename string, dirs ...string) (string, string, error) {
 	for _, d := range dirs {
 		fullname := filepath.Join(d, basename)
-		switch _, err := os.Stat(fullname); {
+		switch fi, err := os.Stat(fullname); {
 		case err == nil:
+			if fi.IsDir() {
+				return "", "", fmt.Errorf("not a file: %s", fullname)
+			}
 			return d, filepath.Clean(fullname), nil
 		case os.IsNotExist(err):
 			continue
@@ -158,7 +161,7 @@ func (s *ServiceServer) LookForFile(basename string, dirs ...string) (string, st
 		}
 	}
 
-	return "", "", fmt.Errorf("unable to find: %s", basename)
+	return "", "", &os.PathError{"stat", basename, os.ErrNotExist}
 }
 
 func (s *ServiceServer) newContext(ctx context.Context) context.Context {

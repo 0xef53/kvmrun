@@ -134,7 +134,8 @@ message ListNamesResponse {
 message SetFirmwareRequest {
     string name = 1;
     string image = 2;
-    bool remove_conf = 3;
+    string flash = 3;
+    bool remove_conf = 100;
 }
 
 message SetMemLimitsRequest {

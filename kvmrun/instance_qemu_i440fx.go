@@ -296,7 +296,7 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 	pool := make(DiskPool, 0, len(blkDevs))
 	for _, dev := range blkDevs {
 		// Skip reserved names and empty devices
-		if dev.Device == "modiso" || dev.Device == "cidata" {
+		if dev.Device == "modiso" || dev.Device == "cidata" || dev.Device == "fwloader" || dev.Device == "fwflash" {
 			continue
 		}
 		if dev.Inserted.File == "" {
@@ -564,18 +564,20 @@ func (r *InstanceQemu_i440fx) initNetwork() error {
 		var mq bool
 		var vectors uint32
 
-		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "mq"}}, &mq); err == nil {
-			if mq {
-				err = r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "vectors"}}, &vectors)
-				if err != nil {
-					return err
+		if netif.Driver == "virtio-net-pci" {
+			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "mq"}}, &mq); err == nil {
+				if mq {
+					err = r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "vectors"}}, &vectors)
+					if err != nil {
+						return err
+					}
+					if vectors > 4 {
+						netif.Queues = int(vectors-2) / 2
+					}
 				}
-				if vectors > 4 {
-					netif.Queues = int(vectors-2) / 2
-				}
+			} else {
+				return err
 			}
-		} else {
-			return err
 		}
 
 		// QdevId -- is a string with prefix 'net_'

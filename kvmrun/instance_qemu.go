@@ -199,6 +199,11 @@ func (r *InstanceQemu) initMachine() error {
 func (r *InstanceQemu) initFirmware() error {
 	r.Firmware.Image = r.startupConf.GetFirmwareImage()
 
+	if fwflash := r.startupConf.GetFirmwareFlash(); fwflash != nil {
+		r.Firmware.Flash = fwflash.Path
+		r.Firmware.flashDisk = fwflash
+	}
+
 	return nil
 }
 
@@ -405,6 +410,10 @@ func (r InstanceQemu) SetMachineType(_ string) error {
 }
 
 func (r InstanceQemu) SetFirmwareImage(_ string) error {
+	return ErrNotImplemented
+}
+
+func (r InstanceQemu) SetFirmwareFlash(_ string) error {
 	return ErrNotImplemented
 }
 
