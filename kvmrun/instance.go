@@ -9,6 +9,8 @@ type Instance interface {
 	Uid() int
 	Pid() int
 
+	GetQemuVersion() QemuVersion
+
 	Status() (InstanceState, error)
 	GetMachineType() *QemuMachine
 	SetMachineType(string) error
@@ -124,6 +126,10 @@ func (p InstanceProperties) Name() string {
 
 func (p InstanceProperties) Uid() int {
 	return p.uid
+}
+
+func (p InstanceProperties) GetQemuVersion() QemuVersion {
+	return 0
 }
 
 func (p InstanceProperties) GetMachineType() *QemuMachine {

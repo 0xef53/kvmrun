@@ -211,6 +211,10 @@ func (r InstanceQemu) Pid() int {
 	return r.pid
 }
 
+func (r InstanceQemu) GetQemuVersion() QemuVersion {
+	return r.qemuVer
+}
+
 func (r *InstanceQemu) initCPU() error {
 	var firstThreadID int
 

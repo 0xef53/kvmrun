@@ -268,7 +268,7 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 		}
 	}
 
-	for _, device := range []string{"/dev/net/tun", "/dev/vhost-net", "/dev/vhost-vsock"} {
+	for _, device := range []string{"/dev/net/tun", "/dev/vhost-net", "/dev/vhost-vsock", "/dev/null"} {
 		stat := syscall.Stat_t{}
 		if err := syscall.Stat(device, &stat); err != nil {
 			return fmt.Errorf("stat %s: %s", device, err)
@@ -333,30 +333,36 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 		return nil
 	}
 
-	// EFI vars image (actually this is only necessary during the incoming migration)
-	if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
-		if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
-			if v, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
-				switch v.DiskBackend.(type) {
-				case *block.Device:
-					if err := os.MkdirAll(filepath.Join(vmChrootDir, filepath.Dir(fwflash.Path)), 0755); err != nil {
-						return err
-					}
-					stat := syscall.Stat_t{}
-					if err := syscall.Stat(fwflash.Path, &stat); err != nil {
-						return fmt.Errorf("stat %s: %w", fwflash.Path, err)
-					}
-					if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
-						return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
-					}
-				case *file.Device:
+	// Firmware flash image
+	if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
+		if err := os.MkdirAll(filepath.Join(vmChrootDir, filepath.Dir(fwflash.Path)), 0755); err != nil {
+			return err
+		}
+		if inner, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
+			switch inner.DiskBackend.(type) {
+			case *block.Device:
+				stat := syscall.Stat_t{}
+				if err := syscall.Stat(fwflash.Path, &stat); err != nil {
+					return fmt.Errorf("stat %s: %w", fwflash.Path, err)
+				}
+				if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
+					return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
+				}
+			case *file.Device:
+				if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
+					// In case of incoming migration
 					if err := copyFileContent(fwflash.Path); err != nil {
 						return err
 					}
+				} else {
+					// In case of outgoing migration
+					if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
+						return err
+					}
 				}
-				if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.Uid(), 0); err != nil {
-					return err
-				}
+			}
+			if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.Uid(), 0); err != nil {
+				return err
 			}
 		}
 	}

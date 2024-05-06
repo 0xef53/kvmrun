@@ -165,9 +165,11 @@ func (t *MachineMigrationTask) Main() error {
 	// Start mirroring the firmware flash device (if needed)
 	if fwflash := t.vm.C.GetFirmwareFlash(); fwflash != nil {
 		firmwareFlashReady := make(chan struct{})
+
 		group.Go(func() error {
 			return StartStorageProcessor(ctx, t, []kvmrun.Disk{*fwflash}, firmwareFlashReady, vmstateMigrated)
 		})
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -675,9 +677,12 @@ func (t *MachineMigrationTask) newQemuDriveMirrorOpts(addr string, port int, src
 		CopyMode: "background",
 	}
 
-	if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
-		t.Logger.Info("WriteBlocking mode is used")
-		opts.CopyMode = "write-blocking"
+	if t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+		// TODO: remove this debug mode
+		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
+			t.Logger.Info("WriteBlocking mode is used")
+			opts.CopyMode = "write-blocking"
+		}
 	}
 
 	return &opts
@@ -788,13 +793,6 @@ func (t *MachineMigrationTask) extraFiles() (map[string][]byte, error) {
 
 	return extraFiles, nil
 }
-
-//
-//
-//
-//
-//
-//
 
 type MachineMigrationTask_StorageProcessor struct {
 	t *MachineMigrationTask
@@ -1074,10 +1072,12 @@ func (p *MachineMigrationTask_StorageProcessor) newMirrorOpts(srcName, dstName s
 		Mode:   "existing",
 	}
 
-	// TODO: remove this debug mode
-	if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
-		p.t.Logger.Info("WriteBlocking mode is used")
-		opts.CopyMode = "write-blocking"
+	if p.t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+		// TODO: remove this debug mode
+		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
+			p.t.Logger.Info("WriteBlocking mode is used")
+			opts.CopyMode = "write-blocking"
+		}
 	}
 
 	return &opts

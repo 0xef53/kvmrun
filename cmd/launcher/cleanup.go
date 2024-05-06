@@ -61,7 +61,7 @@ func (l *launcher) Cleanup() error {
 		}
 	}
 
-	// EFI vars: in case the machine turns off for the first time after migration to this host
+	// Handle firmware flash image
 	err := func() error {
 		vmconf, err := kvmrun.GetStartupConf(l.vmname)
 		if err != nil {
@@ -71,24 +71,37 @@ func (l *launcher) Cleanup() error {
 		if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
 			if inner, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
 				if _, ok := inner.DiskBackend.(*file.Device); ok {
+					if b, err := file.New(filepath.Join(chrootDir, fwflash.Path)); err == nil {
+						if size, err := b.Size(); size == 0 && err != nil {
+							return os.ErrNotExist
+						}
+					} else {
+						return err
+					}
+
+					// In case the machine turns off for the first time after migration to this host
 					src, err := os.Open(filepath.Join(chrootDir, fwflash.Path))
 					if err != nil {
 						return err
 					}
 					defer src.Close()
+
 					dst, err := os.Create(fwflash.Path)
 					if err != nil {
 						return err
 					}
 					defer dst.Close()
+
 					if _, err := io.Copy(dst, src); err != nil {
 						return err
 					}
+
+					return nil
 				}
 			}
 		}
 
-		return nil
+		return os.ErrNotExist
 	}()
 
 	if err == nil {
