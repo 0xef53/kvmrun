@@ -34,9 +34,10 @@ type IncomingMachineTask struct {
 
 	req *pb.StartIncomingMachineRequest
 
-	requisites   *pb_types.IncomingMachineRequisites
-	listenAddr   net.IP
-	createdDisks []string
+	requisites       *pb_types.IncomingMachineRequisites
+	listenAddr       net.IP
+	hasFirmwareFlash bool
+	createdDisks     []string
 }
 
 func NewIncomingMachineTask(req *pb.StartIncomingMachineRequest, ss *services.ServiceServer) *IncomingMachineTask {
@@ -93,9 +94,33 @@ func (t *IncomingMachineTask) BeforeStart(resp interface{}) error {
 		return err
 	}
 
+	if vmconf.GetFirmwareFlash() != nil {
+		t.hasFirmwareFlash = true
+	}
+
 	if err := t.startNBDServer(kvmrun.FIRST_NBD_PORT + vmconf.Uid()); err != nil {
 		return err
 	}
+
+	/*
+		t.Logger.Debug("Set migration capabilities")
+
+		capsArgs := struct {
+			Capabilities []qemu_types.MigrationCapabilityStatus `json:"capabilities"`
+		}{
+			Capabilities: []qemu_types.MigrationCapabilityStatus{
+				{"xbzrle", true},
+				{"auto-converge", true},
+				{"compress", false},
+				{"block", false},
+				{"dirty-bitmaps", true},
+				{"late-block-activate", true},
+			},
+		}
+		if err := t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-capabilities", &capsArgs}, nil); err != nil {
+			return err
+		}
+	*/
 
 	t.requisites.IncomingPort = int32(kvmrun.FIRST_INCOMING_PORT + vmconf.Uid())
 	t.requisites.NBDPort = int32(kvmrun.FIRST_NBD_PORT + vmconf.Uid())
@@ -490,6 +515,19 @@ func (t *IncomingMachineTask) startNBDServer(port int) error {
 		return err
 	}
 
+	if t.hasFirmwareFlash {
+		opts := struct {
+			Device   string `json:"device"`
+			Writable bool   `json:"writable"`
+		}{
+			Device:   "fwflash",
+			Writable: true,
+		}
+		if err := t.Mon.Run(t.req.Name, qmp.Command{"nbd-server-add", &opts}, nil); err != nil {
+			return fmt.Errorf("failed to export (fwflash): %w", err)
+		}
+	}
+
 	for diskPath := range t.req.Disks {
 		d, err := kvmrun.NewDisk(diskPath)
 		if err != nil {
@@ -503,7 +541,7 @@ func (t *IncomingMachineTask) startNBDServer(port int) error {
 			Writable: true,
 		}
 		if err := t.Mon.Run(t.req.Name, qmp.Command{"nbd-server-add", &opts}, nil); err != nil {
-			return err
+			return fmt.Errorf("failed to export (%s): %w", d.BaseName(), err)
 		}
 	}
 

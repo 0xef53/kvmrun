@@ -16,6 +16,8 @@ import (
 	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
+	"github.com/0xef53/kvmrun/kvmrun/backend/block"
+	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 
 	cg "github.com/0xef53/go-cgroups"
 )
@@ -266,7 +268,7 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 		}
 	}
 
-	for _, device := range []string{"/dev/net/tun", "/dev/vhost-net", "/dev/vhost-vsock"} {
+	for _, device := range []string{"/dev/net/tun", "/dev/vhost-net", "/dev/vhost-vsock", "/dev/null"} {
 		stat := syscall.Stat_t{}
 		if err := syscall.Stat(device, &stat); err != nil {
 			return fmt.Errorf("stat %s: %s", device, err)
@@ -329,6 +331,40 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 			return err
 		}
 		return nil
+	}
+
+	// Firmware flash image
+	if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
+		if err := os.MkdirAll(filepath.Join(vmChrootDir, filepath.Dir(fwflash.Path)), 0755); err != nil {
+			return err
+		}
+		if inner, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
+			switch inner.DiskBackend.(type) {
+			case *block.Device:
+				stat := syscall.Stat_t{}
+				if err := syscall.Stat(fwflash.Path, &stat); err != nil {
+					return fmt.Errorf("stat %s: %w", fwflash.Path, err)
+				}
+				if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
+					return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
+				}
+			case *file.Device:
+				if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
+					// In case of incoming migration
+					if err := copyFileContent(fwflash.Path); err != nil {
+						return err
+					}
+				} else {
+					// In case of outgoing migration
+					if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
+						return err
+					}
+				}
+			}
+			if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.Uid(), 0); err != nil {
+				return err
+			}
+		}
 	}
 
 	err := func() error {

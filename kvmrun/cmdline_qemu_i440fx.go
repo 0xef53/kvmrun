@@ -191,8 +191,11 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args = append(args, "-nodefaults", "-no-user-config")
 
 	// Firmware
-	if p := b.vmconf.GetFirmwareImage(); len(p) > 0 {
-		args = append(args, "-bios", p)
+	if fwimage := b.vmconf.GetFirmwareImage(); len(fwimage) > 0 {
+		args = append(args, "-drive", fmt.Sprintf("if=pflash,unit=0,id=fwloader,format=raw,readonly=on,file=%s", fwimage))
+		if fwflash := b.vmconf.GetFirmwareFlash(); fwflash != nil {
+			args = append(args, "-drive", fmt.Sprintf("if=pflash,unit=1,id=fwflash,format=raw,file=%s", fwflash.Path))
+		}
 	}
 
 	// Memory
