@@ -9,13 +9,19 @@ type Instance interface {
 	Uid() int
 	Pid() int
 
+	GetQemuVersion() QemuVersion
+
 	Status() (InstanceState, error)
 	GetMachineType() *QemuMachine
 	SetMachineType(string) error
-	GetFirmwareImage() string
-	SetFirmwareImage(string) error
-	RemoveFirmwareConf() error
+
 	IsIncoming() bool
+
+	GetFirmwareImage() string
+	GetFirmwareFlash() *Disk
+	SetFirmwareImage(string) error
+	SetFirmwareFlash(string) error
+	RemoveFirmwareConf() error
 
 	Save() error
 
@@ -122,6 +128,10 @@ func (p InstanceProperties) Uid() int {
 	return p.uid
 }
 
+func (p InstanceProperties) GetQemuVersion() QemuVersion {
+	return 0
+}
+
 func (p InstanceProperties) GetMachineType() *QemuMachine {
 	var chipset string
 
@@ -148,6 +158,10 @@ func (p InstanceProperties) GetMachineType() *QemuMachine {
 
 func (p InstanceProperties) GetFirmwareImage() string {
 	return p.Firmware.Image
+}
+
+func (p InstanceProperties) GetFirmwareFlash() *Disk {
+	return p.Firmware.flashDisk
 }
 
 func (p InstanceProperties) GetActualCPUs() int {

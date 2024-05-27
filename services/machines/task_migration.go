@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -160,6 +161,22 @@ func (t *MachineMigrationTask) Main() error {
 	vmstateMigrated := make(chan struct{})
 
 	group, ctx := errgroup.WithContext(t.Ctx())
+
+	// Start mirroring the firmware flash device (if needed)
+	if fwflash := t.vm.C.GetFirmwareFlash(); fwflash != nil {
+		firmwareFlashReady := make(chan struct{})
+
+		group.Go(func() error {
+			return StartStorageProcessor(ctx, t, []kvmrun.Disk{*fwflash}, firmwareFlashReady, vmstateMigrated)
+		})
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-firmwareFlashReady:
+			break
+		}
+	}
 
 	// Start mirroring the specified disks
 	if len(t.req.Disks) > 0 {
@@ -650,14 +667,25 @@ LOOP:
 }
 
 func (t *MachineMigrationTask) newQemuDriveMirrorOpts(addr string, port int, srcName, dstName string) *qemu_types.DriveMirrorOptions {
-	return &qemu_types.DriveMirrorOptions{
-		JobID:  fmt.Sprintf("migr_%s", srcName),
-		Device: srcName,
-		Target: fmt.Sprintf("nbd:%s:%d:exportname=%s", addr, port, dstName),
-		Format: "nbd",
-		Sync:   "full",
-		Mode:   "existing",
+	opts := qemu_types.DriveMirrorOptions{
+		JobID:    fmt.Sprintf("migr_%s", srcName),
+		Device:   srcName,
+		Target:   fmt.Sprintf("nbd:%s:%d:exportname=%s", addr, port, dstName),
+		Format:   "nbd",
+		Sync:     "full",
+		Mode:     "existing",
+		CopyMode: "background",
 	}
+
+	if t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+		// TODO: remove this debug mode
+		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
+			t.Logger.Info("WriteBlocking mode is used")
+			opts.CopyMode = "write-blocking"
+		}
+	}
+
+	return &opts
 }
 
 func (t *MachineMigrationTask) newIncomingRequest() (*s_pb.StartIncomingMachineRequest, error) {
@@ -764,4 +792,293 @@ func (t *MachineMigrationTask) extraFiles() (map[string][]byte, error) {
 	}
 
 	return extraFiles, nil
+}
+
+type MachineMigrationTask_StorageProcessor struct {
+	t *MachineMigrationTask
+
+	ctx context.Context
+
+	disks                kvmrun.DiskPool
+	readyToComplete      chan struct{}
+	machineStateMigrated chan struct{}
+
+	errJobNotFound error
+}
+
+func StartStorageProcessor(ctx context.Context, t *MachineMigrationTask, disks kvmrun.DiskPool, ready, stateMigrated chan struct{}) error {
+	// TODO: add sub ID to make it easier to search in logs
+
+	defer func() {
+		select {
+		case <-ready:
+		default:
+			close(ready)
+		}
+	}()
+
+	processor := MachineMigrationTask_StorageProcessor{
+		t:                    t,
+		ctx:                  ctx,
+		disks:                disks,
+		readyToComplete:      ready,
+		machineStateMigrated: stateMigrated,
+		errJobNotFound:       errors.New("job not found"),
+	}
+
+	return processor.run()
+}
+
+func (p *MachineMigrationTask_StorageProcessor) run() error {
+	diskNames := make([]string, 0, len(p.disks))
+	for _, d := range p.disks {
+		diskNames = append(diskNames, d.BaseName())
+	}
+
+	p.t.Logger.Infof("Start disks mirroring process (%s)", strings.Join(diskNames, ", "))
+
+	group1, ctx1 := errgroup.WithContext(p.ctx)
+
+	// Start the mirroring all disks.
+	// For each disk, we run a separate goroutine,
+	// where the Ready status is expected.
+	for _, d := range p.disks {
+		p.t.Logger.Infof("Run QMP command: drive-mirror; name=%s, remote_addr=%s:%d", d.BaseName(), p.t.dstServerAddr.String(), p.t.requisites.NBDPort)
+
+		d := d // shadow to be captured by closure
+		dstName := d.BaseName()
+
+		if ovrd, ok := p.t.req.Overrides.Disks[d.Path]; ok {
+			if _d, err := kvmrun.NewDisk(ovrd); err == nil {
+				dstName = _d.BaseName()
+			} else {
+				return err
+			}
+		}
+
+		ts := time.Now()
+
+		if err := p.t.Mon.Run(p.t.req.Name, qmp.Command{"drive-mirror", p.newMirrorOpts(d.BaseName(), dstName)}, nil); err != nil {
+			return fmt.Errorf("failed to start mirroring (%s): %w", d.BaseName(), err)
+		}
+
+		group1.Go(func() error { return p.waitForReady(ctx1, ts, &d) })
+	}
+
+	p.t.Logger.Info("Wait for disks synchronization ...")
+
+	if err := group1.Wait(); err != nil {
+		return err
+	}
+
+	// All disks are ready. Notify dependent processes about this
+	close(p.readyToComplete)
+
+	p.t.Logger.Info("All disks are synchronized")
+
+	// Stat update and wait for machine state is migrated
+	if err := p.waitMachineStateMigrated(); err != nil {
+		return err
+	}
+
+	p.t.Logger.Debug("QEMU migration is completed. Wait for total disks synchronization ...")
+
+	group2, ctx2 := errgroup.WithContext(p.ctx)
+
+	// Stop the mirroring
+	for _, d := range p.disks {
+		p.t.Logger.Debugf("Run QMP command: block-job-complete; name=%s", d.BaseName())
+
+		d := d // shadow for closure
+
+		jobID := struct {
+			Device string `json:"device"`
+		}{
+			Device: "migr_" + d.BaseName(),
+		}
+
+		ts := time.Now()
+
+		if err := p.t.Mon.Run(p.t.req.Name, qmp.Command{"block-job-complete", &jobID}, nil); err != nil {
+			// Non-fatal error, just printing
+			p.t.Logger.Errorf("Failed to stop mirroring (%s): %s", d.BaseName(), err.Error())
+			continue
+		}
+
+		group2.Go(func() error { return p.waitForCompleted(ctx2, ts, &d) })
+	}
+
+	switch err := group2.Wait(); {
+	case err == nil:
+	case err == context.Canceled, err == context.DeadlineExceeded:
+		return err
+	default:
+		// The migration is actually done,
+		// so we don't care about these errors
+		p.t.Logger.Error(err.Error())
+	}
+
+	p.t.Logger.Infof("Disks mirroring process completed (%s)", strings.Join(diskNames, ", "))
+
+	return nil
+}
+
+func (p *MachineMigrationTask_StorageProcessor) getJob(jobID string) (*qemu_types.BlockJobInfo, error) {
+	jobs := make([]*qemu_types.BlockJobInfo, 0, len(p.disks))
+
+	if err := p.t.Mon.Run(p.t.req.Name, qmp.Command{"query-block-jobs", nil}, &jobs); err != nil {
+		return nil, err
+	}
+
+	for _, j := range jobs {
+		if j.Device == jobID {
+			return j, nil
+		}
+	}
+	return nil, p.errJobNotFound
+}
+
+func (p *MachineMigrationTask_StorageProcessor) waitForReady(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
+	jobID := "migr_" + d.BaseName()
+
+	// Stat will be available after the job status changes to running
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	if _, err := p.t.Mon.WaitJobStatusChangeEvent(p.t.req.Name, timeoutCtx, jobID, "running", uint64(ts.Unix())); err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+
+		job, err := p.getJob(jobID)
+		if err != nil {
+			// No errors should be here, even errJobNotfound
+			return err
+		}
+
+		if d.BaseName() != "fwflash" {
+			p.t.updateStat(&machineMigrationTaskStatUpdate{
+				Object:      "disk",
+				Name:        d.Path,
+				Total:       d.QemuVirtualSize,
+				Remaining:   job.Len - job.Offset,
+				Transferred: d.QemuVirtualSize - (job.Len - job.Offset),
+			})
+		}
+
+		if job.Ready {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (p *MachineMigrationTask_StorageProcessor) waitForCompleted(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
+	jobID := "migr_" + d.BaseName()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+
+		job, err := p.getJob(jobID)
+		if err != nil && err != p.errJobNotFound {
+			return fmt.Errorf("failed to complete disk mirroring for %s: %s", d.BaseName(), err)
+		}
+
+		// Ok, job completed
+		if job == nil {
+			if _, found, err := p.t.Mon.FindBlockJobErrorEvent(p.t.req.Name, jobID, uint64(ts.Unix())); err == nil {
+				if found {
+					return fmt.Errorf("errors detected during disk mirroring: %s", d.BaseName())
+				}
+			} else {
+				return fmt.Errorf("FindBlockJobErrorEvent failed: %s: %s", d.BaseName(), err)
+			}
+
+			if _, found, err := p.t.Mon.FindBlockJobCompletedEvent(p.t.req.Name, jobID, uint64(ts.Unix())); err == nil {
+				if !found {
+					return fmt.Errorf("no completed event found: %s", d.BaseName())
+				}
+			} else {
+				return fmt.Errorf("FindBlockJobCompletedEvent failed: %s: %s", d.BaseName(), err)
+			}
+
+			break
+		}
+	}
+
+	return nil
+}
+
+func (p *MachineMigrationTask_StorageProcessor) waitMachineStateMigrated() error {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+LOOP:
+	for {
+		select {
+		case <-p.ctx.Done():
+			return p.ctx.Err()
+		case <-p.machineStateMigrated:
+			ticker.Stop()
+			break LOOP
+		case <-ticker.C:
+		}
+
+		for _, d := range p.disks {
+			job, err := p.getJob("migr_" + d.BaseName())
+			if err != nil {
+				return err
+			}
+
+			if d.BaseName() != "fwflash" {
+				p.t.updateStat(&machineMigrationTaskStatUpdate{
+					Object:      "disk",
+					Name:        d.Path,
+					Total:       d.QemuVirtualSize,
+					Remaining:   job.Len - job.Offset,
+					Transferred: d.QemuVirtualSize - (job.Len - job.Offset),
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (p *MachineMigrationTask_StorageProcessor) newMirrorOpts(srcName, dstName string) *qemu_types.DriveMirrorOptions {
+	opts := qemu_types.DriveMirrorOptions{
+		JobID:  fmt.Sprintf("migr_%s", srcName),
+		Device: srcName,
+		Target: fmt.Sprintf("nbd:%s:%d:exportname=%s", p.t.dstServerAddr.String(), int(p.t.requisites.NBDPort), dstName),
+		Format: "nbd",
+		Sync:   "full",
+		Mode:   "existing",
+	}
+
+	if p.t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+		// TODO: remove this debug mode
+		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
+			p.t.Logger.Info("WriteBlocking mode is used")
+			opts.CopyMode = "write-blocking"
+		}
+	}
+
+	return &opts
 }

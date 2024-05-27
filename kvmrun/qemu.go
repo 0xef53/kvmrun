@@ -28,7 +28,3 @@ type QemuMachine struct {
 func (m *QemuMachine) String() string {
 	return m.name
 }
-
-type QemuFirmware struct {
-	Image string `json:"image,omitempty"`
-}

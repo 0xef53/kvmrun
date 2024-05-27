@@ -72,6 +72,18 @@ func GetInstanceConf(vmname string) (Instance, error) {
 
 	vmc.MachineType = strings.TrimSpace(strings.ToLower(vmc.MachineType))
 
+	if len(vmc.Firmware.Flash) > 0 {
+		b, err := NewFirmwareBackend(vmc.Firmware.Flash)
+		if err != nil {
+			return nil, err
+		}
+		vmc.Firmware.flashDisk = &Disk{
+			Path:    vmc.Firmware.Flash,
+			Driver:  "pflash",
+			Backend: b,
+		}
+	}
+
 	for idx := range vmc.HostPCIDevices {
 		addr, err := pci.AddressFromHex(vmc.HostPCIDevices[idx].Addr)
 		if err != nil {
@@ -199,8 +211,27 @@ func (c *InstanceConf) SetFirmwareImage(p string) error {
 	return nil
 }
 
+func (c *InstanceConf) SetFirmwareFlash(p string) error {
+	if len(p) == 0 && p != c.Firmware.Flash {
+		b, err := NewFirmwareBackend(p)
+		if err != nil {
+			return err
+		}
+		c.Firmware.flashDisk = &Disk{
+			Path:    p,
+			Driver:  "pflash",
+			Backend: b,
+		}
+		c.Firmware.Flash = p
+	}
+
+	return nil
+}
+
 func (c *InstanceConf) RemoveFirmwareConf() error {
 	c.Firmware.Image = ""
+	c.Firmware.Flash = ""
+	c.Firmware.flashDisk = nil
 
 	return nil
 }
@@ -653,6 +684,18 @@ func GetIncomingConf(vmname string) (Instance, error) {
 		return nil, err
 	}
 
+	if len(c.Firmware.Flash) > 0 {
+		b, err := NewFirmwareBackend(c.Firmware.Flash)
+		if err != nil {
+			return nil, err
+		}
+		c.Firmware.flashDisk = &Disk{
+			Path:    c.Firmware.Flash,
+			Driver:  "pflash",
+			Backend: b,
+		}
+	}
+
 	for idx := range c.Disks {
 		b, err := NewDiskBackend(c.Disks[idx].Path)
 		if err != nil {
@@ -686,6 +729,18 @@ func GetStartupConf(vmname string) (Instance, error) {
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, err
+	}
+
+	if len(c.Firmware.Flash) > 0 {
+		b, err := NewFirmwareBackend(c.Firmware.Flash)
+		if err != nil {
+			return nil, err
+		}
+		c.Firmware.flashDisk = &Disk{
+			Path:    c.Firmware.Flash,
+			Driver:  "pflash",
+			Backend: b,
+		}
 	}
 
 	for idx := range c.HostPCIDevices {

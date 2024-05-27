@@ -296,7 +296,7 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 	pool := make(DiskPool, 0, len(blkDevs))
 	for _, dev := range blkDevs {
 		// Skip reserved names and empty devices
-		if dev.Device == "modiso" || dev.Device == "cidata" {
+		if dev.Device == "modiso" || dev.Device == "cidata" || dev.Device == "fwloader" || dev.Device == "fwflash" {
 			continue
 		}
 		if dev.Inserted.File == "" {
