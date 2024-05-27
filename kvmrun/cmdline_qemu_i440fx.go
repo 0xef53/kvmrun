@@ -168,8 +168,10 @@ func (b *qemuCommandLine_i440fx) hostpciArgs(num int, dev *HostPCI, backend *pci
 
 	args = append(args, "-device", strings.Join(opts(backend.String(), 0), ","))
 
-	for _, sub := range subdevices {
-		args = append(args, "-device", strings.Join(opts(sub.String(), sub.AddrFunction()), ","))
+	if dev.Multifunction {
+		for _, sub := range subdevices {
+			args = append(args, "-device", strings.Join(opts(sub.String(), sub.AddrFunction()), ","))
+		}
 	}
 
 	return args
