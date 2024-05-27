@@ -212,7 +212,7 @@ func (c *InstanceConf) SetFirmwareImage(p string) error {
 }
 
 func (c *InstanceConf) SetFirmwareFlash(p string) error {
-	if len(p) == 0 && p != c.Firmware.Flash {
+	if len(p) != 0 && p != c.Firmware.Flash {
 		b, err := NewFirmwareBackend(p)
 		if err != nil {
 			return err
