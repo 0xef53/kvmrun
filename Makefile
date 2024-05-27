@@ -36,14 +36,16 @@ DOCKER_DEB_ARGS := \
 
 binaries = \
     bin/kvmrund bin/vmm bin/launcher \
-    bin/netinit bin/vnetctl bin/gencert bin/proxy-launcher
+    bin/netinit bin/vnetctl bin/gencert bin/proxy-launcher \
+    bin/printpci
 
 proto_files = \
     api/types/types.proto \
     api/services/machines/v1/machines.proto \
     api/services/tasks/v1/tasks.proto \
     api/services/system/v1/system.proto \
-    api/services/network/v1/network.proto
+    api/services/network/v1/network.proto \
+    api/services/hardware/v1/hardware.proto
 
 .PHONY: all build clean protobufs $(proto_files)
 
@@ -55,7 +57,7 @@ $(binaries):
 	@echo "##########################"
 	@echo
 	install -d bin
-	docker run --rm -i $(DOCKER_BUILD_ARGS) golang:latest
+	docker run --rm -it $(DOCKER_BUILD_ARGS) golang:1.18-buster
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"

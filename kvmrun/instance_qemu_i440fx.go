@@ -22,10 +22,17 @@ import (
 // InstanceQemu represents a configuration of a running QEMU instance.
 type InstanceQemu_i440fx struct {
 	*InstanceQemu
+
+	pciDevs []qemu_types.PCIInfo `json:"-"`
 }
 
 func (r *InstanceQemu_i440fx) init() error {
 	var gr errgroup.Group
+
+	r.pciDevs = make([]qemu_types.PCIInfo, 0, 3)
+	if err := r.mon.Run(qmp.Command{"query-pci", nil}, &r.pciDevs); err != nil {
+		return err
+	}
 
 	gr.Go(func() error { return r.initCdroms() })
 	gr.Go(func() error { return r.initStorage() })
@@ -270,13 +277,8 @@ func (r *InstanceQemu_i440fx) RemoveCdrom(name string) error {
 }
 
 func (r *InstanceQemu_i440fx) initStorage() error {
-	pciDevs := make([]qemu_types.PCIInfo, 0, 1)
-	if err := r.mon.Run(qmp.Command{"query-pci", nil}, &pciDevs); err != nil {
-		return err
-	}
-
 	r.scsiBuses = make(map[string]*SCSIBusInfo)
-	for _, dev := range pciDevs[0].Devices {
+	for _, dev := range r.pciDevs[0].Devices {
 		// desc:      SCSI controller
 		// class:     256
 		// id.device: 4100
@@ -539,13 +541,8 @@ func (r *InstanceQemu_i440fx) RemoveDisk(dpath string) error {
 }
 
 func (r *InstanceQemu_i440fx) initNetwork() error {
-	pciDevs := make([]qemu_types.PCIInfo, 0, 1)
-	if err := r.mon.Run(qmp.Command{"query-pci", nil}, &pciDevs); err != nil {
-		return err
-	}
-
 	pool := make(NetifPool, 0, 8)
-	for _, dev := range pciDevs[0].Devices {
+	for _, dev := range r.pciDevs[0].Devices {
 		// {'class': 512, 'desc': 'Ethernet controller'}
 		if dev.ClassInfo.Class != 512 {
 			continue

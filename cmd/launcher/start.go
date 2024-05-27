@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
 
@@ -74,6 +75,42 @@ func (l *launcher) Start() error {
 	if os.Getenv("DEBUG") != "" {
 		fmt.Println(strings.Join(args, " "))
 		return nil
+	}
+
+	// Check all the PCI devices and detach them from the host
+	if devs := vmconf.GetHostPCIDevices(); len(devs) > 0 {
+		if err := loadVfioModule(); err != nil {
+			return err
+		}
+
+		for _, hpci := range devs {
+			pcidev, err := pci.LookupDevice(hpci.BackendAddr.String())
+			if err != nil {
+				return err
+			}
+
+			if pcidev.Enabled() {
+				if pcidev.CurrentDriver() == "vfio-pci" {
+					return fmt.Errorf("unable to work with open PCI device: %s", pcidev.String())
+				}
+			}
+
+			// Switch to the "vfio-pci" driver this device and all its child devices
+			// (all devices within the iommu_group are bound to their vfio bus driver)
+			if err := pcidev.AssignDriver("vfio-pci"); err == nil {
+				Info.Printf("PCI device has been detached from the host: %s\n", pcidev.String())
+			} else {
+				return fmt.Errorf("failed to detach PCI device %s: %w", pcidev.String(), err)
+			}
+
+			for _, sub := range pcidev.Subdevices() {
+				if err := sub.AssignDriver("vfio-pci"); err == nil {
+					Info.Printf("PCI device has been detached from the host: %s\n", sub.String())
+				} else {
+					return fmt.Errorf("failed to detach PCI device %s: %w", sub.String(), err)
+				}
+			}
+		}
 	}
 
 	// Start proxy servers for disk backends
@@ -357,6 +394,19 @@ func enableCgroupCPU(vmconf kvmrun.Instance) error {
 	cgconf.CpuQuota = (cgconf.CpuPeriod * int64(vmconf.GetCPUQuota())) / 100
 	if err := cpuGroup.Set(&cgconf); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func loadVfioModule() error {
+	if _, err := os.Stat("/sys/bus/pci/drivers/vfio-pci"); err == nil {
+		return nil
+	}
+
+	// Try to load anyway
+	if _, err := exec.Command("modprobe", "vfio-pci").CombinedOutput(); err != nil {
+		return fmt.Errorf("could not load vfio-pci module: modprobe failed with %s", err)
 	}
 
 	return nil

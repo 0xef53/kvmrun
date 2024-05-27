@@ -1,7 +1,7 @@
 package network
 
 import (
-//"github.com/vishvananda/netlink"
+// "github.com/vishvananda/netlink"
 )
 
 type VlanDeviceAttrs struct {

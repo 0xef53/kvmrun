@@ -106,6 +106,14 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 			}
 		}
 
+		for _, d := range vmi.GetHostPCIDevices() {
+			opts.HostPCIDevices = append(opts.HostPCIDevices, &pb_types.MachineOpts_HostPCI{
+				Addr:          d.BackendAddr.String(),
+				Multifunction: d.Multifunction,
+				PrimaryGPU:    d.PrimaryGPU,
+			})
+		}
+
 		return &opts
 	}
 

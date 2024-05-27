@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 )
 
@@ -136,6 +137,46 @@ func (b *qemuCommandLine_i440fx) ifaceArgs(iface *NetIface) []string {
 	return []string{"-netdev", strings.Join(backendOpts, ","), "-device", strings.Join(deviceOpts, ",")}
 }
 
+func (b *qemuCommandLine_i440fx) hostpciArgs(num int, dev *HostPCI, backend *pci.Device) []string {
+	opts := func(hexaddr string, fn uint8) []string {
+		v := []string{
+			"vfio-pci",
+			fmt.Sprintf("host=%s", hexaddr),
+			"bus=pci.1",
+		}
+		if dev.Multifunction {
+			v = append(v, fmt.Sprintf("id=hostpci%d.%d", num, fn))
+			v = append(v, fmt.Sprintf("addr=0x%x.0x%x", num, fn))
+		} else {
+			v = append(v, fmt.Sprintf("id=hostpci%d", num))
+			v = append(v, fmt.Sprintf("addr=0x%x", num))
+		}
+		if fn == 0 {
+			if dev.PrimaryGPU {
+				v = append(v, "x-vga=on")
+			}
+			if dev.Multifunction {
+				v = append(v, "multifunction=on")
+			}
+		}
+		return v
+	}
+
+	subdevices := backend.Subdevices()
+
+	args := make([]string, 0, 2*(len(subdevices)+1))
+
+	args = append(args, "-device", strings.Join(opts(backend.String(), 0), ","))
+
+	if dev.Multifunction {
+		for _, sub := range subdevices {
+			args = append(args, "-device", strings.Join(opts(sub.String(), sub.AddrFunction()), ","))
+		}
+	}
+
+	return args
+}
+
 func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args := make([]string, 0, 96)
 
@@ -184,8 +225,36 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args = append(args, "-chardev", fmt.Sprintf("socket,id=virtcon,path=%s.virtcon,server,nowait", filepath.Join(QMPMONDIR, b.vmconf.Name())))
 	args = append(args, "-device", "virtconsole,chardev=virtcon,name=console.0")
 
+	var hasPrimaryGPU bool
+
+	// PCI passthrough
+	if devs := b.vmconf.GetHostPCIDevices(); len(devs) > 0 {
+		// Dedicated PCI bus
+		args = append(args, "-device", "pci-bridge,id=pci.1,chassis_nr=1,bus=pci.0,addr=0x7")
+		for num, dev := range devs {
+			backend, err := pci.LookupDevice(dev.Addr)
+			if err != nil {
+				return nil, err
+			}
+
+			if dev.Multifunction && !backend.HasMultifunctionFeature() {
+				return nil, fmt.Errorf("multifunction is not supported: %s", backend.String())
+			}
+
+			args = append(args, b.hostpciArgs(num, &dev, backend)...)
+
+			if dev.PrimaryGPU {
+				hasPrimaryGPU = true
+			}
+		}
+	}
+
 	// VGA
-	args = append(args, "-vga", "cirrus")
+	if hasPrimaryGPU {
+		args = append(args, "-vga", "none", "-nographic")
+	} else {
+		args = append(args, "-vga", "cirrus")
+	}
 
 	// Input devices
 	for _, dev := range b.vmconf.GetInputDevices() {

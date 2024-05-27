@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/0xef53/kvmrun/internal/pci"
 )
 
 // InstanceConf represents a virtual machine configuration
@@ -69,6 +71,15 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	}
 
 	vmc.MachineType = strings.TrimSpace(strings.ToLower(vmc.MachineType))
+
+	for idx := range vmc.HostPCIDevices {
+		addr, err := pci.AddressFromHex(vmc.HostPCIDevices[idx].Addr)
+		if err != nil {
+			return nil, err
+		}
+		vmc.HostPCIDevices[idx].BackendAddr = addr
+		vmc.HostPCIDevices[idx].Addr = addr.String() // normalizing
+	}
 
 	for idx := range vmc.Disks {
 		b, err := NewDiskBackend(vmc.Disks[idx].Path)
@@ -216,6 +227,51 @@ func (c *InstanceConf) SetTotalMem(s int) error {
 	}
 
 	c.Mem.Total = s
+
+	return nil
+}
+
+func (c *InstanceConf) AppendHostPCI(d HostPCI) error {
+	if c.HostPCIDevices.Exists(d.Addr) {
+		return &AlreadyConnectedError{"instance_conf", d.Addr}
+	}
+
+	c.HostPCIDevices.Append(&d)
+
+	return nil
+}
+
+func (c *InstanceConf) RemoveHostPCI(hexaddr string) error {
+	addr, err := pci.AddressFromHex(hexaddr)
+	if err != nil {
+		return err
+	}
+
+	if c.HostPCIDevices.Exists(addr.String()) {
+		return c.HostPCIDevices.Remove(addr.String())
+	}
+
+	return &NotConnectedError{"instance_conf", addr.String()}
+}
+
+func (c *InstanceConf) SetHostPCIMultifunctionOption(hexaddr string, enabled bool) error {
+	d := c.HostPCIDevices.Get(hexaddr)
+	if d == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	d.Multifunction = enabled
+
+	return nil
+}
+
+func (c *InstanceConf) SetHostPCIPrimaryGPUOption(hexaddr string, enabled bool) error {
+	d := c.HostPCIDevices.Get(hexaddr)
+	if d == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	d.PrimaryGPU = enabled
 
 	return nil
 }
@@ -630,6 +686,15 @@ func GetStartupConf(vmname string) (Instance, error) {
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, err
+	}
+
+	for idx := range c.HostPCIDevices {
+		addr, err := pci.AddressFromHex(c.HostPCIDevices[idx].Addr)
+		if err != nil {
+			return nil, err
+		}
+		c.HostPCIDevices[idx].BackendAddr = addr
+		c.HostPCIDevices[idx].Addr = addr.String() // normalizing
 	}
 
 	for idx := range c.Disks {

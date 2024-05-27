@@ -35,6 +35,12 @@ type Instance interface {
 	SetCPUQuota(int) error
 	SetCPUModel(string) error
 
+	GetHostPCIDevices() HostPCIPool
+	AppendHostPCI(HostPCI) error
+	RemoveHostPCI(string) error
+	SetHostPCIMultifunctionOption(string, bool) error
+	SetHostPCIPrimaryGPUOption(string, bool) error
+
 	GetInputDevices() InputPool
 	AppendInputDevice(InputDevice) error
 	RemoveInputDevice(string) error
@@ -95,16 +101,17 @@ type InstanceProperties struct {
 	MachineType string       `json:"machine_type,omitempty"`
 	Firmware    QemuFirmware `json:"firmware,omitempty"`
 
-	Mem         Memory         `json:"memory"`
-	CPU         Processor      `json:"cpu"`
-	Inputs      InputPool      `json:"inputs"`
-	Cdroms      CDPool         `json:"cdrom"`
-	Disks       DiskPool       `json:"storage"`
-	Proxy       ProxyPool      `json:"proxy,omitempty"`
-	NetIfaces   NetifPool      `json:"network"`
-	VSockDevice *VirtioVSock   `json:"vsock_device,omitempty"`
-	CIDrive     CloudInitDrive `json:"cloudinit_drive,omitempty"`
-	Kernel      ExtKernel      `json:"kernel"`
+	Mem            Memory         `json:"memory"`
+	CPU            Processor      `json:"cpu"`
+	Inputs         InputPool      `json:"inputs"`
+	Cdroms         CDPool         `json:"cdrom"`
+	Disks          DiskPool       `json:"storage"`
+	Proxy          ProxyPool      `json:"proxy,omitempty"`
+	NetIfaces      NetifPool      `json:"network"`
+	VSockDevice    *VirtioVSock   `json:"vsock_device,omitempty"`
+	CIDrive        CloudInitDrive `json:"cloudinit_drive,omitempty"`
+	Kernel         ExtKernel      `json:"kernel"`
+	HostPCIDevices HostPCIPool    `json:"hostpci"`
 }
 
 func (p InstanceProperties) Name() string {
@@ -169,6 +176,15 @@ func (p InstanceProperties) GetActualMem() int {
 
 func (p InstanceProperties) GetTotalMem() int {
 	return p.Mem.Total
+}
+
+func (p InstanceProperties) GetHostPCIDevices() HostPCIPool {
+	// Currently deep copy is not needed
+	pool := make(HostPCIPool, len(p.HostPCIDevices))
+
+	copy(pool, p.HostPCIDevices)
+
+	return pool
 }
 
 func (p InstanceProperties) GetInputDevices() InputPool {

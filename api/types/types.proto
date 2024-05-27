@@ -66,6 +66,11 @@ message MachineOpts {
         string command = 2;
         map<string, string> envs = 3;
     }
+    message HostPCI {
+        string addr = 1;
+        bool multifunction = 2;
+        bool primary_gpu = 3 [(gogoproto.customname) = "PrimaryGPU"];
+    }
     string machine_type = 1;
     Firmware firmware = 2;
     Memory memory = 3;
@@ -78,6 +83,7 @@ message MachineOpts {
     CloudInit cloudinit_drive = 10 [(gogoproto.customname) = "CIDrive"];
     Kernel kernel = 11;
     repeated BackendProxy proxy = 12;
+    repeated HostPCI hostpci = 20  [(gogoproto.customname) = "HostPCIDevices"];
 }
 
 message Machine {
@@ -213,4 +219,20 @@ message NetworkEndPoint {
         Vxlan vxlan_attrs = 4;
         IPFabric ipfabric_attrs = 5 [(gogoproto.customname) = "IPFabricAttrs"];
     }
+}
+
+message PCIDevice {
+    string addr = 1;
+    string driver = 2;
+    bool enabled = 3;
+    bool multifunction = 4;
+    uint32 class = 11;
+    uint32 vendor = 12;
+    uint32 device = 13;
+    string class_name = 21;
+    string subclass_name = 22;
+    string vendor_name = 23;
+    string device_name = 24;
+    bool reserved = 91;
+    string holder = 92;
 }

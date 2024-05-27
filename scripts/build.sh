@@ -12,6 +12,6 @@ trap "chown -R $USER_GROUP $GOBIN" 0
 
 go version
 go fmt "${PROJECT_REPO}/..."
-go install -v -ldflags "-s -w" "${PROJECT_REPO}/cmd/..."
+go install -v -buildvcs=false -ldflags "-s -w" "${PROJECT_REPO}/cmd/..."
 
 exit 0
