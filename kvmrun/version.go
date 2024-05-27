@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-var Version = KvmrunVersion{1, 2, 1}
+var Version = KvmrunVersion{1, 3, 1}
 
 type KvmrunVersion struct {
 	Major int `json:"major"`
