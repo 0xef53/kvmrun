@@ -678,11 +678,7 @@ func (t *MachineMigrationTask) newQemuDriveMirrorOpts(addr string, port int, src
 	}
 
 	if t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
-		// TODO: remove this debug mode
-		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
-			t.Logger.Info("WriteBlocking mode is used")
-			opts.CopyMode = "write-blocking"
-		}
+		opts.CopyMode = "write-blocking"
 	}
 
 	return &opts
@@ -1073,11 +1069,7 @@ func (p *MachineMigrationTask_StorageProcessor) newMirrorOpts(srcName, dstName s
 	}
 
 	if p.t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
-		// TODO: remove this debug mode
-		if _, err := os.Stat("/run/kvmrun-write-blocking-migration"); err == nil {
-			p.t.Logger.Info("WriteBlocking mode is used")
-			opts.CopyMode = "write-blocking"
-		}
+		opts.CopyMode = "write-blocking"
 	}
 
 	return &opts
