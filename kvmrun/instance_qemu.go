@@ -430,11 +430,16 @@ func (r *InstanceQemu) initMemory() error {
 		Actual uint64 `json:"actual"`
 	}{}
 
-	if err := r.mon.Run(qmp.Command{"query-balloon", nil}, &balloonInfo); err != nil {
-		return err
+	if err := r.mon.Run(qmp.Command{"query-balloon", nil}, &balloonInfo); err == nil {
+		r.Mem.Actual = int(balloonInfo.Actual >> 20)
+	} else {
+		if _, ok := err.(*qmp.DeviceNotActive); ok {
+			r.Mem.Actual = r.startupConf.GetActualMem()
+		} else {
+			return err
+		}
 	}
 
-	r.Mem.Actual = int(balloonInfo.Actual >> 20)
 	r.Mem.Total = r.startupConf.GetTotalMem()
 
 	return nil
