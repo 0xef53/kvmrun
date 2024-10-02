@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
-	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
-	"github.com/0xef53/kvmrun/internal/cloudinit"
+	c_pb "github.com/0xef53/kvmrun/api/services/cloudinit/v1"
+	m_pb "github.com/0xef53/kvmrun/api/services/machines/v1"
+	flag_types "github.com/0xef53/kvmrun/cmd/vmm/types"
 	"github.com/0xef53/kvmrun/kvmrun"
 
 	cli "github.com/urfave/cli/v2"
@@ -35,18 +34,27 @@ var cmdCloudInitAttach = &cli.Command{
 	Usage:     "attach a cloud-init drive",
 	ArgsUsage: "VMNAME ISO-IMAGE-FILE",
 	HideHelp:  true,
+	Flags: []cli.Flag{
+		&cli.GenericFlag{Name: "driver", Value: flag_types.DefaultCloudInitDriver(), Usage: "cloud-init device driver `name`"},
+	},
 	Action: func(c *cli.Context) error {
 		return executeGRPC(c, attachCloudInitDrive)
 	},
 }
 
 func attachCloudInitDrive(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
-	req := pb.AttachCloudInitRequest{
-		Name: vmname,
-		Path: c.Args().Tail()[0],
+	req := m_pb.AttachCloudInitRequest{
+		Name:   vmname,
+		Driver: c.Generic("driver").(*flag_types.CloudInitDriver).Value(),
 	}
 
-	_, err := pb.NewMachineServiceClient(conn).AttachCloudInitDrive(ctx, &req)
+	if v, err := filepath.Abs(c.Args().Tail()[0]); err == nil {
+		req.Media = v
+	} else {
+		return err
+	}
+
+	_, err := m_pb.NewMachineServiceClient(conn).AttachCloudInitDrive(ctx, &req)
 
 	return err
 }
@@ -62,11 +70,11 @@ var cmdCloudInitDetach = &cli.Command{
 }
 
 func detachCloudInitDrive(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
-	req := pb.DetachCloudInitRequest{
+	req := m_pb.DetachCloudInitRequest{
 		Name: vmname,
 	}
 
-	_, err := pb.NewMachineServiceClient(conn).DetachCloudInitDrive(ctx, &req)
+	_, err := m_pb.NewMachineServiceClient(conn).DetachCloudInitDrive(ctx, &req)
 
 	return err
 }
@@ -76,18 +84,27 @@ var cmdCloudInitChangeMedium = &cli.Command{
 	Usage:     "change the medium inserted into a guest system",
 	ArgsUsage: "VMNAME ISO-IMAGE-FILE",
 	HideHelp:  true,
+	Flags: []cli.Flag{
+		&cli.BoolFlag{Name: "live", Usage: "apply changes to the running machine instance"},
+	},
 	Action: func(c *cli.Context) error {
 		return executeGRPC(c, changeCloudInitDrive)
 	},
 }
 
 func changeCloudInitDrive(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
-	req := pb.ChangeCloudInitRequest{
+	req := m_pb.ChangeCloudInitRequest{
 		Name: vmname,
-		Path: c.Args().Tail()[0],
+		Live: c.Bool("live"),
 	}
 
-	_, err := pb.NewMachineServiceClient(conn).ChangeCloudInitDrive(ctx, &req)
+	if v, err := filepath.Abs(c.Args().Tail()[0]); err == nil {
+		req.Media = v
+	} else {
+		return err
+	}
+
+	_, err := m_pb.NewMachineServiceClient(conn).ChangeCloudInitDrive(ctx, &req)
 
 	return err
 }
@@ -97,6 +114,17 @@ var cmdCloudInitBuild = &cli.Command{
 	Usage:     "build an ISO image file",
 	ArgsUsage: "VMNAME [OUTPUT-FILE]",
 	HideHelp:  true,
+	Flags: []cli.Flag{
+		&cli.StringFlag{Name: "user-config", Usage: "path to the user defined cloud-config data"},
+		&cli.StringFlag{Name: "platform", Usage: "a cloud platform name (nocloud, openstack, gce, ec2, etc...)"},
+		&cli.StringFlag{Name: "subplatform", Usage: "additional detail describing the specific source or type of metadata used"},
+		&cli.StringFlag{Name: "cloudname", Usage: "a cloud common name (netangels, google, aws, azure, etc...)"},
+		&cli.StringFlag{Name: "region", Usage: "the identifier of the region where instances of this platform are located (ru-ekt-1, us-east-2, ...)"},
+		&cli.StringFlag{Name: "zone", Usage: "the identifier of the zone in which the instance is deployed (ru-ekt-1a, us-east-2b, ...)"},
+		&cli.StringFlag{Name: "hostname", Usage: "set the server hostname"},
+		&cli.StringFlag{Name: "domain", Usage: "set the domain to configure FQDN"},
+		&cli.StringFlag{Name: "timezone", Usage: "set the system timezone"},
+	},
 	Action: func(c *cli.Context) error {
 		return executeGRPC(c, buildCloudInitDrive)
 	},
@@ -106,135 +134,38 @@ func buildCloudInitDrive(ctx context.Context, vmname string, c *cli.Context, con
 	var outputFile string
 
 	if len(c.Args().Tail()) >= 1 {
-		outputFile = c.Args().Tail()[0]
+		if v, err := filepath.Abs(c.Args().Tail()[0]); err == nil {
+			outputFile = v
+		} else {
+			return err
+		}
 	} else {
 		outputFile = filepath.Join(kvmrun.CONFDIR, vmname, "config_cidata")
 	}
 
-	mainConfigFile := filepath.Join(kvmrun.CONFDIR, vmname, "config")
-	netConfigFile := mainConfigFile + "_network"
+	req := c_pb.BuildImageRequest{
+		MachineName:      vmname,
+		Platform:         c.String("platform"),
+		Subplatform:      c.String("subplatform"),
+		Cloudname:        c.String("cloudname"),
+		Region:           c.String("region"),
+		AvailabilityZone: c.String("zone"),
+		Hostname:         c.String("hostname"),
+		Domain:           c.String("domain"),
+		Timezone:         c.String("timezone"),
+		OutputFile:       outputFile,
+	}
 
-	macaddrs, err := func() (map[string]string, error) {
-		res := make(map[string]string)
-
-		tmp := struct {
-			Network []struct {
-				Name   string `json:"ifname"`
-				Hwaddr string `json:"hwaddr"`
-			} `json:"network"`
-		}{}
-
-		b, err := ioutil.ReadFile(mainConfigFile)
+	if fname := strings.TrimSpace(c.String("user-config")); len(fname) > 0 {
+		b, err := os.ReadFile(fname)
 		if err != nil {
-			if os.IsNotExist(err) {
-				// this is not an error and means
-				// that machine has no network
-				return res, nil
-			}
-			return nil, err
-		}
-		if err := json.Unmarshal(b, &tmp); err != nil {
-			return nil, err
+			return err
 		}
 
-		for _, netif := range tmp.Network {
-			res[netif.Name] = netif.Hwaddr
-		}
-
-		return res, nil
-	}()
-	if err != nil {
-		return fmt.Errorf("failed to build cloud-init image: %s", err)
+		req.UserConfig = b
 	}
 
-	ethernets, err := func() (map[string]cloudinit.EthernetConfig, error) {
-		res := make(map[string]cloudinit.EthernetConfig)
-
-		tmp := []struct {
-			Name   string   `json:"ifname"`
-			Scheme string   `json:"scheme"`
-			IPs    []string `json:"ips"`
-		}{}
-
-		b, err := ioutil.ReadFile(netConfigFile)
-		if err != nil {
-			if os.IsNotExist(err) {
-				// this is not an error and means
-				// that machine has no network
-				return res, nil
-			}
-			return nil, err
-		}
-		if err := json.Unmarshal(b, &tmp); err != nil {
-			return nil, err
-		}
-
-		for _, netif := range tmp {
-			if _, ok := macaddrs[netif.Name]; !ok || len(netif.IPs) == 0 {
-				// skip unknown devices and devices without IPs
-				continue
-			}
-			if netif.Scheme != "routed" && netif.Scheme != "bridged" {
-				// skip entries with unknown schemes
-				continue
-			}
-
-			var ip4addrs, ip6addrs []*net.IPNet
-
-			for _, ipstr := range netif.IPs {
-				ipnet, err := parseIPNet(ipstr)
-				if err != nil {
-					return nil, err
-				}
-				if ipnet.IP.To4() != nil {
-					ip4addrs = append(ip4addrs, ipnet)
-				} else {
-					ip6addrs = append(ip6addrs, ipnet)
-				}
-			}
-
-			cfg := cloudinit.EthernetConfig{
-				Addresses: netif.IPs,
-			}
-
-			cfg.Match.MacAddress = macaddrs[netif.Name]
-
-			if netif.Scheme == "routed" {
-				// public net
-				if len(ip4addrs) > 0 {
-					if gw := getGatewayAddr(ip4addrs[0]); gw != nil {
-						cfg.Gateway4 = gw.String()
-					}
-				}
-				if len(ip6addrs) > 0 {
-					if gw := getGatewayAddr(ip6addrs[0]); gw != nil {
-						cfg.Gateway6 = gw.String()
-					}
-				}
-				res["public"] = cfg
-			} else {
-				res["private"] = cfg
-			}
-		}
-
-		return res, nil
-	}()
-	if err != nil {
-		return fmt.Errorf("failed to build cloud-init image: %s", err)
-	}
-
-	data := cloudinit.Data{
-		Metadata: &cloudinit.MetadataConfig{
-			DSMode:     "local",
-			InstanceID: "i-" + vmname,
-		},
-		Network: &cloudinit.NetworkConfig{
-			Version:   2,
-			Ethernets: ethernets,
-		},
-	}
-
-	if err := cloudinit.GenImage(&data, outputFile); err != nil {
+	if _, err := c_pb.NewCloudInitServiceClient(conn).BuildImage(ctx, &req); err != nil {
 		return err
 	}
 

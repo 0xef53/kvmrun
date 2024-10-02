@@ -101,6 +101,14 @@ func GetInstanceConf(vmname string) (Instance, error) {
 		vmc.Disks[idx].Backend = b
 	}
 
+	if vmc.CIDrive != nil {
+		b, err := NewCloudInitDriveBackend(vmc.CIDrive.Media)
+		if err != nil {
+			return nil, err
+		}
+		vmc.CIDrive.Backend = b
+	}
+
 	vmuser, err := user.Lookup(vmname)
 	if err != nil {
 		return nil, err
@@ -596,8 +604,40 @@ func (c *InstanceConf) RemoveVSockDevice() error {
 	return nil
 }
 
-func (c *InstanceConf) SetCloudInitDrive(s string) error {
-	c.CIDrive.Path = s
+func (c *InstanceConf) SetCloudInitMedia(s string) error {
+	newdrive, err := NewCloudInitDrive(s)
+	if err != nil {
+		return err
+	}
+
+	if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, c.name) {
+		return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, c.name))
+	}
+
+	if c.CIDrive != nil {
+		newdrive.Driver = c.CIDrive.Driver
+	}
+
+	c.CIDrive = newdrive
+
+	return nil
+}
+
+func (c *InstanceConf) SetCloudInitDriver(s string) error {
+	if c.CIDrive == nil {
+		return &NotConnectedError{"instance_conf", "cloud-init drive"}
+	}
+
+	if !CloudInitDrivers.Exists(s) {
+		return fmt.Errorf("unknown cloud-init device driver: %s", s)
+	}
+	c.CIDrive.Driver = s
+
+	return nil
+}
+
+func (c *InstanceConf) RemoveCloudInitConf() error {
+	c.CIDrive = nil
 
 	return nil
 }

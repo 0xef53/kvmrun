@@ -269,10 +269,25 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	}
 
 	// CloudInit drive
-	if cidrive := b.vmconf.GetCloudInitDrive(); len(cidrive) > 0 {
+	if cidrive := b.vmconf.GetCloudInitDrive(); cidrive != nil {
+		if len(cidrive.Driver) == 0 {
+			// to ensure backward compatibility
+			cidrive.Driver = "floppy"
+		}
+		if !CloudInitDrivers.Exists(cidrive.Driver) {
+			return nil, fmt.Errorf("unknown cloud-init device driver: %s", cidrive.Driver)
+		}
+
 		args = append(args, "-smbios", "type=1,serial=ds=nocloud")
-		args = append(args, "-drive", fmt.Sprintf("file=%s,id=cidata,format=raw,media=cdrom,if=none,aio=native,cache=none,readonly", cidrive))
-		args = append(args, "-device", "floppy,drive=cidata,id=cidata")
+		args = append(args, "-drive", fmt.Sprintf("file=%s,id=cidata,format=raw,media=cdrom,if=none,aio=native,cache=none,readonly", cidrive.Media))
+		switch cidrive.Driver {
+		case "floppy":
+			args = append(args, "-device", "floppy,drive=cidata,id=cidata")
+		case "ide-cd":
+			args = append(args, "-device", "ide-cd,drive=cidata,id=cidata")
+		case "virtio-blk-pci":
+			args = append(args, "-device", "virtio-blk-pci,drive=cidata,id=cidata,bus=pci.0,addr=0x1e")
+		}
 	}
 
 	// Channels: default virtio serial port

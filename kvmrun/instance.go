@@ -84,8 +84,10 @@ type Instance interface {
 	AppendVSockDevice(uint32) error
 	RemoveVSockDevice() error
 
-	GetCloudInitDrive() string
-	SetCloudInitDrive(string) error
+	GetCloudInitDrive() *CloudInitDrive
+	SetCloudInitMedia(string) error
+	SetCloudInitDriver(string) error
+	RemoveCloudInitConf() error
 
 	GetKernelImage() string
 	GetKernelCmdline() string
@@ -107,17 +109,17 @@ type InstanceProperties struct {
 	MachineType string       `json:"machine_type,omitempty"`
 	Firmware    QemuFirmware `json:"firmware,omitempty"`
 
-	Mem            Memory         `json:"memory"`
-	CPU            Processor      `json:"cpu"`
-	Inputs         InputPool      `json:"inputs"`
-	Cdroms         CDPool         `json:"cdrom"`
-	Disks          DiskPool       `json:"storage"`
-	Proxy          ProxyPool      `json:"proxy,omitempty"`
-	NetIfaces      NetifPool      `json:"network"`
-	VSockDevice    *VirtioVSock   `json:"vsock_device,omitempty"`
-	CIDrive        CloudInitDrive `json:"cloudinit_drive,omitempty"`
-	Kernel         ExtKernel      `json:"kernel"`
-	HostPCIDevices HostPCIPool    `json:"hostpci"`
+	Mem            Memory          `json:"memory"`
+	CPU            Processor       `json:"cpu"`
+	Inputs         InputPool       `json:"inputs"`
+	Cdroms         CDPool          `json:"cdrom"`
+	Disks          DiskPool        `json:"storage"`
+	Proxy          ProxyPool       `json:"proxy,omitempty"`
+	NetIfaces      NetifPool       `json:"network"`
+	VSockDevice    *VirtioVSock    `json:"vsock_device,omitempty"`
+	CIDrive        *CloudInitDrive `json:"cloudinit_drive,omitempty"`
+	Kernel         ExtKernel       `json:"kernel"`
+	HostPCIDevices HostPCIPool     `json:"hostpci"`
 }
 
 func (p InstanceProperties) Name() string {
@@ -259,8 +261,16 @@ func (p InstanceProperties) GetVSockDevice() *VirtioVSock {
 	return p.VSockDevice
 }
 
-func (p InstanceProperties) GetCloudInitDrive() string {
-	return p.CIDrive.Path
+func (p InstanceProperties) GetCloudInitDrive() *CloudInitDrive {
+	if p.CIDrive == nil {
+		return nil
+	}
+
+	return &CloudInitDrive{
+		Media:   p.CIDrive.Media,
+		Driver:  p.CIDrive.Driver,
+		Backend: p.CIDrive.Backend.Copy(),
+	}
 }
 
 func (p InstanceProperties) GetKernelImage() string {

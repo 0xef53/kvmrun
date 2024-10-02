@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/0xef53/kvmrun/kvmrun/backend"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -18,6 +20,10 @@ func New(p string) (*Device, error) {
 
 func (d *Device) QdevID() string {
 	return "blk_" + d.BaseName()
+}
+
+func (d *Device) FullPath() string {
+	return d.Path
 }
 
 func (d *Device) BaseName() string {
@@ -42,10 +48,16 @@ func (d *Device) IsAvailable() (bool, error) {
 		}
 
 	case os.IsNotExist(err):
-		return false, &os.PathError{"stat", d.Path, os.ErrNotExist}
+		return false, fmt.Errorf("%w: %s", os.ErrNotExist, d.Path)
 	default:
 		return false, err
 	}
 
 	return true, nil
+}
+
+func (d *Device) Copy() backend.DiskBackend {
+	return &Device{
+		Path: d.Path,
+	}
 }

@@ -30,9 +30,6 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Model:   vmi.GetCPUModel(),
 				Quota:   int64(vmi.GetCPUQuota()),
 			},
-			CIDrive: &pb_types.MachineOpts_CloudInit{
-				Path: vmi.GetCloudInitDrive(),
-			},
 		}
 
 		for _, d := range vmi.GetInputDevices() {
@@ -106,6 +103,13 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Auto:      vsock.Auto,
 				ContextID: vsock.ContextID,
 				Addr:      vsock.Addr,
+			}
+		}
+
+		if cidrive := vmi.GetCloudInitDrive(); cidrive != nil {
+			opts.CIDrive = &pb_types.MachineOpts_CloudInit{
+				Path:   cidrive.Media,
+				Driver: cidrive.Driver,
 			}
 		}
 
