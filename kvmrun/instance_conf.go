@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/pci"
+	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 )
 
 // InstanceConf represents a virtual machine configuration
@@ -610,8 +611,10 @@ func (c *InstanceConf) SetCloudInitMedia(s string) error {
 		return err
 	}
 
-	if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, c.name) {
-		return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, c.name))
+	if _, ok := newdrive.Backend.(*file.Device); ok {
+		if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, c.name) {
+			return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, c.name))
+		}
 	}
 
 	if c.CIDrive != nil {

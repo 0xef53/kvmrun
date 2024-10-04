@@ -34,14 +34,6 @@ func NewCloudInitDrive(media string) (*CloudInitDrive, error) {
 		return nil, err
 	}
 
-	if ok, err := b.IsAvailable(); err == nil {
-		if !ok {
-			return nil, fmt.Errorf("not available: %s", b.FullPath())
-		}
-	} else {
-		return nil, err
-	}
-
 	return &CloudInitDrive{
 		Media:   b.FullPath(),
 		Driver:  "ide-cd",

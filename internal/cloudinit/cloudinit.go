@@ -7,10 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
-
-var userDataHeader = []byte("#cloud-config\n")
 
 type Data struct {
 	Meta    MetadataConfig
@@ -43,11 +41,33 @@ type NetworkConfig struct {
 
 type EthernetConfig struct {
 	Match struct {
-		MacAddress string `json:"mac_address" yaml:"mac_address"`
+		MacAddress string `json:"macaddress" yaml:"macaddress"`
 	} `json:"match" yaml:"match"`
 	Addresses []string `json:"addresses" yaml:"addresses"`
 	Gateway4  string   `json:"gateway4,omitempty" yaml:"gateway4,omitempty"`
 	Gateway6  string   `json:"gateway6,omitempty" yaml:"gateway6,omitempty"`
+}
+
+// Function is used to provide backward compatibility
+// with Phoenix Guest Agent, which looks at the "mac_address" field.
+func (c EthernetConfig) MarshalYAML() (interface{}, error) {
+	ovrd := struct {
+		Match struct {
+			MacAddress  string `yaml:"macaddress"`
+			Mac_Address string `yaml:"mac_address"`
+		} `yaml:"match"`
+		Addresses []string `yaml:"addresses"`
+		Gateway4  string   `yaml:"gateway4,omitempty"`
+		Gateway6  string   `yaml:"gateway6,omitempty"`
+	}{}
+
+	ovrd.Match.MacAddress = c.Match.MacAddress
+	ovrd.Match.Mac_Address = c.Match.MacAddress
+	ovrd.Addresses = c.Addresses
+	ovrd.Gateway4 = c.Gateway4
+	ovrd.Gateway6 = c.Gateway6
+
+	return &ovrd, nil
 }
 
 func GenImage(data *Data, outfile string) error {

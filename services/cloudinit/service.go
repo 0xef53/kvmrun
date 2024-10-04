@@ -18,7 +18,7 @@ import (
 	grpc "google.golang.org/grpc"
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 var _ pb.CloudInitServiceServer = &ServiceServer{}
@@ -177,13 +177,6 @@ func buildEthernetsConfig(vmconfdir string) (map[string]cloudinit.EthernetConfig
 					ip6addrs = append(ip6addrs, ipnet)
 				}
 			}
-
-			// Default Route can be determined automatically
-			// according to the following rules:
-			//  - IPv4, netlen < 32:  the last addr from the network
-			//  - IPv4, netlen = 32:  onlink 10.11.11.11 (must be configured
-			//                        on dummy-interface on the host)
-			//  - IPv6:               the last addr from the network
 
 			if len(ip4addrs) > 0 && len(netif.Gateway4) > 0 {
 				if netif.Gateway4 == "auto" {

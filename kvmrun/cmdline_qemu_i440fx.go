@@ -284,7 +284,7 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 		case "floppy":
 			args = append(args, "-device", "floppy,drive=cidata,id=cidata")
 		case "ide-cd":
-			args = append(args, "-device", "ide-cd,drive=cidata,id=cidata")
+			args = append(args, "-device", "ide-cd,bus=ide.0,unit=1,drive=cidata,id=cidata")
 		case "virtio-blk-pci":
 			args = append(args, "-device", "virtio-blk-pci,drive=cidata,id=cidata,bus=pci.0,addr=0x1e")
 		}

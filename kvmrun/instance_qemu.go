@@ -911,8 +911,14 @@ func (r *InstanceQemu) SetCloudInitMedia(media string) error {
 
 	newdrive.Driver = r.CIDrive.Driver
 
-	if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, r.name) {
-		return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, r.name))
+	if _, ok := newdrive.Backend.(*file.Device); ok {
+		if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, r.name) {
+			return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, r.name))
+		}
+	}
+
+	if ok, err := newdrive.Backend.IsAvailable(); !ok {
+		return err
 	}
 
 	curdrive := r.CIDrive
