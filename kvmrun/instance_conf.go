@@ -103,11 +103,15 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	}
 
 	if vmc.CIDrive != nil {
-		b, err := NewCloudInitDriveBackend(vmc.CIDrive.Media)
-		if err != nil {
-			return nil, err
+		if len(vmc.CIDrive.Media) > 0 {
+			b, err := NewCloudInitDriveBackend(vmc.CIDrive.Media)
+			if err != nil {
+				return nil, err
+			}
+			vmc.CIDrive.Backend = b
+		} else {
+			vmc.CIDrive = nil
 		}
-		vmc.CIDrive.Backend = b
 	}
 
 	vmuser, err := user.Lookup(vmname)
@@ -747,6 +751,18 @@ func GetIncomingConf(vmname string) (Instance, error) {
 		c.Disks[idx].Backend = b
 	}
 
+	if c.CIDrive != nil {
+		if len(c.CIDrive.Media) > 0 {
+			b, err := NewCloudInitDriveBackend(c.CIDrive.Media)
+			if err != nil {
+				return nil, err
+			}
+			c.CIDrive.Backend = b
+		} else {
+			c.CIDrive = nil
+		}
+	}
+
 	return &c, nil
 }
 
@@ -801,6 +817,18 @@ func GetStartupConf(vmname string) (Instance, error) {
 			return nil, err
 		}
 		c.Disks[idx].Backend = b
+	}
+
+	if c.CIDrive != nil {
+		if len(c.CIDrive.Media) > 0 {
+			b, err := NewCloudInitDriveBackend(c.CIDrive.Media)
+			if err != nil {
+				return nil, err
+			}
+			c.CIDrive.Backend = b
+		} else {
+			c.CIDrive = nil
+		}
 	}
 
 	return &c, nil
