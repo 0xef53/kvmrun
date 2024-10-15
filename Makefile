@@ -37,7 +37,7 @@ DOCKER_DEB_ARGS := \
 binaries = \
     bin/kvmrund bin/vmm bin/launcher \
     bin/netinit bin/vnetctl bin/gencert bin/proxy-launcher \
-    bin/printpci
+    bin/printpci bin/update-kvmrun-package
 
 proto_files = \
     api/types/types.proto \

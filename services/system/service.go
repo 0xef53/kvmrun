@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"fmt"
+	"syscall"
 	"time"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
@@ -145,6 +146,16 @@ func (s *ServiceServer) StopDiskBackendProxy(ctx context.Context, req *pb.DiskBa
 	if err := gr.Wait(); err != nil {
 		return nil, err
 	}
+
+	return new(empty.Empty), nil
+}
+
+func (s *ServiceServer) GracefulShutdown(ctx context.Context, _ *empty.Empty) (*empty.Empty, error) {
+	log.Info("A graceful shutdown requested. SIGTEM will be sent to the kvmrund process")
+
+	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+
+	time.Sleep(3 * time.Second)
 
 	return new(empty.Empty), nil
 }

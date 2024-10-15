@@ -16,6 +16,8 @@ service SystemService {
 
     rpc StartDiskBackendProxy(DiskBackendProxyRequest) returns (google.protobuf.Empty) { }
     rpc StopDiskBackendProxy(DiskBackendProxyRequest) returns (google.protobuf.Empty) { }
+
+    rpc GracefulShutdown(google.protobuf.Empty) returns (google.protobuf.Empty) { }
 }
 
 message RegisterQemuInstanceRequest {
