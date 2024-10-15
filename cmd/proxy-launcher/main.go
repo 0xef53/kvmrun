@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -72,7 +71,7 @@ func run(c *cli.Context) error {
 		var err error
 
 		// Running config
-		b, err = ioutil.ReadFile(filepath.Join(kvmrun.CHROOTDIR, vmname, "run/backend_proxy"))
+		b, err = os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, vmname, "run/backend_proxy"))
 		if err == nil {
 			fmt.Printf("Config file: %s\n", filepath.Join(kvmrun.CHROOTDIR, vmname, "run/backend_proxy"))
 
@@ -83,7 +82,7 @@ func run(c *cli.Context) error {
 			var tmp map[string]*json.RawMessage
 
 			// Standard virt.machine config
-			b, err = ioutil.ReadFile(filepath.Join(kvmrun.CONFDIR, vmname, "config"))
+			b, err = os.ReadFile(filepath.Join(kvmrun.CONFDIR, vmname, "config"))
 			if err != nil {
 				return nil, err
 			}

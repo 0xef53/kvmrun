@@ -1,7 +1,7 @@
 package osprober
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -16,7 +16,7 @@ func (p CentosReleaseProber) probe(fname string) (*OSReleaseInfo, error) {
 		Name:    "CentOS Linux",
 	}
 
-	b, err := ioutil.ReadFile(fname)
+	b, err := os.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}

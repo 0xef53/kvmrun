@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -31,7 +30,7 @@ func main() {
 
 	config := filepath.Join(kvmrun.CHROOTDIR, vmname, "run/net", ifname)
 
-	c, err := ioutil.ReadFile(config)
+	c, err := os.ReadFile(config)
 	if err != nil {
 		Error.Fatalln(err)
 	}

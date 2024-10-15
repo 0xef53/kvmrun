@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -223,7 +222,7 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 	if err := os.MkdirAll(filepath.Join(vmChrootDir, ".tasks"), 0755); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(vmChrootDir, "pid"), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(vmChrootDir, "pid"), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
 		return err
 	}
 
@@ -260,7 +259,7 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 	// A structure of proxies to use in Kvmrund
 	if pp := vmconf.GetProxyServers(); len(pp) > 0 {
 		if b, err := json.MarshalIndent(pp, "", "    "); err == nil {
-			if err := ioutil.WriteFile(filepath.Join(vmChrootDir, "run/backend_proxy"), b, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(vmChrootDir, "run/backend_proxy"), b, 0644); err != nil {
 				return err
 			}
 		} else {
@@ -285,7 +284,7 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 		if err != nil {
 			return err
 		}
-		if err := ioutil.WriteFile(filepath.Join(vmChrootDir, "run/net", iface.Ifname), jStr, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(vmChrootDir, "run/net", iface.Ifname), jStr, 0644); err != nil {
 			return err
 		}
 	}

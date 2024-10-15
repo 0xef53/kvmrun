@@ -2,7 +2,7 @@ package ps
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,7 +15,7 @@ const SC_CLK_TCK int64 = 100 // C.sysconf(C._SC_CLK_TCK)
 // GetCmdline returns the command line arguments of the process
 // with the specified pid as a slice.
 func GetCmdline(pid int) ([]string, error) {
-	c, err := ioutil.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "cmdline"))
+	c, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "cmdline"))
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func GetLifeTime(pid int) (time.Duration, error) {
 		return 0, err
 	}
 
-	c, err := ioutil.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "stat"))
+	c, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "stat"))
 	if err != nil {
 		return 0, err
 	}

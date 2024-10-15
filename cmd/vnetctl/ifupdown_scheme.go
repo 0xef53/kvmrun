@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +20,7 @@ type Scheme interface {
 
 func GetNetworkScheme(linkname string, configs ...string) (Scheme, error) {
 	for _, fname := range configs {
-		b, err := ioutil.ReadFile(fname)
+		b, err := os.ReadFile(fname)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue

@@ -3,7 +3,6 @@ package system
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -255,7 +254,7 @@ func (t *IncomingMachineTask) OnSuccess() error {
 	if t.req.TurnOffAfter {
 		t.Logger.Info("The machine will be turned off as requested (TurnOffAfter == true)")
 
-		ioutil.WriteFile(t.MachineDownFile(t.req.Name), []byte(""), 0644)
+		os.WriteFile(t.MachineDownFile(t.req.Name), []byte(""), 0644)
 
 		if err := t.SystemCtl.StopAndWait(t.MachineToUnit(t.req.Name), 60*time.Second, nil); err != nil {
 			t.Logger.Errorf("Unable to turn off the machine: %s", err)
@@ -455,7 +454,7 @@ func (t *IncomingMachineTask) startIncomingMachine() (int32, error) {
 	// Extra files
 	if t.req.ExtraFiles != nil {
 		for fname, content := range t.req.ExtraFiles {
-			if err := ioutil.WriteFile(filepath.Join(kvmrun.CONFDIR, t.req.Name, fname), content, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(kvmrun.CONFDIR, t.req.Name, fname), content, 0644); err != nil {
 				return 0, err
 			}
 		}
@@ -484,7 +483,7 @@ func (t *IncomingMachineTask) startIncomingMachine() (int32, error) {
 	}
 
 	return func() (int32, error) {
-		b, err := ioutil.ReadFile(filepath.Join(kvmrun.CHROOTDIR, t.req.Name, "pid"))
+		b, err := os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, t.req.Name, "pid"))
 		if err != nil {
 			return 0, err
 		}

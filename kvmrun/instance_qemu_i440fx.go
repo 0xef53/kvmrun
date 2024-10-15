@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -585,7 +584,7 @@ func (r *InstanceQemu_i440fx) initNetwork() error {
 			Ifup   string `json:"ifup"`
 			Ifdown string `json:"ifdown"`
 		}{}
-		c, err := ioutil.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/net", netif.Ifname))
+		c, err := os.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/net", netif.Ifname))
 		if err != nil {
 			return err
 		}
@@ -665,7 +664,7 @@ func (r *InstanceQemu_i440fx) AppendNetIface(iface NetIface) error {
 		return err
 	}
 	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", iface.Ifname)
-	if err := ioutil.WriteFile(ifaceConf, b, 0644); err != nil {
+	if err := os.WriteFile(ifaceConf, b, 0644); err != nil {
 		return err
 	}
 

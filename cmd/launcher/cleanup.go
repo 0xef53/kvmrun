@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +20,7 @@ func (l *launcher) Cleanup() error {
 	deconfigureIface := func(ifname string) error {
 		iface := kvmrun.NetIface{}
 
-		b, err := ioutil.ReadFile(filepath.Join(chrootDir, "run/net", ifname))
+		b, err := os.ReadFile(filepath.Join(chrootDir, "run/net", ifname))
 		if err != nil {
 			return err
 		}
@@ -47,7 +46,7 @@ func (l *launcher) Cleanup() error {
 		return kvmrun.DelTapInterface(iface.Ifname)
 	}
 
-	if files, err := ioutil.ReadDir(filepath.Join(chrootDir, "run/net")); err == nil {
+	if files, err := os.ReadDir(filepath.Join(chrootDir, "run/net")); err == nil {
 		for _, f := range files {
 			if err := deconfigureIface(f.Name()); err == nil {
 				Info.Println("cleanup: interface has been removed:", f.Name())

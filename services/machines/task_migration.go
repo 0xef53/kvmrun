@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -193,7 +192,7 @@ func (t *MachineMigrationTask) Main() error {
 }
 
 func (t *MachineMigrationTask) OnSuccess() error {
-	ioutil.WriteFile(t.MachineDownFile(t.req.Name), []byte(""), 0644)
+	os.WriteFile(t.MachineDownFile(t.req.Name), []byte(""), 0644)
 
 	// Forced shutdown when migration is successful
 	if err := t.Mon.Run(t.req.Name, qmp.Command{"quit", nil}, nil); err != nil {
@@ -767,7 +766,7 @@ func (t *MachineMigrationTask) extraFiles() (map[string][]byte, error) {
 
 	vmdir := filepath.Join(kvmrun.CONFDIR, t.req.Name)
 
-	files, err := ioutil.ReadDir(vmdir)
+	files, err := os.ReadDir(vmdir)
 	if err != nil {
 		return nil, err
 	}
@@ -775,11 +774,11 @@ func (t *MachineMigrationTask) extraFiles() (map[string][]byte, error) {
 	extraFiles := make(map[string][]byte)
 
 	for _, f := range files {
-		if !f.Mode().IsRegular() || f.Name() == "config" || !r.MatchString(f.Name()) {
+		if !f.Type().IsRegular() || f.Name() == "config" || !r.MatchString(f.Name()) {
 			continue
 		}
 
-		c, err := ioutil.ReadFile(filepath.Join(vmdir, f.Name()))
+		c, err := os.ReadFile(filepath.Join(vmdir, f.Name()))
 		if err != nil {
 			return nil, err
 		}

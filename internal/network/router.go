@@ -3,9 +3,9 @@ package network
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/netip"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -173,7 +173,7 @@ func setOutboundLimits(linkname string, linkID int, rate uint32, bindInterface, 
 	*/
 
 	if len(classidFile) > 0 {
-		if err := ioutil.WriteFile(classidFile, []byte(fmt.Sprintf("%d", 65536+linkID)), 0700); err != nil {
+		if err := os.WriteFile(classidFile, []byte(fmt.Sprintf("%d", 65536+linkID)), 0700); err != nil {
 			return fmt.Errorf("failed to update net_cls.classid file: %s", err)
 		}
 	}

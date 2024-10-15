@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -123,7 +122,7 @@ func (t *DiskBackupTask) Main() error {
 		if err != nil {
 			return err
 		}
-		return ioutil.WriteFile(t.statfile, b, 0644)
+		return os.WriteFile(t.statfile, b, 0644)
 	}
 
 	defer func() {

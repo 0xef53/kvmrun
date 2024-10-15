@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -643,7 +642,7 @@ func (r *InstanceQemu) RemoveDisk(_ string) error {
 }
 
 func (r *InstanceQemu) initProxyServers() error {
-	b, err := ioutil.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"))
+	b, err := os.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -662,7 +661,7 @@ func (r *InstanceQemu) AppendProxy(proxy Proxy) error {
 	r.Proxy.Append(&proxy)
 
 	if b, err := json.MarshalIndent(r.Proxy, "", "    "); err == nil {
-		if err := ioutil.WriteFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"), b, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"), b, 0644); err != nil {
 			return err
 		}
 	} else {
@@ -682,7 +681,7 @@ func (r *InstanceQemu) RemoveProxy(fullpath string) error {
 	}
 
 	if b, err := json.MarshalIndent(r.Proxy, "", "    "); err == nil {
-		if err := ioutil.WriteFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"), b, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(CHROOTDIR, r.name, "run/backend_proxy"), b, 0644); err != nil {
 			return err
 		}
 	} else {

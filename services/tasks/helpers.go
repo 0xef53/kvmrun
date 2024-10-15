@@ -2,7 +2,6 @@ package tasks
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,7 +68,7 @@ func readStatFromFile(key string) (*task.TaskStat, error) {
 
 	statfile := filepath.Join(kvmrun.CHROOTDIR, ff[1], ".tasks", key)
 
-	b, err := ioutil.ReadFile(statfile)
+	b, err := os.ReadFile(statfile)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +83,7 @@ func readStatFromFile(key string) (*task.TaskStat, error) {
 }
 
 func getFileSystemKeys() ([]string, error) {
-	chdirs, err := ioutil.ReadDir(kvmrun.CHROOTDIR)
+	chdirs, err := os.ReadDir(kvmrun.CHROOTDIR)
 	switch {
 	case err == nil:
 	case os.IsNotExist(err):
@@ -97,7 +96,7 @@ func getFileSystemKeys() ([]string, error) {
 
 	for _, x := range chdirs {
 		if x.IsDir() {
-			tasks, err := ioutil.ReadDir(filepath.Join(kvmrun.CHROOTDIR, x.Name(), ".tasks"))
+			tasks, err := os.ReadDir(filepath.Join(kvmrun.CHROOTDIR, x.Name(), ".tasks"))
 			if err == nil {
 				for _, key := range tasks {
 					keys = append(keys, key.Name())

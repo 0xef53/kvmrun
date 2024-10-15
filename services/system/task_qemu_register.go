@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -207,7 +206,7 @@ func (t *QemuInstanceRegistrationTask) initNetworkSecondStage(ctx context.Contex
 		Ifaces []kvmrun.NetIface `json:"network"`
 	}{}
 
-	if b, err := ioutil.ReadFile(filepath.Join(kvmrun.CONFDIR, t.req.Name, "config")); err == nil {
+	if b, err := os.ReadFile(filepath.Join(kvmrun.CONFDIR, t.req.Name, "config")); err == nil {
 		if err := json.Unmarshal(b, &cfg); err != nil {
 			return err
 		}

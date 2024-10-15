@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -206,7 +205,7 @@ func setProcessInfo(entries []SockTableEntry) error {
 		basedir := filepath.Join("/proc", strconv.Itoa(pid))
 
 		// format of link name: socket:[5860846]
-		fds, err := ioutil.ReadDir(filepath.Join(basedir, "fd"))
+		fds, err := os.ReadDir(filepath.Join(basedir, "fd"))
 		if err != nil {
 			return err
 		}
@@ -221,7 +220,7 @@ func setProcessInfo(entries []SockTableEntry) error {
 				e := &entries[idx]
 
 				if lname == "socket:["+e.Inode+"]" && e.Process == nil {
-					b, err := ioutil.ReadFile(filepath.Join(basedir, "comm"))
+					b, err := os.ReadFile(filepath.Join(basedir, "comm"))
 					if err != nil {
 						return err
 					}
@@ -234,7 +233,7 @@ func setProcessInfo(entries []SockTableEntry) error {
 		return nil
 	}
 
-	files, err := ioutil.ReadDir("/proc")
+	files, err := os.ReadDir("/proc")
 	if err != nil {
 		return err
 	}

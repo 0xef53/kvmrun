@@ -3,7 +3,6 @@ package kvmrun
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -59,7 +58,7 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	vmc.CPU.Total = 1
 	vmc.CPU.Actual = 1
 
-	b, err := ioutil.ReadFile(vmc.config())
+	b, err := os.ReadFile(vmc.config())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, &NotFoundError{vmname}
@@ -137,7 +136,7 @@ func (c InstanceConf) Save() error {
 		return err
 	}
 
-	return ioutil.WriteFile(c.config(), b, 0644)
+	return os.WriteFile(c.config(), b, 0644)
 }
 
 func (c InstanceConf) SaveStartupConfig() error {
@@ -146,7 +145,7 @@ func (c InstanceConf) SaveStartupConfig() error {
 		return err
 	}
 
-	return ioutil.WriteFile(filepath.Join(CHROOTDIR, c.name, "run/startup_config"), b, 0644)
+	return os.WriteFile(filepath.Join(CHROOTDIR, c.name, "run/startup_config"), b, 0644)
 }
 
 func (c InstanceConf) config() string {
@@ -723,7 +722,7 @@ func GetIncomingConf(vmname string) (Instance, error) {
 		},
 	}
 
-	b, err := ioutil.ReadFile(c.config())
+	b, err := os.ReadFile(c.config())
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +781,7 @@ func GetStartupConf(vmname string) (Instance, error) {
 		},
 	}
 
-	b, err := ioutil.ReadFile(c.config())
+	b, err := os.ReadFile(c.config())
 	if err != nil {
 		return nil, err
 	}

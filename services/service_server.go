@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -111,7 +110,7 @@ func (s *ServiceServer) GetMachineStatus(vm *kvmrun.Machine) (kvmrun.InstanceSta
 }
 
 func (s *ServiceServer) GetMachineNames() ([]string, error) {
-	files, err := ioutil.ReadDir(kvmrun.CONFDIR)
+	files, err := os.ReadDir(kvmrun.CONFDIR)
 	if err != nil {
 		return nil, err
 	}

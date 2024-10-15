@@ -2,7 +2,7 @@ package osprober
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,7 +18,7 @@ func (p DebianVersionProber) probe(fname string) (*OSReleaseInfo, error) {
 		Name:    "Debian GNU/Linux",
 	}
 
-	b, err := ioutil.ReadFile(fname)
+	b, err := os.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}

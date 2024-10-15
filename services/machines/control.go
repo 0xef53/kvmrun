@@ -2,7 +2,6 @@ package machines
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -37,7 +36,7 @@ func (s *ServiceServer) Stop(ctx context.Context, req *pb.StopMachineRequest) (*
 	}
 
 	err := s.RunFuncTask(ctx, req.Name+"::", func(l *log.Entry) error {
-		if err := ioutil.WriteFile(s.MachineDownFile(req.Name), []byte(""), 0644); err != nil {
+		if err := os.WriteFile(s.MachineDownFile(req.Name), []byte(""), 0644); err != nil {
 			return err
 		}
 

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -174,12 +173,12 @@ func monitorReConnect(systemctl *systemd.Manager, mon *monitor.Pool) (int, error
 			relpath := filepath.Join(kvmrun.CGROOTPATH, vmname)
 			pidfile := filepath.Join(kvmrun.CHROOTDIR, vmname, "pid")
 
-			pid, err := ioutil.ReadFile(pidfile)
+			pid, err := os.ReadFile(pidfile)
 			if err != nil {
 				return err
 			}
 
-			return ioutil.WriteFile(filepath.Join(cpuMP, relpath, "tasks"), pid, 0644)
+			return os.WriteFile(filepath.Join(cpuMP, relpath, "tasks"), pid, 0644)
 		}
 
 		for _, vmname := range names {

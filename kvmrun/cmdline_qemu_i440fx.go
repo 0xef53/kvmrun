@@ -2,7 +2,6 @@ package kvmrun
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -407,7 +406,7 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 
 	// Extra args from extra file
 	if _, err := os.Stat("extra"); err == nil {
-		b, err := ioutil.ReadFile("extra")
+		b, err := os.ReadFile("extra")
 		if err != nil {
 			return nil, err
 		}

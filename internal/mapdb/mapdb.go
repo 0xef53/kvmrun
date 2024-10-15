@@ -3,7 +3,6 @@ package mapdb
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,7 +47,7 @@ func (db *DB) Get(key string) (int, error) {
 
 	var m map[string]int
 
-	if b, err := ioutil.ReadFile(db.file); err == nil {
+	if b, err := os.ReadFile(db.file); err == nil {
 		if err := json.Unmarshal(b, &m); err != nil {
 			return -1, err
 		}
@@ -96,7 +95,7 @@ func (db *DB) Delete(key string) (int, error) {
 
 	var m map[string]int
 
-	if b, err := ioutil.ReadFile(db.file); err == nil {
+	if b, err := os.ReadFile(db.file); err == nil {
 		if err := json.Unmarshal(b, &m); err != nil {
 			return -1, err
 		}
@@ -127,7 +126,7 @@ func (db *DB) save(m map[string]int) error {
 		return err
 	}
 
-	return ioutil.WriteFile(db.file, b, 0644)
+	return os.WriteFile(db.file, b, 0644)
 }
 
 func getVacantValue(values []int) (int, error) {
