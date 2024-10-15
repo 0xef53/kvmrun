@@ -23,32 +23,33 @@ import (
 type InstanceQemu_i440fx struct {
 	*InstanceQemu
 
-	pciDevs []qemu_types.PCIInfo `json:"-"`
+	pciDevs []qemu_types.PCIInfo   `json:"-"`
+	blkDevs []qemu_types.BlockInfo `json:"-"`
 }
 
 func (r *InstanceQemu_i440fx) init() error {
 	var gr errgroup.Group
 
 	r.pciDevs = make([]qemu_types.PCIInfo, 0, 3)
-	if err := r.mon.Run(qmp.Command{"query-pci", nil}, &r.pciDevs); err != nil {
+	if err := r.mon.Run(qmp.Command{Name: "query-pci", Arguments: nil}, &r.pciDevs); err != nil {
+		return err
+	}
+	r.blkDevs = make([]qemu_types.BlockInfo, 0, 8)
+	if err := r.mon.Run(qmp.Command{Name: "query-block", Arguments: nil}, &r.blkDevs); err != nil {
 		return err
 	}
 
 	gr.Go(func() error { return r.initCdroms() })
 	gr.Go(func() error { return r.initStorage() })
 	gr.Go(func() error { return r.initNetwork() })
+	gr.Go(func() error { return r.initCloudInitDrive() })
 
 	return gr.Wait()
 }
 
 func (r *InstanceQemu_i440fx) initCdroms() error {
-	blkDevs := make([]qemu_types.BlockInfo, 0, 8)
-	if err := r.mon.Run(qmp.Command{"query-block", nil}, &blkDevs); err != nil {
-		return err
-	}
-
-	pool := make(CDPool, 0, len(blkDevs))
-	for _, dev := range blkDevs {
+	pool := make(CDPool, 0, len(r.blkDevs))
+	for _, dev := range r.blkDevs {
 		// Skip non-cdrom devices
 		if !strings.HasPrefix(dev.QdevPath, "cdrom_") {
 			continue
@@ -288,13 +289,8 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 		r.scsiBuses[dev.QdevID] = &SCSIBusInfo{"virtio-scsi-pci", fmt.Sprintf("0x%x", dev.Slot)}
 	}
 
-	blkDevs := make([]qemu_types.BlockInfo, 0, 8)
-	if err := r.mon.Run(qmp.Command{"query-block", nil}, &blkDevs); err != nil {
-		return err
-	}
-
-	pool := make(DiskPool, 0, len(blkDevs))
-	for _, dev := range blkDevs {
+	pool := make(DiskPool, 0, len(r.blkDevs))
+	for _, dev := range r.blkDevs {
 		// Skip reserved names and empty devices
 		if dev.Device == "modiso" || dev.Device == "cidata" || dev.Device == "fwloader" || dev.Device == "fwflash" {
 			continue
@@ -721,6 +717,43 @@ func (r *InstanceQemu_i440fx) RemoveNetIface(ifname string) error {
 	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", ifname)
 	if err := os.Remove(ifaceConf); err != nil && !os.IsNotExist(err) {
 		return err
+	}
+
+	return nil
+}
+
+func (r *InstanceQemu_i440fx) initCloudInitDrive() error {
+	for _, dev := range r.blkDevs {
+		if dev.Device == "cidata" && dev.Inserted.File != "" {
+			d := CloudInitDrive{
+				Media: dev.Inserted.File,
+			}
+
+			b, err := NewCloudInitDriveBackend(d.Media)
+			if err != nil {
+				return err
+			}
+			d.Backend = b
+
+			qomTypeArgs := qemu_types.QomQuery{
+				Path:     "cidata",
+				Property: "type",
+			}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomTypeArgs}, &d.Driver); err != nil {
+				if _, ok := err.(*qmp.DeviceNotFound); ok {
+					// Unexpected, but not fatal.
+					continue
+				}
+				return err
+			}
+
+			if !CloudInitDrivers.Exists(d.Driver) {
+				continue
+			}
+
+			r.CIDrive = &d
+		}
 	}
 
 	return nil

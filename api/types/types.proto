@@ -55,6 +55,7 @@ message MachineOpts {
     }
     message CloudInit {
         string path = 1;
+        string driver = 2;
     }
     message Kernel {
         string image = 1;

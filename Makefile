@@ -45,7 +45,8 @@ proto_files = \
     api/services/tasks/v1/tasks.proto \
     api/services/system/v1/system.proto \
     api/services/network/v1/network.proto \
-    api/services/hardware/v1/hardware.proto
+    api/services/hardware/v1/hardware.proto \
+    api/services/cloudinit/v1/cloudinit.proto
 
 .PHONY: all build clean protobufs $(proto_files)
 

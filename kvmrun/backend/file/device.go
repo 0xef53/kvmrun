@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/0xef53/kvmrun/kvmrun/backend"
 )
 
 type Device struct {
@@ -11,11 +13,20 @@ type Device struct {
 }
 
 func New(p string) (*Device, error) {
-	return &Device{Path: p}, nil
+	v, err := filepath.Abs(p)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Device{Path: v}, nil
 }
 
 func (d *Device) QdevID() string {
 	return "blk_" + d.BaseName()
+}
+
+func (d *Device) FullPath() string {
+	return d.Path
 }
 
 func (d *Device) BaseName() string {
@@ -26,7 +37,7 @@ func (d *Device) Size() (uint64, error) {
 	fi, err := os.Lstat(d.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, &os.PathError{"stat", d.Path, os.ErrNotExist}
+			return 0, &os.PathError{Op: "stat", Path: d.Path, Err: os.ErrNotExist}
 		} else {
 			return 0, err
 		}
@@ -47,7 +58,7 @@ func (d *Device) IsAvailable() (bool, error) {
 	fi, err := os.Lstat(d.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, &os.PathError{"stat", d.Path, os.ErrNotExist}
+			return false, fmt.Errorf("%w: %s", os.ErrNotExist, d.Path)
 		} else {
 			return false, err
 		}
@@ -58,4 +69,10 @@ func (d *Device) IsAvailable() (bool, error) {
 	}
 
 	return false, fmt.Errorf("not a regular file: %s", d.Path)
+}
+
+func (d *Device) Copy() backend.DiskBackend {
+	return &Device{
+		Path: d.Path,
+	}
 }

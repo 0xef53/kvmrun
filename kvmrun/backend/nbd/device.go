@@ -27,6 +27,10 @@ func (d *Device) QdevID() string {
 	return "blk_" + d.URI.ExportName
 }
 
+func (d *Device) FullPath() string {
+	return d.Path
+}
+
 func (d *Device) BaseName() string {
 	return d.URI.ExportName
 }
@@ -41,4 +45,10 @@ func (d *Device) IsLocal() bool {
 
 func (d *Device) IsAvailable() (bool, error) {
 	return true, nil
+}
+
+func (d *Device) Copy() backend.DiskBackend {
+	return &Device{
+		Path: d.Path,
+	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/0xef53/kvmrun/kvmrun"
 
 	"github.com/0xef53/kvmrun/services"
+	_ "github.com/0xef53/kvmrun/services/cloudinit"
 	_ "github.com/0xef53/kvmrun/services/hardware"
 	_ "github.com/0xef53/kvmrun/services/machines"
 	_ "github.com/0xef53/kvmrun/services/network"

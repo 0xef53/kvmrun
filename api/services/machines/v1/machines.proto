@@ -343,7 +343,9 @@ message DetachChannelRequest {
 
 message AttachCloudInitRequest {
     string name = 1;
-    string path = 2;
+    string media = 2;
+    // TODO: need to replace with enum DeviceDriver
+    string driver = 3;
 }
 
 message DetachCloudInitRequest {
@@ -352,7 +354,8 @@ message DetachCloudInitRequest {
 
 message ChangeCloudInitRequest {
     string name = 1;
-    string path = 2;
+    string media = 2;
+    bool live = 100;
 }
 
 message StartDiskBackupRequest {

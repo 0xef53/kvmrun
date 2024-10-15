@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -17,7 +18,9 @@ import (
 	"time"
 
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
+	"github.com/0xef53/kvmrun/kvmrun/backend"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
+	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 
 	cg "github.com/0xef53/go-cgroups"
 	qmp "github.com/0xef53/go-qmp/v2"
@@ -89,7 +92,6 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 	gr.Go(func() error { return inner.initHostPCIDevices() })
 	gr.Go(func() error { return inner.initInputDevices() })
 	gr.Go(func() error { return inner.initVSockDevice() })
-	gr.Go(func() error { return inner.initCloudInitDrive() })
 	gr.Go(func() error { return inner.initKern() })
 	gr.Go(func() error { return inner.initProxyServers() })
 
@@ -897,13 +899,178 @@ func (r *InstanceQemu) RemoveVSockDevice() error {
 	return nil
 }
 
-func (r *InstanceQemu) initCloudInitDrive() error {
-	r.CIDrive.Path = r.startupConf.GetCloudInitDrive()
+func (r *InstanceQemu) SetCloudInitMedia(media string) error {
+	if r.CIDrive == nil {
+		return &NotConnectedError{"instance_qemu", "cloud-init drive"}
+	}
+
+	newdrive, err := NewCloudInitDrive(media)
+	if err != nil {
+		return err
+	}
+
+	newdrive.Driver = r.CIDrive.Driver
+
+	if _, ok := newdrive.Backend.(*file.Device); ok {
+		if filepath.Dir(newdrive.Media) != filepath.Join(CONFDIR, r.name) {
+			return fmt.Errorf("must be placed in the machine home directory: %s/", filepath.Join(CONFDIR, r.name))
+		}
+	}
+
+	if ok, err := newdrive.Backend.IsAvailable(); !ok {
+		return err
+	}
+
+	curdrive := r.CIDrive
+
+	var success bool
+
+	inChroot := func(p string) string {
+		return filepath.Join(CHROOTDIR, r.name, p)
+	}
+
+	defer func() {
+		if success && newdrive.Media != curdrive.Media {
+			os.Remove(inChroot(curdrive.Backend.FullPath()))
+		}
+	}()
+
+	//
+	// Update in CHROOT
+	//
+
+	if newdrive.IsLocal() {
+		if err := os.MkdirAll(filepath.Dir(inChroot(newdrive.Backend.FullPath())), 0755); err != nil {
+			return err
+		}
+
+		defer func() {
+			if !success && newdrive.Media != curdrive.Media {
+				os.Remove(inChroot(newdrive.Backend.FullPath()))
+			}
+		}()
+
+		switch newdrive.Backend.(type) {
+		case *block.Device:
+			stat := syscall.Stat_t{}
+			if err := syscall.Stat(newdrive.Backend.FullPath(), &stat); err != nil {
+				return err
+			}
+
+			if err := syscall.Mknod(inChroot(newdrive.Backend.FullPath()), syscall.S_IFBLK|uint32(os.FileMode(01640)), int(stat.Rdev)); err != nil {
+				if !os.IsExist(err) {
+					return err
+				}
+			}
+		case *file.Device:
+			err := func() error {
+				src, err := os.Open(newdrive.Backend.FullPath())
+				if err != nil {
+					return err
+				}
+				defer src.Close()
+
+				tempDst, err := os.CreateTemp(filepath.Dir(inChroot(newdrive.Backend.FullPath())), ".cidata-*")
+				if err != nil {
+					return err
+				}
+				defer tempDst.Close()
+
+				defer func() {
+					os.Remove(tempDst.Name())
+				}()
+
+				if _, err := io.Copy(tempDst, src); err != nil {
+					return err
+				}
+
+				return os.Rename(tempDst.Name(), inChroot(newdrive.Backend.FullPath()))
+			}()
+
+			if err != nil {
+				return fmt.Errorf("failed to copy cloud-init drive into the chroot directory: %w", err)
+			}
+		default:
+			return &backend.UnknownBackendError{Path: newdrive.Media}
+		}
+
+		if err := os.Chown(inChroot(newdrive.Backend.FullPath()), r.uid, 0); err != nil {
+			return err
+		}
+	}
+
+	//
+	// Update in QEMU
+	//
+
+	wait := func(fn func(context.Context, string, uint64) (*qmp.Event, error), after time.Time) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		_, err := fn(ctx, newdrive.QdevID(), uint64(after.Unix()))
+		if err != nil {
+			if err == context.DeadlineExceeded {
+				return fmt.Errorf("change medium timeout error: failed to complete within 60 seconds")
+			}
+			return err
+		}
+
+		return nil
+	}
+
+	changeMediumArgs := struct {
+		ID       string `json:"id"`
+		Filename string `json:"filename"`
+	}{
+		ID:       "cidata",
+		Filename: newdrive.Backend.FullPath(),
+	}
+
+	switch curdrive.Driver {
+	case "ide-cd":
+		var ts time.Time
+
+		// Open the tray
+		ts = time.Now()
+
+		if err := r.mon.Run(qmp.Command{Name: "blockdev-open-tray", Arguments: &qemu_types.StrID{ID: "cidata"}}, nil); err != nil {
+			return err
+		}
+
+		// ... wait until the tray is opened
+		if err := wait(r.mon.WaitDeviceTrayOpenedEvent, ts); err != nil {
+			return err
+		}
+
+		// Replace the media and close the tray
+		ts = time.Now()
+
+		if err := r.mon.Run(qmp.Command{Name: "blockdev-change-medium", Arguments: &changeMediumArgs}, nil); err != nil {
+			return err
+		}
+
+		// ... wait until the tray is closed
+		if err := wait(r.mon.WaitDeviceTrayClosedEvent, ts); err != nil {
+			return err
+		}
+	case "floppy":
+		if err := r.mon.Run(qmp.Command{Name: "blockdev-change-medium", Arguments: &changeMediumArgs}, nil); err != nil {
+			return err
+		}
+	}
+
+	success = true
+
+	r.CIDrive = newdrive
 
 	return nil
 }
 
-func (r *InstanceQemu) SetCloudInitDrive(s string) error {
+func (r *InstanceQemu) SetCloudInitDriver(s string) error {
+	return ErrNotImplemented
+}
+
+func (r *InstanceQemu) RemoveCloudInitConf() error {
 	return ErrNotImplemented
 }
 
