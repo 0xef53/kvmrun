@@ -58,7 +58,7 @@ func (d *Device) IsAvailable() (bool, error) {
 	fi, err := os.Lstat(d.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, fmt.Errorf("%w: %s", os.ErrNotExist, d.Path)
+			return false, &os.PathError{Op: "stat", Path: d.Path, Err: os.ErrNotExist}
 		} else {
 			return false, err
 		}

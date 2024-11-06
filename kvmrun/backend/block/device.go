@@ -48,7 +48,7 @@ func (d *Device) IsAvailable() (bool, error) {
 		}
 
 	case os.IsNotExist(err):
-		return false, fmt.Errorf("%w: %s", os.ErrNotExist, d.Path)
+		return false, &os.PathError{Op: "stat", Path: d.Path, Err: os.ErrNotExist}
 	default:
 		return false, err
 	}
