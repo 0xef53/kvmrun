@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,13 +11,16 @@ import (
 	"syscall"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	cg "github.com/0xef53/kvmrun/internal/cgroups"
+	"github.com/0xef53/kvmrun/internal/fsutil"
+	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/pci"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 
-	cg "github.com/0xef53/go-cgroups"
+	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
 func (l *launcher) Start() error {
@@ -78,6 +80,31 @@ func (l *launcher) Start() error {
 		return nil
 	}
 
+	var qemuRootDir string
+
+	// AppConf with global Kvmrun options
+	if resp, err := l.client.GetAppConf(l.ctx, new(empty.Empty)); err == nil {
+		qemuRootDir = resp.AppConf.QemuRootdir
+	} else {
+		return fmt.Errorf("failed to request global Kvmrun configuration: %w", err)
+	}
+
+	if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
+		qemuRootDir = v
+
+		if _, err := os.Stat(qemuRootDir); err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("QEMU root directory does not exist: %s", qemuRootDir)
+			}
+			return fmt.Errorf("failed to check QEMU root directory: %w", err)
+		}
+		Info.Printf("QEMU root directory: %s\n", qemuRootDir)
+	} else {
+		if err := os.Setenv("QEMU_ROOTDIR", qemuRootDir); err != nil {
+			return err
+		}
+	}
+
 	// Check all the PCI devices and detach them from the host
 	if devs := vmconf.GetHostPCIDevices(); len(devs) > 0 {
 		if err := loadVfioModule(); err != nil {
@@ -122,7 +149,7 @@ func (l *launcher) Start() error {
 	}
 
 	// Prepare chroot environment
-	switch err := prepareChroot(vmconf); {
+	switch err := prepareChroot(vmconf, qemuRootDir); {
 	case err == nil:
 	case IsNonFatalError(err):
 		Error.Println("non fatal:", err)
@@ -131,8 +158,14 @@ func (l *launcher) Start() error {
 	}
 
 	// CPU cgroup init
-	if err := enableCgroupCPU(vmconf); err != nil {
-		return fmt.Errorf("cpu cgroup init: %s", err)
+	if quota := vmconf.GetCPUQuota(); quota > 0 {
+		mgr, err := cg.LoadManager(os.Getpid())
+		if err != nil {
+			return err
+		}
+		if err := mgr.SetCpuQuota(int64(quota)); err != nil {
+			return err
+		}
 	}
 
 	for _, fname := range []string{"incoming_config", ".runtime/migration_stat"} {
@@ -172,7 +205,7 @@ func (l *launcher) Start() error {
 	}
 
 	// Run QEMU process
-	Info.Printf("starting qemu-kvm process: pid = %d\n", os.Getpid())
+	Info.Printf("starting QEMU process: pid = %d\n", os.Getpid())
 
 	var qemuBinary string
 
@@ -182,22 +215,28 @@ func (l *launcher) Start() error {
 		qemuBinary = qemu.BINARY
 	}
 
-	Info.Printf("qemu binary: %s\n", qemuBinary)
+	Info.Printf("QEMU binary: %s\n", qemuBinary)
 
 	return syscall.Exec(qemuBinary, args, os.Environ())
 }
 
-func lookForRomfile(romfile string) (string, error) {
+// lookForRomfile returns a path to the romfile directory relative to the rootdir
+// or an error if the romfile could not be found.
+func lookForRomfile(romfile, rootdir string) (string, error) {
 	possibleDirs := []string{
-		".",
-		"/usr/share/qemu",
-		"/usr/lib/ipxe/qemu",
-		"/usr/share/seabios",
-		"/usr/share/ipxe",
+		"usr/share/qemu",
+		"usr/lib/ipxe/qemu",
+		"usr/share/seabios",
+		"usr/share/ipxe",
+	}
+
+	// Check in current work directory
+	if _, err := os.Stat(romfile); err == nil {
+		return ".", nil
 	}
 
 	for _, d := range possibleDirs {
-		switch _, err := os.Stat(filepath.Join(d, romfile)); {
+		switch _, err := os.Stat(filepath.Join(rootdir, d, romfile)); {
 		case err == nil:
 			return d, nil
 		case os.IsNotExist(err):
@@ -207,10 +246,10 @@ func lookForRomfile(romfile string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("failed to find romfile: %s", romfile)
+	return "", fmt.Errorf("unable to find romfile: %s", romfile)
 }
 
-func prepareChroot(vmconf kvmrun.Instance) error {
+func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 	vmChrootDir := filepath.Join(kvmrun.CHROOTDIR, vmconf.Name())
 
 	if err := os.MkdirAll(filepath.Join(vmChrootDir, "dev/net"), 0755); err != nil {
@@ -289,48 +328,47 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 		}
 	}
 
-	for _, romfile := range []string{"efi-virtio.rom"} {
-		dir, err := lookForRomfile(romfile)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Join(vmChrootDir, dir), 0755); err != nil {
-			return err
-		}
-		src, err := os.Open(filepath.Join(dir, romfile))
-		if err != nil {
-			return err
-		}
-		defer src.Close()
-		dst, err := os.Create(filepath.Join(vmChrootDir, dir, romfile))
-		if err != nil {
-			return err
-		}
-		defer dst.Close()
-		if _, err := io.Copy(dst, src); err != nil {
-			return err
-		}
+	// ROMs
+	possibleDirs := []string{
+		filepath.Join(qemuRootDir, "usr/share/qemu"),
+		filepath.Join(qemuRootDir, "usr/lib/ipxe/qemu"),
+		filepath.Join(qemuRootDir, "usr/share/seabios"),
+		filepath.Join(qemuRootDir, "usr/share/ipxe"),
 	}
 
-	copyFileContent := func(fname string) error {
-		if err := os.MkdirAll(filepath.Join(vmChrootDir, filepath.Dir(fname)), 0755); err != nil {
+	fmt.Printf("DEBUG(romfile) Start\n")
+	for _, romname := range []string{"efi-virtio.rom"} {
+		fmt.Printf("DEBUG(romfile) Check %s\n", romname)
+
+		var rompath string
+
+		// Check in current work directory
+		if _, err := os.Stat(romname); err == nil {
+			rompath = romname
+			fmt.Printf("DEBUG(romfile) Found in the current work dir\n")
+		} else {
+			if _, p, err := helpers.LookForFile(romname, possibleDirs...); err == nil {
+				rompath = p
+				fmt.Printf("DEBUG(romfile) Found by LookForFile at %s\n", rompath)
+			} else {
+				return fmt.Errorf("unable to find romfile: %s", romname)
+			}
+		}
+
+		var dstname string
+
+		if p, err := filepath.Rel(qemuRootDir, rompath); err == nil {
+			dstname = filepath.Join(vmChrootDir, p)
+		} else {
 			return err
 		}
-		src, err := os.Open(fname)
-		if err != nil {
+
+		if err := fsutil.Copy(rompath, dstname); err != nil {
 			return err
 		}
-		defer src.Close()
-		dst, err := os.Create(filepath.Join(vmChrootDir, fname))
-		if err != nil {
-			return err
-		}
-		defer dst.Close()
-		if _, err := io.Copy(dst, src); err != nil {
-			return err
-		}
-		return nil
+		fmt.Printf("DEBUG(romfile) Copy from %s to %s\n", rompath, dstname)
 	}
+	fmt.Printf("DEBUG(romfile) END\n")
 
 	// Firmware flash image
 	if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
@@ -350,11 +388,12 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 			case *file.Device:
 				if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
 					// In case of incoming migration
-					if err := copyFileContent(fwflash.Path); err != nil {
+					if err := fsutil.Copy(fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
 						return err
 					}
+					fmt.Printf("DEBUG(efivars) Copy from %s to %s\n", fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path))
 				} else {
-					// In case of outgoing migration
+					// It's a trick in case of outgoing migration? as QEMU checks for the presence of a "file" at this path
 					if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
 						return err
 					}
@@ -367,18 +406,19 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 	}
 
 	err := func() error {
-		iscsiLib := "/usr/lib/x86_64-linux-gnu/qemu/block-iscsi.so"
+		libfile := "/usr/lib/x86_64-linux-gnu/qemu/block-iscsi.so"
 
-		if err := copyFileContent(iscsiLib); err != nil {
+		if err := fsutil.Copy(libfile, filepath.Join(vmChrootDir, libfile)); err != nil {
 			return err
 		}
+		fmt.Printf("DEBUG(iscsi) Copy from %s to %s\n", libfile, filepath.Join(vmChrootDir, libfile))
 
 		lddBinary, err := exec.LookPath("ldd")
 		if err != nil {
 			return err
 		}
 
-		out, err := exec.Command(lddBinary, iscsiLib).CombinedOutput()
+		out, err := exec.Command(lddBinary, libfile).CombinedOutput()
 		if err != nil {
 			return err
 		}
@@ -390,45 +430,16 @@ func prepareChroot(vmconf kvmrun.Instance) error {
 			}
 			parts := strings.Fields(line)
 
-			if err := copyFileContent(parts[2]); err != nil {
+			if err := fsutil.Copy(parts[2], filepath.Join(vmChrootDir, parts[2])); err != nil {
 				return err
 			}
+			fmt.Printf("DEBUG(iscsi) Copy from %s to %s\n", parts[2], filepath.Join(vmChrootDir, parts[2]))
 		}
 
 		return nil
 	}()
 	if err != nil {
 		return &NonFatalError{"unable to prepare iSCSI libs: " + err.Error()}
-	}
-
-	return nil
-}
-
-func enableCgroupCPU(vmconf kvmrun.Instance) error {
-	if vmconf.GetCPUQuota() == 0 {
-		return nil
-	}
-
-	relpath := filepath.Join(kvmrun.CGROOTPATH, vmconf.Name())
-
-	cpuGroup, err := cg.NewCpuGroup(relpath, os.Getpid())
-	if err != nil {
-		return err
-	}
-
-	cgconf := cg.Config{}
-	if err := cpuGroup.Get(&cgconf); err != nil {
-		return err
-	}
-
-	// If CPU quota is disabled in Kernel
-	if cgconf.CpuPeriod == 0 {
-		return cg.ErrCfsNotEnabled
-	}
-
-	cgconf.CpuQuota = (cgconf.CpuPeriod * int64(vmconf.GetCPUQuota())) / 100
-	if err := cpuGroup.Set(&cgconf); err != nil {
-		return err
 	}
 
 	return nil

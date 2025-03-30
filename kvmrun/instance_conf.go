@@ -202,16 +202,19 @@ func (c *InstanceConf) SetCPUSockets(n int) error {
 
 func (c *InstanceConf) SetCPUModel(model string) error {
 	c.CPU.Model = model
+
 	return nil
 }
 
 func (c *InstanceConf) SetCPUQuota(quota int) error {
 	c.CPU.Quota = quota
+
 	return nil
 }
 
 func (c *InstanceConf) SetMachineType(t string) error {
 	c.MachineType = t
+
 	return nil
 }
 

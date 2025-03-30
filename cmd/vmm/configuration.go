@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,6 +53,16 @@ func createMachineConf(ctx context.Context, vmname string, c *cli.Context, conn 
 				Quota:  int64(c.Int("cpu-quota")),
 			},
 		},
+	}
+
+	if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
+		if v = strings.TrimSpace(v); len(v) != 0 {
+			if p, err := filepath.Abs(v); err == nil {
+				req.QemuRootdir = p
+			} else {
+				return err
+			}
+		}
 	}
 
 	resp, err := pb.NewMachineServiceClient(conn).Create(ctx, &req)

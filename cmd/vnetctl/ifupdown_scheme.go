@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/0xef53/kvmrun/kvmrun"
 
 	pb "github.com/0xef53/kvmrun/api/services/network/v1"
 )
@@ -64,16 +67,30 @@ func GetNetworkScheme(linkname string, configs ...string) (Scheme, error) {
 
 					return &vxlanScheme{linkname, &opts}, nil
 				case "routed":
-					opts := routerSchemeOptions{}
-
 					/*
-						TODO: cgroup classid dirty hack. Fix it.
+						PID is needed to configure net_cls.classid for use in traffic control rules.
 					*/
-					if cwd, err := os.Getwd(); err == nil {
-						opts.MachineName = filepath.Base(cwd)
-					} else {
-						return nil, fmt.Errorf("unable to determine machine name: %s", err)
+					pid, err := func() (uint32, error) {
+						if cwd, err := os.Getwd(); err == nil {
+							if b, err := os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, filepath.Base(cwd), "pid")); err == nil {
+								if v, err := strconv.ParseUint(string(b), 10, 32); err == nil {
+									return uint32(v), nil
+								} else {
+									return 0, err
+								}
+							} else {
+								return 0, err
+							}
+						} else {
+							return 0, err
+						}
+					}()
+
+					if err != nil {
+						return nil, fmt.Errorf("failed to determine the machine process ID: %w", err)
 					}
+
+					opts := routerSchemeOptions{ProcessID: pid}
 
 					if err := json.Unmarshal(b, &opts); err != nil {
 						return nil, err

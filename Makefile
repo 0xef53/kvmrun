@@ -39,6 +39,9 @@ binaries = \
     bin/netinit bin/vnetctl bin/gencert bin/proxy-launcher \
     bin/printpci bin/update-kvmrun-package
 
+scripts = \
+    scripts/delegate-cgroup-v1-controller
+
 proto_files = \
     api/types/types.proto \
     api/services/machines/v1/machines.proto \
@@ -92,6 +95,8 @@ protobufs: $(proto_files)
 install: $(binaries)
 	install -d $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(DESTDIR)/etc/$(PROJECT_NAME)
 	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(binaries)
+	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(scripts)
+	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) contrib/qemu.wrapper
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifup
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifdown
 	mv -t $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME)/vmm

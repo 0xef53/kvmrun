@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	BINARY = "/usr/bin/qemu-system-x86_64"
+	BINARY = "/usr/lib/kvmrun/qemu.wrapper"
 )
 
 func DefaultMachineType() (string, error) {

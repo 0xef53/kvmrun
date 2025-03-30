@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	pb "github.com/0xef53/kvmrun/api/services/network/v1"
@@ -80,10 +81,17 @@ func (s *ServiceServer) Configure(ctx context.Context, req *pb.ConfigureRequest)
 				DefaultGateway: v.Router.DefaultGateway,
 				InLimit:        v.Router.InLimit,
 				OutLimit:       v.Router.OutLimit,
-				MachineName:    v.Router.MachineName,
+				ProcessID:      v.Router.ProcessID,
 			}
 
-			return network.ConfigureRouter(req.LinkName, &attrs, req.SecondStage)
+			err := network.ConfigureRouter(req.LinkName, &attrs, req.SecondStage)
+			if err != nil && errors.Is(err, network.ErrCgroupBinding) {
+				log.WithField("ifname", req.LinkName).Warnf("Non-fatal error: %s", err)
+
+				return nil
+			}
+
+			return err
 		case *pb.ConfigureRequest_Bridge:
 			attrs := network.BridgeDeviceAttrs{Ifname: v.Bridge.Ifname, MTU: v.Bridge.MTU}
 			return network.ConfigureBridgePort(req.LinkName, &attrs, req.SecondStage)

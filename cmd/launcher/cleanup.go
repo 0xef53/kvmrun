@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	"github.com/0xef53/kvmrun/internal/fsutil"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 )
@@ -79,23 +79,16 @@ func (l *launcher) Cleanup() error {
 					}
 
 					// In case the machine turns off for the first time after migration to this host
-					src, err := os.Open(filepath.Join(chrootDir, fwflash.Path))
-					if err != nil {
-						return err
+					if err := fsutil.Copy(filepath.Join(chrootDir, fwflash.Path), fwflash.Path); err != nil {
+						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					defer src.Close()
+					fmt.Printf("DEBUG(cleanup) Copy from %s to %s\n", filepath.Join(chrootDir, fwflash.Path), fwflash.Path)
 
-					dst, err := os.Create(fwflash.Path)
-					if err != nil {
-						return err
-					}
-					defer dst.Close()
-
-					if _, err := io.Copy(dst, src); err != nil {
+					if err := os.Chown(fwflash.Path, 0, 0); err != nil {
 						return err
 					}
 
-					return nil
+					return os.Chmod(fwflash.Path, 0644)
 				}
 			}
 		}

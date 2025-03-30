@@ -238,3 +238,7 @@ message PCIDevice {
     bool reserved = 91;
     string holder = 92;
 }
+
+message AppConf {
+    string qemu_rootdir = 1;
+}

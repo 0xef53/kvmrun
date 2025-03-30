@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 
 	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
@@ -35,15 +37,34 @@ var cmdBootSet = &cli.Command{
 }
 
 func setBootParameters(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
-	if image := c.String("firmware"); len(image) > 0 {
+	if image := strings.TrimSpace(c.String("firmware")); len(image) > 0 {
 		req := pb.SetFirmwareRequest{
 			Name:       vmname,
-			Image:      image,
 			RemoveConf: strings.ToLower(image) == "default",
 		}
 
-		if flash := c.String("flash-device"); len(flash) > 0 {
-			req.Flash = flash
+		if p, err := filepath.Abs(image); err == nil {
+			req.Image = p
+		} else {
+			return err
+		}
+
+		if flash := strings.TrimSpace(c.String("flash-device")); len(flash) > 0 {
+			if p, err := filepath.Abs(flash); err == nil {
+				req.Flash = p
+			} else {
+				return err
+			}
+		}
+
+		if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
+			if v = strings.TrimSpace(v); len(v) != 0 {
+				if p, err := filepath.Abs(v); err == nil {
+					req.QemuRootdir = p
+				} else {
+					return err
+				}
+			}
 		}
 
 		if _, err := pb.NewMachineServiceClient(conn).SetFirmware(ctx, &req); err != nil {

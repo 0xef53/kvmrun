@@ -3,7 +3,6 @@ package machines
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/0xef53/kvmrun/internal/fsutil"
+	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/osuser"
 	"github.com/0xef53/kvmrun/kvmrun"
 
@@ -81,35 +82,45 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 				req.Options.Firmware.Image = ""
 				req.Options.Firmware.Flash = ""
 			case "efi", "uefi", "ovmf":
-				// Try to find the OVMF_CODE.fd file
-				_, fname, err := s.LookForFile("OVMF_CODE.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+				qemuRootDir := s.AppConf.Common.QemuRootDir
+
+				if v := strings.TrimSpace(req.QemuRootdir); len(v) != 0 {
+					qemuRootDir = v
+				}
+
+				possibleDirs := []string{
+					filepath.Join(qemuRootDir, "usr/share/OVMF"),
+					filepath.Join(qemuRootDir, "usr/share/ovmf"),
+					filepath.Join(qemuRootDir, "usr/share/qemu"),
+				}
+
+				// Copy OVMF_CODE.fd to a virt.machine config dir
+				_, fname, err := helpers.LookForFile("OVMF_CODE.fd", possibleDirs...)
 				if err != nil {
 					return err
 				}
+				fmt.Printf("DEBUG(create) Found CODE by LookForFile at %s\n", fname)
+
+				if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
+					return fmt.Errorf("failed to copy config_eficode: %w", err)
+				}
+				fmt.Printf("DEBUG(create) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
+
 				req.Options.Firmware.Image = fname
 
+				// Copy OVMF_VARS.fd to a virt.machine config dir
 				if len(req.Options.Firmware.Flash) == 0 {
 					err := func() error {
-						_, fname, err := s.LookForFile("OVMF_VARS.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+						_, fname, err := helpers.LookForFile("OVMF_VARS.fd", possibleDirs...)
 						if err != nil {
 							return err
 						}
+						fmt.Printf("DEBUG(create) Found VARS by LookForFile at %s\n", fname)
 
-						src, err := os.Open(fname)
-						if err != nil {
-							return err
+						if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
+							return fmt.Errorf("failed to copy config_efivars: %w", err)
 						}
-						defer src.Close()
-
-						dst, err := os.OpenFile(filepath.Join(vmdir, "config_efivars"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)
-						if err != nil {
-							return err
-						}
-						defer dst.Close()
-
-						if _, err := io.Copy(dst, src); err != nil {
-							return err
-						}
+						fmt.Printf("DEBUG(create) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_efivars"))
 
 						return nil
 					}()
@@ -260,14 +271,17 @@ func (s *ServiceServer) List(ctx context.Context, req *pb.ListMachinesRequest) (
 	get := func(name string) *pb_types.Machine {
 		vm, err := s.GetMachine(name)
 		if err != nil {
+			fmt.Println("LIST ERR 1: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		vmstate, err := s.GetMachineStatus(vm)
 		if err != nil {
+			fmt.Println("LIST ERR 2: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		t, err := s.GetMachineLifeTime(vm)
 		if err != nil {
+			fmt.Println("LIST ERR 3: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		return machineToProto(vm, vmstate, t)
@@ -369,35 +383,44 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 			req.Image = ""
 			req.Flash = ""
 		case "efi", "uefi", "ovmf":
-			// Try to find the OVMF_CODE.fd file
-			_, fname, err := s.LookForFile("OVMF_CODE.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+			qemuRootDir := s.AppConf.Common.QemuRootDir
+
+			if v := strings.TrimSpace(req.QemuRootdir); len(v) != 0 {
+				qemuRootDir = v
+			}
+
+			possibleDirs := []string{
+				filepath.Join(qemuRootDir, "usr/share/OVMF"),
+				filepath.Join(qemuRootDir, "usr/share/ovmf"),
+				filepath.Join(qemuRootDir, "usr/share/qemu"),
+			}
+
+			// Copy OVMF_CODE.fd to a virt.machine config dir
+			_, fname, err := helpers.LookForFile("OVMF_CODE.fd", possibleDirs...)
 			if err != nil {
 				return err
 			}
+			fmt.Printf("DEBUG(set-firmware) Found CODE by LookForFile at %s\n", fname)
+
+			if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
+				return fmt.Errorf("failed to copy config_eficode: %w", err)
+			}
+			fmt.Printf("DEBUG(set-firmware) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
+
 			req.Image = fname
 
 			if len(req.Flash) == 0 {
 				err := func() error {
-					_, fname, err := s.LookForFile("OVMF_VARS.fd", "/usr/share/OVMF", "/usr/share/ovmf", "/usr/share/qemu")
+					_, fname, err := helpers.LookForFile("OVMF_VARS.fd", possibleDirs...)
 					if err != nil {
 						return err
 					}
+					fmt.Printf("DEBUG(set-firmware) Found VARS by LookForFile at %s\n", fname)
 
-					src, err := os.Open(fname)
-					if err != nil {
-						return err
+					if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
+						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					defer src.Close()
-
-					dst, err := os.OpenFile(filepath.Join(vmdir, "config_efivars"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)
-					if err != nil {
-						return err
-					}
-					defer dst.Close()
-
-					if _, err := io.Copy(dst, src); err != nil {
-						return err
-					}
+					fmt.Printf("DEBUG(set-firmware) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_efivars"))
 
 					return nil
 				}()

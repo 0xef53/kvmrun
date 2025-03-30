@@ -2,14 +2,14 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
+	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	"github.com/0xef53/kvmrun/internal/garp"
 	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/ipmath"
@@ -18,7 +18,11 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-var linkDB = mapdb.New("/var/run/kvm-network/linkdb")
+var (
+	linkDB = mapdb.New("/var/run/kvm-network/linkdb")
+
+	ErrCgroupBinding = errors.New("failed to configure cgroup")
+)
 
 type RouterDeviceAttrs struct {
 	Addrs          []string
@@ -27,7 +31,7 @@ type RouterDeviceAttrs struct {
 	DefaultGateway string
 	InLimit        uint32
 	OutLimit       uint32
-	MachineName    string
+	ProcessID      uint32
 }
 
 func ConfigureRouter(linkname string, attrs *RouterDeviceAttrs, secondStage bool) error {
@@ -72,12 +76,7 @@ func ConfigureRouterInterface(linkname string, attrs *RouterDeviceAttrs) error {
 	}
 
 	if len(attrs.BindInterface) > 0 {
-		/*
-			TODO: cgroup classid dirty hack. Fix it.
-		*/
-		classidFile := filepath.Join("/sys/fs/cgroup/net_cls,net_prio/kvmrun", attrs.MachineName, "net_cls.classid")
-
-		if err := setOutboundLimits(linkname, linkID, attrs.OutLimit, attrs.BindInterface, classidFile); err != nil {
+		if err := setOutboundLimits(linkname, linkID, attrs.ProcessID, attrs.OutLimit, attrs.BindInterface); err != nil {
 			return err
 		}
 	}
@@ -133,7 +132,7 @@ func setInboundLimits(linkname string, rate uint32) error {
 	return nil
 }
 
-func setOutboundLimits(linkname string, linkID int, rate uint32, bindInterface, classidFile string) error {
+func setOutboundLimits(linkname string, linkID int, pid, rate uint32, bindInterface string) error {
 	/*
 		TODO: should be rewritten using the "netlink" library
 	*/
@@ -168,14 +167,24 @@ func setOutboundLimits(linkname string, linkID int, rate uint32, bindInterface, 
 		return fmt.Errorf("failed to create class rule for %s (linkname = %s, classid = 1:0x%x) (%s): %s", bindInterface, linkname, linkID, err, strings.TrimSpace(string(out)))
 	}
 
-	/*
-		TODO: cgroup classid dirty hack. Fix it.
-	*/
+	// Try to set net_cls.classid for the virt.machine process
+	err := func() error {
+		if pid > 0 {
+			cgmgr, err := cg.LoadManager(int(pid))
+			if err != nil {
+				return err
+			}
 
-	if len(classidFile) > 0 {
-		if err := os.WriteFile(classidFile, []byte(fmt.Sprintf("%d", 65536+linkID)), 0700); err != nil {
-			return fmt.Errorf("failed to update net_cls.classid file: %s", err)
+			if err := cgmgr.SetNetClassID(int64(65536 + linkID)); err != nil {
+				return err
+			}
 		}
+
+		return nil
+	}()
+
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrCgroupBinding, err)
 	}
 
 	return nil
@@ -373,7 +382,7 @@ func DeconfigureRouter(linkname, bindInterface string) error {
 
 	if len(bindInterface) > 0 {
 		if linkID, err := linkDB.Delete(linkname); err == nil && linkID != -1 {
-			setOutboundLimits(linkname, linkID, 0, bindInterface, "")
+			setOutboundLimits(linkname, linkID, 0, 0, bindInterface)
 		}
 	}
 
