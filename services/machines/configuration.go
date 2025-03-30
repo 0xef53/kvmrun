@@ -106,7 +106,7 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 				}
 				fmt.Printf("DEBUG(create) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
 
-				req.Options.Firmware.Image = fname
+				req.Options.Firmware.Image = filepath.Join(vmdir, "config_eficode")
 
 				// Copy OVMF_VARS.fd to a virt.machine config dir
 				if len(req.Options.Firmware.Flash) == 0 {
@@ -407,7 +407,7 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 			}
 			fmt.Printf("DEBUG(set-firmware) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
 
-			req.Image = fname
+			req.Image = filepath.Join(vmdir, "config_eficode")
 
 			if len(req.Flash) == 0 {
 				err := func() error {

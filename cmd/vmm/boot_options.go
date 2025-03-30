@@ -39,30 +39,38 @@ var cmdBootSet = &cli.Command{
 func setBootParameters(ctx context.Context, vmname string, c *cli.Context, conn *grpc.ClientConn) error {
 	if image := strings.TrimSpace(c.String("firmware")); len(image) > 0 {
 		req := pb.SetFirmwareRequest{
-			Name:       vmname,
-			RemoveConf: strings.ToLower(image) == "default",
+			Name: vmname,
 		}
 
-		if p, err := filepath.Abs(image); err == nil {
-			req.Image = p
+		if strings.ToLower(image) == "default" {
+			req.RemoveConf = true
 		} else {
-			return err
-		}
-
-		if flash := strings.TrimSpace(c.String("flash-device")); len(flash) > 0 {
-			if p, err := filepath.Abs(flash); err == nil {
-				req.Flash = p
-			} else {
-				return err
-			}
-		}
-
-		if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
-			if v = strings.TrimSpace(v); len(v) != 0 {
-				if p, err := filepath.Abs(v); err == nil {
-					req.QemuRootdir = p
+			switch image {
+			case "efi", "uefi", "ovmf":
+				req.Image = image
+			default:
+				if p, err := filepath.Abs(image); err == nil {
+					req.Image = p
 				} else {
 					return err
+				}
+			}
+
+			if flash := strings.TrimSpace(c.String("flash-device")); len(flash) > 0 {
+				if p, err := filepath.Abs(flash); err == nil {
+					req.Flash = p
+				} else {
+					return err
+				}
+			}
+
+			if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
+				if v = strings.TrimSpace(v); len(v) != 0 {
+					if p, err := filepath.Abs(v); err == nil {
+						req.QemuRootdir = p
+					} else {
+						return err
+					}
 				}
 			}
 		}

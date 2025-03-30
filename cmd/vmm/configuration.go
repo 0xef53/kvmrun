@@ -29,6 +29,8 @@ var cmdConfCreate = &cli.Command{
 		&cli.GenericFlag{Name: "cpu", Value: &flag_types.IntRange{1, 1}, Usage: "virtual cpu `range` (e.g. 1-8, where 8 is the maximum number of hotpluggable CPUs)"},
 		&cli.IntFlag{Name: "cpu-quota", DefaultText: "not set", Usage: "the quota in `percent` of one CPU core (e.g., 100 or 200 or 350)"},
 		&cli.StringFlag{Name: "cpu-model", Usage: "the CPU `model` (e.g., 'Westmere,+pcid' )"},
+		&cli.StringFlag{Name: "firmware", Value: "", DefaultText: "not set", Usage: "firmware image file `file`"},
+		&cli.StringFlag{Name: "flash-device", Value: "", DefaultText: "not set", Usage: "firmware flash device `file`"},
 	},
 	Action: func(c *cli.Context) error {
 		return executeGRPC(c, createMachineConf)
@@ -53,6 +55,31 @@ func createMachineConf(ctx context.Context, vmname string, c *cli.Context, conn 
 				Quota:  int64(c.Int("cpu-quota")),
 			},
 		},
+	}
+
+	if c.IsSet("firmware") {
+		if image := strings.TrimSpace(c.String("firmware")); len(image) > 0 {
+			req.Options.Firmware = new(pb_types.MachineOpts_Firmware)
+
+			switch image {
+			case "efi", "uefi", "ovmf":
+				req.Options.Firmware.Image = image
+			default:
+				if p, err := filepath.Abs(image); err == nil {
+					req.Options.Firmware.Image = p
+				} else {
+					return err
+				}
+			}
+
+			if flash := strings.TrimSpace(c.String("flash-device")); len(flash) > 0 {
+				if p, err := filepath.Abs(flash); err == nil {
+					req.Options.Firmware.Flash = p
+				} else {
+					return err
+				}
+			}
+		}
 	}
 
 	if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
