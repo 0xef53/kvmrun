@@ -89,21 +89,26 @@ func (l *launcher) Start() error {
 		return fmt.Errorf("failed to request global Kvmrun configuration: %w", err)
 	}
 
-	if v, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
-		qemuRootDir = v
-
-		if _, err := os.Stat(qemuRootDir); err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("QEMU root directory does not exist: %s", qemuRootDir)
-			}
-			return fmt.Errorf("failed to check QEMU root directory: %w", err)
+	if dir, ok := os.LookupEnv("QEMU_ROOTDIR"); ok {
+		if v, err := filepath.Abs(dir); err == nil {
+			qemuRootDir = v
+		} else {
+			return err
 		}
-		Info.Printf("QEMU root directory: %s\n", qemuRootDir)
 	} else {
 		if err := os.Setenv("QEMU_ROOTDIR", qemuRootDir); err != nil {
 			return err
 		}
 	}
+
+	if _, err := os.Stat(qemuRootDir); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("QEMU root directory does not exist: %s", qemuRootDir)
+		}
+		return fmt.Errorf("failed to check QEMU root directory: %w", err)
+	}
+
+	Info.Printf("QEMU root directory: %s\n", qemuRootDir)
 
 	// Check all the PCI devices and detach them from the host
 	if devs := vmconf.GetHostPCIDevices(); len(devs) > 0 {
