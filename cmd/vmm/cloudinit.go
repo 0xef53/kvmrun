@@ -116,6 +116,7 @@ var cmdCloudInitBuild = &cli.Command{
 	HideHelp:  true,
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "user-config", Usage: "path to the user defined cloud-config data"},
+		&cli.StringFlag{Name: "vendor-config", Usage: "path to the vendor defined cloud-config data"},
 		&cli.StringFlag{Name: "platform", Usage: "a cloud platform name (nocloud, openstack, gce, ec2, etc...)"},
 		&cli.StringFlag{Name: "subplatform", Usage: "additional detail describing the specific source or type of metadata used"},
 		&cli.StringFlag{Name: "cloudname", Usage: "a cloud common name (netangels, google, aws, azure, etc...)"},
@@ -154,6 +155,15 @@ func buildCloudInitDrive(ctx context.Context, vmname string, c *cli.Context, con
 		Domain:           c.String("domain"),
 		Timezone:         c.String("timezone"),
 		OutputFile:       outputFile,
+	}
+
+	if fname := strings.TrimSpace(c.String("vendor-config")); len(fname) > 0 {
+		b, err := os.ReadFile(fname)
+		if err != nil {
+			return err
+		}
+
+		req.VendorConfig = b
 	}
 
 	if fname := strings.TrimSpace(c.String("user-config")); len(fname) > 0 {

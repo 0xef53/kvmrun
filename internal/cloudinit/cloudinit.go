@@ -19,7 +19,8 @@ type Data struct {
 	Domain   string
 	Timezone string
 
-	User map[string]interface{}
+	Vendor map[string]interface{}
+	User   map[string]interface{}
 }
 
 type MetadataConfig struct {
@@ -98,20 +99,24 @@ func GenImage(data *Data, outfile string) error {
 		data.Domain = "localdomain"
 	}
 
+	if data.Vendor == nil {
+		data.Vendor = make(map[string]interface{})
+	}
+
 	if data.User == nil {
 		data.User = make(map[string]interface{})
 	}
 
-	if _, ok := data.User["hostname"]; !ok && len(data.Hostname) > 0 {
-		data.User["hostname"] = data.Hostname
-		data.User["create_hostname_file"] = true
-		data.User["fqdn"] = fmt.Sprintf("%s.%s", data.Hostname, data.Domain)
+	if _, ok := data.Vendor["hostname"]; !ok && len(data.Hostname) > 0 {
+		data.Vendor["hostname"] = data.Hostname
+		data.Vendor["create_hostname_file"] = true
+		data.Vendor["fqdn"] = fmt.Sprintf("%s.%s", data.Hostname, data.Domain)
 
-		data.User["manage_etc_hosts"] = "localhost"
+		data.Vendor["manage_etc_hosts"] = "localhost"
 	}
 
-	if _, ok := data.User["timezone"]; !ok && len(data.Timezone) > 0 {
-		data.User["timezone"] = data.Timezone
+	if _, ok := data.Vendor["timezone"]; !ok && len(data.Timezone) > 0 {
+		data.Vendor["timezone"] = data.Timezone
 	}
 
 	tmpdir, err := os.MkdirTemp(filepath.Dir(outfile), ".cidata-*")
@@ -123,7 +128,25 @@ func GenImage(data *Data, outfile string) error {
 	imageFile := filepath.Join(tmpdir, "image")
 	userFile := filepath.Join(tmpdir, "user-data")
 	metaFile := filepath.Join(tmpdir, "meta-data")
+	vendorFile := filepath.Join(tmpdir, "vendor-data")
 	netFile := filepath.Join(tmpdir, "network-config")
+
+	// vendor-data
+	var vendorDataContent []byte
+
+	if len(data.Vendor) > 0 {
+		if b, err := yaml.Marshal(data.Vendor); err == nil {
+			vendorDataContent = append([]byte("#cloud-config\n"), b...)
+		} else {
+			return err
+		}
+	} else {
+		vendorDataContent = []byte("#cloud-config\n")
+	}
+
+	if err := os.WriteFile(vendorFile, vendorDataContent, 0644); err != nil {
+		return err
+	}
 
 	// user-data
 	var userDataContent []byte
@@ -168,6 +191,7 @@ func GenImage(data *Data, outfile string) error {
 		"-rock",
 		userFile,
 		metaFile,
+		vendorFile,
 		netFile,
 	}
 

@@ -76,6 +76,12 @@ func (s *ServiceServer) BuildImage(ctx context.Context, req *pb.BuildImageReques
 		Timezone: req.Timezone,
 	}
 
+	if len(req.VendorConfig) > 0 {
+		if err := yaml.Unmarshal(req.VendorConfig, &data.Vendor); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(req.UserConfig) > 0 {
 		if err := yaml.Unmarshal(req.UserConfig, &data.User); err != nil {
 			return nil, err

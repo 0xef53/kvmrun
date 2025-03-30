@@ -24,6 +24,7 @@ message BuildImageRequest {
     string domain = 202;
     string timezone = 203;
 
+    bytes vendor_config = 298;
     bytes user_config = 299;
 
     string output_file = 301;
