@@ -220,35 +220,6 @@ func (l *launcher) Start() error {
 	return syscall.Exec(qemuBinary, args, os.Environ())
 }
 
-// lookForRomfile returns a path to the romfile directory relative to the rootdir
-// or an error if the romfile could not be found.
-func lookForRomfile(romfile, rootdir string) (string, error) {
-	possibleDirs := []string{
-		"usr/share/qemu",
-		"usr/lib/ipxe/qemu",
-		"usr/share/seabios",
-		"usr/share/ipxe",
-	}
-
-	// Check in current work directory
-	if _, err := os.Stat(romfile); err == nil {
-		return ".", nil
-	}
-
-	for _, d := range possibleDirs {
-		switch _, err := os.Stat(filepath.Join(rootdir, d, romfile)); {
-		case err == nil:
-			return d, nil
-		case os.IsNotExist(err):
-			continue
-		default:
-			return "", err
-		}
-	}
-
-	return "", fmt.Errorf("unable to find romfile: %s", romfile)
-}
-
 func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 	vmChrootDir := filepath.Join(kvmrun.CHROOTDIR, vmconf.Name())
 

@@ -177,34 +177,5 @@ func monitorReConnect(systemctl *systemd.Manager, mon *monitor.Pool) (int, error
 		}
 	}
 
-	/*
-			TODO: удалить после проверки
-			Не потребуется, поскольку переходим на cgroup v2. За активацию нужных контроллеров
-			и заполнение переменных с номерами процессов будет отвечать systemd.
-			Ошибки о невозможности задать CPU квоту будем выводить в launcher'е.
-
-		if cpuMP, err := cg.GetSubsystemMountpoint("cpu"); err == nil {
-			reEnableCPU := func(vmname string) error {
-				relpath := filepath.Join(kvmrun.CGROOTPATH, vmname)
-				pidfile := filepath.Join(kvmrun.CHROOTDIR, vmname, "pid")
-
-				pid, err := os.ReadFile(pidfile)
-				if err != nil {
-					return err
-				}
-
-				return os.WriteFile(filepath.Join(cpuMP, relpath, "tasks"), pid, 0644)
-			}
-
-			for _, vmname := range names {
-				if err := reEnableCPU(vmname); err != nil {
-					log.Errorf("Unable to re-add '%s' to the CPU control group: %s", vmname, err)
-				}
-			}
-		} else {
-			log.Errorf("Unable to initialize 'cpu' controller: %s", err)
-		}
-	*/
-
 	return count, nil
 }
