@@ -76,6 +76,7 @@ message CreateMachineRequest {
     types.MachineOpts options = 2;
     bool persistent = 3;
     map<string, bytes> extra_files = 4;
+    string qemu_rootdir = 110;
 }
 
 message CreateMachineResponse {
@@ -136,6 +137,7 @@ message SetFirmwareRequest {
     string image = 2;
     string flash = 3;
     bool remove_conf = 100;
+    string qemu_rootdir = 110;
 }
 
 message SetMemLimitsRequest {

@@ -29,6 +29,9 @@ cp -t "$TMPDIR" "Makefile"
 
 cd "$TMPDIR"
 
+cp "contrib/qemu.wrapper.debian" "contrib/qemu.wrapper"
+chmod 0755 "contrib/qemu.wrapper"
+
 rm -vf "debian/changelog"
 
 dch \

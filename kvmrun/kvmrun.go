@@ -15,7 +15,7 @@ const (
 	MODULESDIR = "/var/lib/kvmrun/modules"
 	LOGDIR     = "/var/log/kvmrun"
 
-	CGROOTPATH = "kvmrun"
+	DEFAULT_QEMU_ROOTDIR = "/"
 )
 
 type DevDriver struct {

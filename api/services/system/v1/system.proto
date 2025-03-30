@@ -18,6 +18,8 @@ service SystemService {
     rpc StopDiskBackendProxy(DiskBackendProxyRequest) returns (google.protobuf.Empty) { }
 
     rpc GracefulShutdown(google.protobuf.Empty) returns (google.protobuf.Empty) { }
+
+    rpc GetAppConf(google.protobuf.Empty) returns (GetAppConfResponse) { }
 }
 
 message RegisterQemuInstanceRequest {
@@ -55,4 +57,8 @@ message StartIncomingMachineResponse {
 
 message DiskBackendProxyRequest {
     string name = 1;
+}
+
+message GetAppConfResponse {
+    types.AppConf app_conf = 1;
 }

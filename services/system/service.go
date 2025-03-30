@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	pb_types "github.com/0xef53/kvmrun/api/types"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/services"
 
@@ -158,4 +159,12 @@ func (s *ServiceServer) GracefulShutdown(ctx context.Context, _ *empty.Empty) (*
 	time.Sleep(3 * time.Second)
 
 	return new(empty.Empty), nil
+}
+
+func (s *ServiceServer) GetAppConf(ctx context.Context, _ *empty.Empty) (*pb.GetAppConfResponse, error) {
+	appConf := pb_types.AppConf{
+		QemuRootdir: s.AppConf.Common.QemuRootDir,
+	}
+
+	return &pb.GetAppConfResponse{AppConf: &appConf}, nil
 }

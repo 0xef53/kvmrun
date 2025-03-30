@@ -16,12 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
 	"github.com/0xef53/kvmrun/kvmrun/backend"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
 
-	cg "github.com/0xef53/go-cgroups"
 	qmp "github.com/0xef53/go-qmp/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -276,18 +276,11 @@ func (r *InstanceQemu) initCPU() error {
 	r.pid = pid
 
 	// Cgroups CPU quota
-	if g, err := cg.LookupCgroupByPid(r.pid, "cpu"); err == nil {
-		wantSuffix := filepath.Join(CGROOTPATH, r.name)
-		if strings.HasSuffix(g.GetPath(), wantSuffix) {
-			c := cg.Config{}
-			if err := g.Get(&c); err != nil {
-				return err
-			}
-			if c.CpuQuota == 0 || c.CpuQuota == -1 {
-				r.CPU.Quota = 0
-			} else {
-				r.CPU.Quota = int(c.CpuQuota * 100 / c.CpuPeriod)
-			}
+	if mgr, err := cg.LoadManager(r.pid); err == nil {
+		if v, err := mgr.GetCpuQuota(); err == nil {
+			r.CPU.Quota = int(v)
+		} else {
+			return err
 		}
 	}
 
@@ -381,33 +374,12 @@ func (r *InstanceQemu) SetCPUModel(model string) error {
 }
 
 func (r *InstanceQemu) SetCPUQuota(quota int) error {
-	relpath := filepath.Join(CGROOTPATH, r.name)
-
-	cpuGroup, err := cg.NewCpuGroup(relpath, r.pid)
+	mgr, err := cg.LoadManager(r.pid)
 	if err != nil {
 		return err
 	}
 
-	c := cg.Config{}
-	if err := cpuGroup.Get(&c); err != nil {
-		return err
-	}
-
-	// If CPU quota is disabled in Kernel
-	if c.CpuPeriod == 0 {
-		return cg.ErrCfsNotEnabled
-	}
-
-	if quota == 0 {
-		c.CpuQuota = -1
-	} else {
-		c.CpuQuota = (c.CpuPeriod * int64(quota)) / 100
-	}
-	if err := cpuGroup.Set(&c); err != nil {
-		return err
-	}
-
-	return nil
+	return mgr.SetCpuQuota(int64(quota))
 }
 
 func (r InstanceQemu) SetMachineType(_ string) error {

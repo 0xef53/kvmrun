@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -25,7 +24,6 @@ import (
 	_ "github.com/0xef53/kvmrun/services/system"
 	_ "github.com/0xef53/kvmrun/services/tasks"
 
-	cg "github.com/0xef53/go-cgroups"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -70,6 +68,17 @@ func run(c *cli.Context) error {
 
 	if appConf.Common.TLSConfig == nil || appConf.Server.TLSConfig == nil {
 		return fmt.Errorf("both server and client TLS certificates must exist")
+	}
+
+	if _, err := os.Stat(appConf.Common.QemuRootDir); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("QEMU root directory does not exist: %s", appConf.Common.QemuRootDir)
+		}
+		return fmt.Errorf("failed to check QEMU root directory: %w", err)
+	}
+
+	if appConf.Common.QemuRootDir != kvmrun.DEFAULT_QEMU_ROOTDIR {
+		log.Infof("QEMU root directory: %s", appConf.Common.QemuRootDir)
 	}
 
 	systemctl, err := systemd.NewManager()
@@ -166,28 +175,6 @@ func monitorReConnect(systemctl *systemd.Manager, mon *monitor.Pool) (int, error
 				log.Errorf("Unable to connect to %s: %s", unit2vm(unit.Name), err)
 			}
 		}
-	}
-
-	if cpuMP, err := cg.GetSubsystemMountpoint("cpu"); err == nil {
-		reEnableCPU := func(vmname string) error {
-			relpath := filepath.Join(kvmrun.CGROOTPATH, vmname)
-			pidfile := filepath.Join(kvmrun.CHROOTDIR, vmname, "pid")
-
-			pid, err := os.ReadFile(pidfile)
-			if err != nil {
-				return err
-			}
-
-			return os.WriteFile(filepath.Join(cpuMP, relpath, "tasks"), pid, 0644)
-		}
-
-		for _, vmname := range names {
-			if err := reEnableCPU(vmname); err != nil {
-				log.Errorf("Unable to re-add '%s' to the CPU control group: %s", vmname, err)
-			}
-		}
-	} else {
-		log.Errorf("Unable to initialize 'cpu' controller: %s", err)
 	}
 
 	return count, nil

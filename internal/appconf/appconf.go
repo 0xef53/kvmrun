@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/0xef53/kvmrun/internal/grpcserver"
 
@@ -13,6 +14,8 @@ import (
 )
 
 type CommonParams struct {
+	QemuRootDir string `gcfg:"qemu-rootdir"`
+
 	CertDir   string      `gcfg:"cert-dir"`
 	CACrt     string      `gcfg:"-"`
 	CAKey     string      `gcfg:"-"`
@@ -34,7 +37,8 @@ type KvmrunConfig struct {
 func NewConfig(p string) (*KvmrunConfig, error) {
 	cfg := KvmrunConfig{
 		Common: CommonParams{
-			CertDir: "/usr/share/kvmrun/tls",
+			QemuRootDir: "/",
+			CertDir:     "/usr/share/kvmrun/tls",
 		},
 		Server: grpcserver.ServerConf{
 			BindSocket: "/run/kvmrund.sock",
@@ -67,6 +71,17 @@ func NewConfig(p string) (*KvmrunConfig, error) {
 		cfg.Server.TLSConfig = v
 	} else {
 		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+	if v := strings.TrimSpace(cfg.Common.QemuRootDir); len(v) == 0 {
+		// Switch to default value
+		cfg.Common.QemuRootDir = "/"
+	} else {
+		if p, err := filepath.Abs(v); err == nil {
+			cfg.Common.QemuRootDir = p
+		} else {
 			return nil, err
 		}
 	}

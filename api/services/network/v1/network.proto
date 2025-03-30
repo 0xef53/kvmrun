@@ -44,7 +44,7 @@ message ConfigureRequest {
         string default_gateway = 4;
         uint32 in_limit = 5;
         uint32 out_limit = 6;
-        string machine_name = 100;
+        uint32 process_id = 100 [(gogoproto.customname) = "ProcessID"];
     }
     message BridgeAttrs {
         string ifname = 1;

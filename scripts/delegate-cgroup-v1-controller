@@ -1,0 +1,65 @@
+#!/bin/bash
+set -eu
+
+delegate() {
+    local UNIT_NAME="${1:-}"
+    local CTRL_NAME="${2:-}"
+
+    if [[ -z "$UNIT_NAME" ]] ; then
+        echo "error: unit name is not set" >&2
+        return 1
+    fi
+
+    if [[ -z "$CTRL_NAME" ]] ; then
+        echo "error: unknown cgroup controller" >&2
+        return 1
+    fi
+
+    if [[ -e "/sys/fs/cgroup/cgroup.controllers" ]] ; then
+        if grep -q "$CTRL_NAME" "/sys/fs/cgroup/cgroup.controllers" ; then
+            echo "controller=${CTRL_NAME}: cannot be mounted as part of cgroup v1" >&2
+            return 1
+        fi
+    fi
+
+    if ! grep -q "$CTRL_NAME" "/proc/cgroups" ; then
+        echo "controller=${CTRL_NAME}: unknown controller name" >&2
+        return 1
+    fi
+
+    local MP="$(awk -v NAME="$CTRL_NAME" '($3 == "cgroup" && $4 ~ NAME){print $2 ; exit}' /proc/mounts)"
+
+    if [[ -n "$MP" ]] ; then
+        echo "controller=${CTRL_NAME}: already mounted in $MP"
+    else
+        MP="/sys/fs/cgroup/${CTRL_NAME}"
+
+        install -d "$MP" && mount -t "cgroup" -o "$CTRL_NAME" "$CTRL_NAME" "$MP"
+
+        echo "controller=${CTRL_NAME}: successfully mounted in $MP"
+    fi
+
+    local GROUP_PATH="${MP}/system-kvmrun.slice/${UNIT_NAME}"
+    local MAIN_PID="$(systemctl show --value -p MainPID ${UNIT_NAME})"
+
+    install -d "$GROUP_PATH"
+
+    if [[ -n "$MAIN_PID" ]] ; then
+        echo "$MAIN_PID" > "${GROUP_PATH}/cgroup.procs"
+    fi
+}
+
+if (( $# < 2 )) ; then
+    echo "usage: $(basename $0) UNIT_NAME CONTROLLERS..." >&2
+    echo "" >&2
+
+    exit 2
+fi
+
+declare -r UNIT="$1" ; shift
+
+for CTRL in $@ ; do
+    delegate "$UNIT" "$CTRL"
+done
+
+exit 0

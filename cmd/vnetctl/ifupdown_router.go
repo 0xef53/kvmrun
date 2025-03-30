@@ -13,7 +13,7 @@ type routerSchemeOptions struct {
 	DefaultGateway string   `json:"default_gateway"`
 	InLimit        uint32   `json:"bwlim_in"`
 	OutLimit       uint32   `json:"bwlim_out"`
-	MachineName    string
+	ProcessID      uint32
 }
 
 type routerScheme struct {
@@ -32,7 +32,7 @@ func (sc *routerScheme) Configure(client pb.NetworkServiceClient, secondStage bo
 				DefaultGateway: sc.opts.DefaultGateway,
 				InLimit:        sc.opts.InLimit,
 				OutLimit:       sc.opts.OutLimit,
-				MachineName:    sc.opts.MachineName,
+				ProcessID:      sc.opts.ProcessID,
 			},
 		},
 		SecondStage: secondStage,
