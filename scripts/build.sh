@@ -11,7 +11,25 @@ install -d "$GOBIN"
 trap "chown -R $USER_GROUP $GOBIN" 0
 
 go version
+
 go fmt "${PROJECT_REPO}/..."
-go install -v -buildvcs=false -ldflags "-s -w" "${PROJECT_REPO}/cmd/..."
+
+for NAME in "kvmrund" "vmm" "launcher" "gencert" "proxy-launcher" "printpci" "update-kvmrun-package" ; do
+    go install \
+        -v \
+        -buildvcs=false \
+        -ldflags "-s -w" \
+        "${PROJECT_REPO}/cmd/${NAME}"
+done
+
+for NAME in "netinit" "vnetctl" ; do
+    go install \
+        -v \
+        -buildvcs=false \
+        -buildmode=pie \
+        -tags 'netgo,osusergo' \
+        -ldflags "-s -w -linkmode external -extldflags -static-pie" \
+        "${PROJECT_REPO}/cmd/${NAME}"
+done
 
 exit 0

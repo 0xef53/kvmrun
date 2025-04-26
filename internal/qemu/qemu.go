@@ -1,29 +1,25 @@
 package qemu
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
+
+	"github.com/0xef53/kvmrun/internal/version"
 )
 
-const (
-	BINARY = "/usr/lib/kvmrun/qemu.wrapper"
+var (
+	ErrUnsupportedVersion = errors.New("unsupported QEMU version")
 )
 
-func DefaultMachineType() (string, error) {
-	if _, err := os.Stat(BINARY); os.IsNotExist(err) {
-		return "", fmt.Errorf("qemu binary not found: %s", BINARY)
-	}
-	outBytes, err := exec.Command(BINARY, "-M", "help").CombinedOutput()
+func VerifyVersion(strver string) error {
+	v, err := version.Parse(strver)
 	if err != nil {
-		return "", fmt.Errorf(string(outBytes))
+		return err
 	}
-	lines := strings.Split(string(outBytes), "\n")
-	for _, line := range lines {
-		if strings.HasSuffix(line, "(default)") {
-			return strings.Fields(line)[0], nil
-		}
+
+	if _, ok := machines[v.Int()]; ok {
+		return nil
 	}
-	return "", fmt.Errorf("cannot determine default qemu machine type")
+
+	return fmt.Errorf("%w: %s", ErrUnsupportedVersion, strver)
 }

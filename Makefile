@@ -61,7 +61,7 @@ $(binaries):
 	@echo "##########################"
 	@echo
 	install -d bin
-	docker run --rm -it $(DOCKER_BUILD_ARGS) golang:1.18-buster
+	docker run --rm -it $(DOCKER_BUILD_ARGS) golang:1.24
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"
@@ -118,7 +118,7 @@ deb-package: $(binaries)
 	@echo "##########################"
 	@echo
 	install -d packages
-	docker run --rm -i $(DOCKER_DEB_ARGS) 0xef53/debian-dev:latest
+	docker run --rm -i $(DOCKER_DEB_ARGS) 0xef53/devtools:debian-bookworm
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"

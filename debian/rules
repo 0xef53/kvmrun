@@ -21,20 +21,13 @@ include /usr/share/dpkg/default.mk
 .PHONY:
 
 %:
-	dh $@ --with=systemd
+	dh $@
 
 build:
 	true
 
-override_dh_installinit:
-	dh_systemd_enable -pkvmrun --name=kvmrund
-	dh_systemd_start -pkvmrun --no-restart-on-upgrade
-
-override_dh_systemd_enable:
-	echo "Not running dh_systemd_enable"
-
-override_dh_systemd_start:
-	echo "Not running dh_systemd_start"
+override_dh_installsystemd:
+	dh_installsystemd -p kvmrun --name=kvmrund --no-restart-on-upgrade
 
 clean:
 	true

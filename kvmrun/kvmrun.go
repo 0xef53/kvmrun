@@ -7,6 +7,8 @@ const (
 
 	CONFDIR = "/etc/kvmrun"
 
+	QEMU_BINARY = "/usr/lib/kvmrun/qemu.wrapper"
+
 	VMNETINIT = "/usr/lib/kvmrun/netinit"
 
 	QMPMONDIR  = "/var/run/kvm-monitor"

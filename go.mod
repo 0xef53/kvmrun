@@ -1,6 +1,6 @@
 module github.com/0xef53/kvmrun
 
-go 1.18
+go 1.24
 
 require (
 	github.com/0xef53/go-qmp/v2 v2.0.4

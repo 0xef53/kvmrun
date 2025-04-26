@@ -60,7 +60,7 @@ func (g *Group_CPU) Set(c Config) error {
 				}
 			}
 		} else {
-			err = fmt.Errorf("%w: %s", ErrUnknownParameter)
+			err = fmt.Errorf("%w: %s", ErrUnknownParameter, param)
 		}
 
 		if err != nil {

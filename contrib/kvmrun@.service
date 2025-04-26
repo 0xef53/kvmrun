@@ -5,7 +5,10 @@ Requires=network-online.target
 
 [Service]
 Delegate=cpu cpuacct
+
+EnvironmentFile=-/etc/kvmrun/%i/config_envs
 Environment=SYSTEMD_UNITNAME=%n
+
 WorkingDirectory=/etc/kvmrun/%i
 
 LimitMEMLOCK=infinity

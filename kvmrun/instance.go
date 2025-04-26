@@ -2,6 +2,8 @@ package kvmrun
 
 import (
 	"strings"
+
+	"github.com/0xef53/kvmrun/internal/version"
 )
 
 type Instance interface {
@@ -9,7 +11,7 @@ type Instance interface {
 	Uid() int
 	Pid() int
 
-	GetQemuVersion() QemuVersion
+	GetQemuVersion() *version.Version
 
 	Status() (InstanceState, error)
 	GetMachineType() *QemuMachine
@@ -130,8 +132,8 @@ func (p InstanceProperties) Uid() int {
 	return p.uid
 }
 
-func (p InstanceProperties) GetQemuVersion() QemuVersion {
-	return 0
+func (p InstanceProperties) GetQemuVersion() *version.Version {
+	return version.MustParse(0)
 }
 
 func (p InstanceProperties) GetMachineType() *QemuMachine {

@@ -15,7 +15,6 @@ import (
 	"github.com/0xef53/kvmrun/internal/fsutil"
 	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/pci"
-	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
@@ -217,7 +216,7 @@ func (l *launcher) Start() error {
 	if v, ok := os.LookupEnv("QEMU_BINARY"); ok {
 		qemuBinary = v
 	} else {
-		qemuBinary = qemu.BINARY
+		qemuBinary = kvmrun.QEMU_BINARY
 	}
 
 	Info.Printf("QEMU binary: %s\n", qemuBinary)

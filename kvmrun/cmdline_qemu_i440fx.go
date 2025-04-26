@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/pci"
-	"github.com/0xef53/kvmrun/internal/qemu"
 )
 
 type qemuCommandLine_i440fx struct {
@@ -179,7 +178,7 @@ func (b *qemuCommandLine_i440fx) hostpciArgs(num int, dev *HostPCI, backend *pci
 func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	args := make([]string, 0, 96)
 
-	args = append(args, qemu.BINARY, "-machine", "accel=kvm:tcg", "-name", b.vmconf.Name())
+	args = append(args, QEMU_BINARY, "-machine", "accel=kvm:tcg", "-name", b.vmconf.Name())
 
 	// Machine type
 	if t := b.vmconf.GetMachineType(); len(t.String()) > 0 {

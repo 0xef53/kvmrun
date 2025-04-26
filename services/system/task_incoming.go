@@ -1,21 +1,27 @@
 package system
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/0xef53/kvmrun/internal/dotenv"
 	"github.com/0xef53/kvmrun/internal/lvm"
 	"github.com/0xef53/kvmrun/internal/netstat"
 	"github.com/0xef53/kvmrun/internal/osuser"
 	"github.com/0xef53/kvmrun/internal/qemu"
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
 	"github.com/0xef53/kvmrun/internal/task"
+	"github.com/0xef53/kvmrun/internal/version"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/services"
 
@@ -460,12 +466,19 @@ func (t *IncomingMachineTask) startIncomingMachine() (int32, error) {
 		}
 	}
 
-	mtype, err := qemu.DefaultMachineType()
-	if err != nil {
+	// Check QEMU that will run this machine
+	if qver, err := t.getMachineQemuVersion(vmdir); err == nil {
+		if err := qemu.VerifyVersion(qver.String()); err == nil {
+			if qemu.IsDefaultMachineType(qver.String(), incvm.R.GetMachineType().String()) {
+				t.Logger.Infof("Machine type on the source and destination servers are the same")
+
+				incvm.R.SetMachineType("")
+			}
+		} else {
+			return 0, err
+		}
+	} else {
 		return 0, err
-	}
-	if incvm.R.GetMachineType().String() == mtype {
-		incvm.R.SetMachineType("")
 	}
 
 	// Write the incoming_config file
@@ -549,4 +562,58 @@ func (t *IncomingMachineTask) startNBDServer(port int) error {
 
 func (t *IncomingMachineTask) stopNBDServer() error {
 	return t.Mon.Run(t.req.Name, qmp.Command{"nbd-server-stop", nil}, nil)
+}
+
+func (t *IncomingMachineTask) getMachineQemuVersion(vmdir string) (*version.Version, error) {
+	qemuRootDir := t.AppConf.Common.QemuRootDir
+
+	if vmenvs, err := dotenv.Read(filepath.Join(vmdir, "config_envs")); err == nil {
+		if dir, ok := vmenvs["QEMU_ROOTDIR"]; ok {
+			if v, err := filepath.Abs(dir); err == nil {
+				qemuRootDir = v
+			} else {
+				return nil, err
+			}
+		}
+	} else {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+	if _, err := os.Stat(qemuRootDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("QEMU root directory does not exist: %s", qemuRootDir)
+		}
+		return nil, fmt.Errorf("failed to check QEMU root directory: %w", err)
+	}
+
+	t.Logger.Infof("QEMU root directory: %s", qemuRootDir)
+
+	qemuCommand := exec.Command(kvmrun.QEMU_BINARY, "-version")
+
+	qemuCommand.Env = append(qemuCommand.Environ(), fmt.Sprintf("QEMU_ROOTDIR=%s", qemuRootDir))
+
+	out, err := qemuCommand.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("QEMU binary failed (%s): %s", err, strings.TrimSpace(string(out)))
+	}
+
+	r := regexp.MustCompile(`^qemu\semulator\sversion\s([0-9\.]{3,})`)
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	for scanner.Scan() {
+		line := strings.ToLower(strings.TrimSpace(scanner.Text()))
+
+		fields := r.FindStringSubmatch(line)
+		if len(fields) == 2 {
+			return version.Parse(fields[1])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("could not determine QEMU version")
 }

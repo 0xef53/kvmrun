@@ -676,7 +676,7 @@ func (t *MachineMigrationTask) newQemuDriveMirrorOpts(addr string, port int, src
 		CopyMode: "background",
 	}
 
-	if t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+	if t.vm.R.GetQemuVersion().Int() >= 60000 { // >= 6.x.x
 		opts.CopyMode = "write-blocking"
 	}
 
@@ -1067,7 +1067,7 @@ func (p *MachineMigrationTask_StorageProcessor) newMirrorOpts(srcName, dstName s
 		Mode:   "existing",
 	}
 
-	if p.t.vm.R.GetQemuVersion() >= 60000 { // >= 6.x.x
+	if p.t.vm.R.GetQemuVersion().Int() >= 60000 { // >= 6.x.x
 		opts.CopyMode = "write-blocking"
 	}
 

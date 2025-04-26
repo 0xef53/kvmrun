@@ -18,6 +18,7 @@ import (
 
 	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
+	"github.com/0xef53/kvmrun/internal/version"
 	"github.com/0xef53/kvmrun/kvmrun/backend"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
@@ -30,10 +31,10 @@ import (
 type InstanceQemu struct {
 	*InstanceProperties
 
-	mon         *qmp.Monitor `json:"-"`
-	startupConf Instance     `json:"-"`
-	pid         int          `json:"-"`
-	qemuVer     QemuVersion  `json:"-"`
+	mon         *qmp.Monitor     `json:"-"`
+	startupConf Instance         `json:"-"`
+	pid         int              `json:"-"`
+	qemuVer     *version.Version `json:"-"`
 
 	scsiBuses map[string]*SCSIBusInfo `json:"-"`
 }
@@ -180,11 +181,7 @@ func (r *InstanceQemu) initMachine() error {
 	r.MachineType = strings.TrimSuffix(strings.ToLower(mtype), "-machine")
 
 	ver := struct {
-		Qemu struct {
-			Major int `json:"major"`
-			Minor int `json:"minor"`
-			Micro int `json:"micro"`
-		} `json:"qemu"`
+		Qemu *version.Version `json:"qemu"`
 	}{}
 
 	if err := r.mon.Run(qmp.Command{"query-version", nil}, &ver); err != nil {
@@ -192,7 +189,7 @@ func (r *InstanceQemu) initMachine() error {
 	}
 
 	// E.g.: 21101 is 2.11.1
-	r.qemuVer = QemuVersion(ver.Qemu.Major*10000 + ver.Qemu.Minor*100 + ver.Qemu.Micro)
+	r.qemuVer = ver.Qemu
 
 	return nil
 }
@@ -212,7 +209,7 @@ func (r InstanceQemu) Pid() int {
 	return r.pid
 }
 
-func (r InstanceQemu) GetQemuVersion() QemuVersion {
+func (r InstanceQemu) GetQemuVersion() *version.Version {
 	return r.qemuVer
 }
 
@@ -221,7 +218,7 @@ func (r *InstanceQemu) initCPU() error {
 
 	// Actual vCPU count
 	switch {
-	case r.qemuVer < 21200:
+	case r.qemuVer.Int() < 21200:
 		attachedCPUs := make([]qemu_types.CPUInfo, 0, 8)
 		if err := r.mon.Run(qmp.Command{"query-cpus", nil}, &attachedCPUs); err != nil {
 			return err
@@ -320,7 +317,7 @@ func (r *InstanceQemu) SetActualCPUs(n int) error {
 	switch {
 	case n < r.CPU.Actual:
 		// Decrease
-		if r.qemuVer < 20700 {
+		if r.qemuVer.Int() < 20700 {
 			return fmt.Errorf("hot-unplug operation is not supported in QEMU %s", r.qemuVer)
 		}
 

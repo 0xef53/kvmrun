@@ -35,7 +35,7 @@ func (g *Group_NETCLS) Set(c Config) error {
 		case "net_cls.classid":
 			err = writeValue(g.path, param, v)
 		default:
-			err = fmt.Errorf("%w: %s", ErrUnknownParameter)
+			err = fmt.Errorf("%w: %s", ErrUnknownParameter, param)
 		}
 
 		return err
