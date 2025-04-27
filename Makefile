@@ -1,6 +1,9 @@
 PROJECT_NAME := kvmrun
 PROJECT_REPO := github.com/0xef53/$(PROJECT_NAME)
 
+GOLANG_IMAGE := golang:1.24-bullseye
+DEVTOOLS_IMAGE := 0xef53/devtools:debian-bullseye
+
 CWD := $(shell pwd)
 
 ifeq (,$(wildcard /etc/debian_version))
@@ -61,7 +64,7 @@ $(binaries):
 	@echo "##########################"
 	@echo
 	install -d bin
-	docker run --rm -it $(DOCKER_BUILD_ARGS) golang:1.24
+	docker run --rm -it $(DOCKER_BUILD_ARGS) $(GOLANG_IMAGE)
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"
@@ -75,7 +78,7 @@ tests:
 	@echo "#  Running tests         #"
 	@echo "##########################"
 	@echo
-	docker run --rm -i $(DOCKER_TESTS_ARGS) golang:latest go test ./...
+	docker run --rm -i $(DOCKER_TESTS_ARGS) $(GOLANG_IMAGE) go test ./...
 	@echo
 	@echo
 
@@ -118,7 +121,7 @@ deb-package: $(binaries)
 	@echo "##########################"
 	@echo
 	install -d packages
-	docker run --rm -i $(DOCKER_DEB_ARGS) 0xef53/devtools:debian-bookworm
+	docker run --rm -i $(DOCKER_DEB_ARGS) $(DEVTOOLS_IMAGE)
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"
