@@ -40,8 +40,8 @@ func GetDefaultMachineType(strver string) (*machineType, error) {
 		return nil, err
 	}
 
-	if _, ok := machines[v.Int()]; ok {
-		for _, t := range machines[v.Int()] {
+	if mtypes := getSuitableTypes(v); mtypes != nil {
+		for _, t := range mtypes {
 			if t.Name == "pc" {
 				// this is alias to default
 				continue
@@ -51,8 +51,8 @@ func GetDefaultMachineType(strver string) (*machineType, error) {
 			}
 		}
 
-		if len(machines[v.Int()]) > 0 {
-			return &(machines[v.Int()][0]), nil
+		if len(mtypes) > 0 {
+			return &(mtypes[0]), nil
 		}
 	}
 
@@ -62,8 +62,8 @@ func GetDefaultMachineType(strver string) (*machineType, error) {
 func IsDefaultMachineType(strver, mtype string) bool {
 	v := version.MustParse(strver)
 
-	if _, ok := machines[v.Int()]; ok {
-		for _, t := range machines[v.Int()] {
+	if mtypes := getSuitableTypes(v); mtypes != nil {
+		for _, t := range mtypes {
 			if t.Default && t.Name == mtype {
 				return true
 			}
@@ -71,4 +71,18 @@ func IsDefaultMachineType(strver, mtype string) bool {
 	}
 
 	return false
+}
+
+func getSuitableTypes(v *version.Version) []machineType {
+	if x, ok := machines[v.Int()]; ok {
+		return x
+	} else {
+		if v.Micro != 0 {
+			v.Micro = 0
+
+			return getSuitableTypes(v)
+		}
+	}
+
+	return nil
 }

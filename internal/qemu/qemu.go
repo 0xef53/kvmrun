@@ -22,7 +22,7 @@ func VerifyVersion(strver string) error {
 		return err
 	}
 
-	if _, ok := machines[v.Int()]; ok {
+	if mtypes := getSuitableTypes(v); mtypes != nil {
 		return nil
 	}
 
