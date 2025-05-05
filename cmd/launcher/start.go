@@ -15,6 +15,7 @@ import (
 	"github.com/0xef53/kvmrun/internal/fsutil"
 	"github.com/0xef53/kvmrun/internal/helpers"
 	"github.com/0xef53/kvmrun/internal/pci"
+	"github.com/0xef53/kvmrun/internal/qemu"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
@@ -23,7 +24,10 @@ import (
 )
 
 func (l *launcher) Start() error {
-	if _, err := os.Stat(filepath.Join(kvmrun.CONFDIR, l.vmname, "down")); err == nil {
+	vmConfDir := filepath.Join(kvmrun.CONFDIR, l.vmname)
+	vmChrootDir := filepath.Join(kvmrun.CHROOTDIR, l.vmname)
+
+	if _, err := os.Stat(filepath.Join(vmConfDir, "down")); err == nil {
 		Info.Println("machine will not start because it marked as disabled")
 		os.Exit(0)
 	} else {
@@ -32,7 +36,7 @@ func (l *launcher) Start() error {
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Join(kvmrun.CONFDIR, l.vmname, ".runtime"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(vmConfDir, ".runtime"), 0755); err != nil {
 		return err
 	}
 
@@ -74,7 +78,7 @@ func (l *launcher) Start() error {
 	}
 
 	// Just show a command line if debug
-	if os.Getenv("DEBUG") != "" {
+	if os.Getenv("_DEBUG") != "" {
 		fmt.Println(strings.Join(args, " "))
 		return nil
 	}
@@ -105,6 +109,20 @@ func (l *launcher) Start() error {
 			return fmt.Errorf("QEMU root directory does not exist: %s", qemuRootDir)
 		}
 		return fmt.Errorf("failed to check QEMU root directory: %w", err)
+	}
+
+	if qver, err := qemu.GetVersion(qemuRootDir, kvmrun.QEMU_BINARY); err == nil {
+		if qver.Int() >= 90000 { // >= 9.x.x
+			args = append(args, "-run-with", fmt.Sprintf("chroot=%s", vmChrootDir))
+		} else {
+			args = append(args, "-chroot", vmChrootDir)
+		}
+	}
+
+	// Just show a command line if debug
+	if os.Getenv("DEBUG") != "" {
+		fmt.Println(strings.Join(args, " "))
+		return nil
 	}
 
 	Info.Printf("QEMU root directory: %s\n", qemuRootDir)

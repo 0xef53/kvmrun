@@ -395,8 +395,8 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 		args = append(args, "-no-reboot")
 	}
 
-	// Chroot
-	args = append(args, "-runas", b.vmconf.Name(), "-chroot", filepath.Join(CHROOTDIR, b.vmconf.Name()))
+	// Run as a non-privileged user
+	args = append(args, "-runas", b.vmconf.Name())
 
 	// For migration
 	if b.vmconf.IsIncoming() {

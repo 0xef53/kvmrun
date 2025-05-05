@@ -1,15 +1,11 @@
 package system
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -590,30 +586,5 @@ func (t *IncomingMachineTask) getMachineQemuVersion(vmdir string) (*version.Vers
 
 	t.Logger.Infof("QEMU root directory: %s", qemuRootDir)
 
-	qemuCommand := exec.Command(kvmrun.QEMU_BINARY, "-version")
-
-	qemuCommand.Env = append(qemuCommand.Environ(), fmt.Sprintf("QEMU_ROOTDIR=%s", qemuRootDir))
-
-	out, err := qemuCommand.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("QEMU binary failed (%s): %s", err, strings.TrimSpace(string(out)))
-	}
-
-	r := regexp.MustCompile(`^qemu\semulator\sversion\s([0-9\.]{3,})`)
-
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-
-	for scanner.Scan() {
-		line := strings.ToLower(strings.TrimSpace(scanner.Text()))
-
-		fields := r.FindStringSubmatch(line)
-		if len(fields) == 2 {
-			return version.Parse(fields[1])
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return nil, fmt.Errorf("could not determine QEMU version")
+	return qemu.GetVersion(qemuRootDir, kvmrun.QEMU_BINARY)
 }
