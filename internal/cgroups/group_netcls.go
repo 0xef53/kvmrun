@@ -13,11 +13,12 @@ type Group_NETCLS struct {
 	version uint16
 }
 
-// GetPath return a full path to the directory of the current cgroup.
+// Path return a full path to the directory of the current cgroup.
 func (g *Group_NETCLS) Path() string {
 	return g.path
 }
 
+// Version returns a version of the current cgroup: 1 or 2.
 func (g *Group_NETCLS) Version() uint16 {
 	return g.version
 }
@@ -63,8 +64,11 @@ func (g *Group_NETCLS) Get(c Config) error {
 	return nil
 }
 
-// GetStats returns usage statistics for the current cgroup.
-func (g *Group_NETCLS) Stat(stat Stat) error {
-	// The NET_CLS controller does not provide any statistics
+// Stat returns usage statistics for the current cgroup.
+func (g *Group_NETCLS) Stat(_ Stat) error {
+	/*
+		The NET_CLS controller does not provide any statistics
+	*/
+
 	return nil
 }

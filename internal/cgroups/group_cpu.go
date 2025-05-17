@@ -22,14 +22,17 @@ type Group_CPU struct {
 	version uint16
 }
 
+// Path return a full path to the directory of the current cgroup.
 func (g *Group_CPU) Path() string {
 	return g.path
 }
 
+// Version returns a version of the current cgroup: 1 or 2.
 func (g *Group_CPU) Version() uint16 {
 	return g.version
 }
 
+// Set applies the parameters specified in the config to the current cgroup.
 func (g *Group_CPU) Set(c Config) error {
 	var params map[string]struct{}
 
@@ -71,6 +74,7 @@ func (g *Group_CPU) Set(c Config) error {
 	return nil
 }
 
+// Get returns actual parameters and limits for the current cgroup.
 func (g *Group_CPU) Get(c Config) error {
 	if c == nil {
 		c = newConfig()
@@ -104,6 +108,7 @@ func (g *Group_CPU) Get(c Config) error {
 	return nil
 }
 
+// Stat returns usage statistics for the current cgroup.
 func (g *Group_CPU) Stat(stat Stat) error {
 	if stat == nil {
 		stat = newStat()

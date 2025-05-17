@@ -4,7 +4,6 @@
 package cgroups
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,21 +13,17 @@ var (
 	ErrNotMounted = errors.New("controller not mounted")
 )
 
+// Manager is a wrapper around the several cgroups to more convenient using.
 type Manager struct {
 	pid     int
 	cgroups map[string]Cgroup
 }
 
+// LoadManager tries to find all cgroup in which the specified pid
+// is placed and returns a new Manager on success to manage them.
 func LoadManager(pid int) (*Manager, error) {
 	cgroups, err := GetProcessGroups(pid)
 	if err != nil {
-		return nil, err
-	}
-
-	// DEBUG
-	if b, err := json.MarshalIndent(cgroups, "", "    "); err == nil {
-		fmt.Printf("%s\n", string(b))
-	} else {
 		return nil, err
 	}
 
