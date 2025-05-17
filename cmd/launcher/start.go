@@ -329,20 +329,19 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 		filepath.Join(qemuRootDir, "usr/share/ipxe"),
 	}
 
-	fmt.Printf("DEBUG(romfile) Start\n")
 	for _, romname := range []string{"efi-virtio.rom"} {
-		fmt.Printf("DEBUG(romfile) Check %s\n", romname)
-
 		var rompath string
 
 		// Check in current work directory
 		if _, err := os.Stat(romname); err == nil {
 			rompath = romname
-			fmt.Printf("DEBUG(romfile) Found in the current work dir\n")
+
+			Info.Printf("(romfile: %s) Found in current working directory\n", romname)
 		} else {
 			if _, p, err := helpers.LookForFile(romname, possibleDirs...); err == nil {
 				rompath = p
-				fmt.Printf("DEBUG(romfile) Found by LookForFile at %s\n", rompath)
+
+				Info.Printf("(romfile: %s) Found at %s\n", romname, rompath)
 			} else {
 				return fmt.Errorf("unable to find romfile: %s", romname)
 			}
@@ -359,9 +358,9 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 		if err := fsutil.Copy(rompath, dstname); err != nil {
 			return err
 		}
-		fmt.Printf("DEBUG(romfile) Copy from %s to %s\n", rompath, dstname)
+
+		Info.Printf("(romfile: %s) Copy to %s\n", romname, dstname)
 	}
-	fmt.Printf("DEBUG(romfile) END\n")
 
 	// Firmware flash image
 	if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
@@ -384,9 +383,9 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 					if err := fsutil.Copy(fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
 						return err
 					}
-					fmt.Printf("DEBUG(efivars) Copy from %s to %s\n", fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path))
+					Info.Printf("(efivars: %s) Copy to %s\n", fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path))
 				} else {
-					// It's a trick in case of outgoing migration? as QEMU checks for the presence of a "file" at this path
+					// It's a trick in case of outgoing migration, as QEMU checks for the presence of a "file" at this path
 					if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
 						return err
 					}
@@ -399,34 +398,67 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 	}
 
 	err := func() error {
-		libfile := "/usr/lib/x86_64-linux-gnu/qemu/block-iscsi.so"
+		possibleDirs := []string{
+			filepath.Join(qemuRootDir, "usr/lib/x86_64-linux-gnu/qemu"),
+		}
 
-		if err := fsutil.Copy(libfile, filepath.Join(vmChrootDir, libfile)); err != nil {
+		libname := "block-iscsi.so"
+
+		var libpath string
+
+		// Check in current work directory
+		if _, err := os.Stat(libname); err == nil {
+			libpath = libname
+
+			Info.Printf("(iscsi: %s) Found in current working directory\n", libname)
+		} else {
+			if _, p, err := helpers.LookForFile(libname, possibleDirs...); err == nil {
+				libpath = p
+
+				Info.Printf("(iscsi: %s) Found at %s\n", libname, libpath)
+			} else {
+				return fmt.Errorf("unable to find: %s", libname)
+			}
+		}
+
+		if p, err := filepath.Rel(qemuRootDir, libpath); err == nil {
+			dstname := filepath.Join(vmChrootDir, p)
+
+			if err := fsutil.Copy(libpath, dstname); err != nil {
+				return err
+			}
+
+			Info.Printf("(iscsi: %s) Copy to %s\n", libname, dstname)
+		} else {
 			return err
 		}
-		fmt.Printf("DEBUG(iscsi) Copy from %s to %s\n", libfile, filepath.Join(vmChrootDir, libfile))
 
+		// Copy dependencies
 		lddBinary, err := exec.LookPath("ldd")
 		if err != nil {
 			return err
 		}
 
-		out, err := exec.Command(lddBinary, libfile).CombinedOutput()
+		out, err := exec.Command(lddBinary, libpath).CombinedOutput()
 		if err != nil {
 			return err
 		}
 
 		lines := strings.Split(string(out), "\n")
+
 		for _, line := range lines {
 			if !strings.Contains(line, " => ") {
 				continue
 			}
+
 			parts := strings.Fields(line)
 
-			if err := fsutil.Copy(parts[2], filepath.Join(vmChrootDir, parts[2])); err != nil {
+			dstname := filepath.Join(vmChrootDir, parts[2])
+
+			if err := fsutil.Copy(filepath.Join(qemuRootDir, parts[2]), dstname); err != nil {
 				return err
 			}
-			fmt.Printf("DEBUG(iscsi) Copy from %s to %s\n", parts[2], filepath.Join(vmChrootDir, parts[2]))
+			Info.Printf("(iscsi: %s) Copy to %s\n", filepath.Base(parts[2]), dstname)
 		}
 
 		return nil

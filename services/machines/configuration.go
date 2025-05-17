@@ -99,12 +99,12 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 				if err != nil {
 					return err
 				}
-				fmt.Printf("DEBUG(create) Found CODE by LookForFile at %s\n", fname)
+				l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
 
 				if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
 					return fmt.Errorf("failed to copy config_eficode: %w", err)
 				}
-				fmt.Printf("DEBUG(create) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
+				l.WithField("file", filepath.Base(fname)).Info("Copy to %s", filepath.Join(vmdir, "config_eficode"))
 
 				req.Options.Firmware.Image = filepath.Join(vmdir, "config_eficode")
 
@@ -115,12 +115,12 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 						if err != nil {
 							return err
 						}
-						fmt.Printf("DEBUG(create) Found VARS by LookForFile at %s\n", fname)
+						l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
 
 						if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
 							return fmt.Errorf("failed to copy config_efivars: %w", err)
 						}
-						fmt.Printf("DEBUG(create) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_efivars"))
+						l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_efivars"))
 
 						return nil
 					}()
@@ -271,17 +271,14 @@ func (s *ServiceServer) List(ctx context.Context, req *pb.ListMachinesRequest) (
 	get := func(name string) *pb_types.Machine {
 		vm, err := s.GetMachine(name)
 		if err != nil {
-			fmt.Println("LIST ERR 1: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		vmstate, err := s.GetMachineStatus(vm)
 		if err != nil {
-			fmt.Println("LIST ERR 2: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		t, err := s.GetMachineLifeTime(vm)
 		if err != nil {
-			fmt.Println("LIST ERR 3: ", err.Error())
 			return &pb_types.Machine{Name: name, State: pb_types.MachineState_CRASHED}
 		}
 		return machineToProto(vm, vmstate, t)
@@ -400,12 +397,12 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 			if err != nil {
 				return err
 			}
-			fmt.Printf("DEBUG(set-firmware) Found CODE by LookForFile at %s\n", fname)
+			l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
 
 			if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
 				return fmt.Errorf("failed to copy config_eficode: %w", err)
 			}
-			fmt.Printf("DEBUG(set-firmware) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_eficode"))
+			l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_eficode"))
 
 			req.Image = filepath.Join(vmdir, "config_eficode")
 
@@ -415,12 +412,12 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 					if err != nil {
 						return err
 					}
-					fmt.Printf("DEBUG(set-firmware) Found VARS by LookForFile at %s\n", fname)
+					l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
 
 					if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
 						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					fmt.Printf("DEBUG(set-firmware) Copy from %s to %s\n", fname, filepath.Join(vmdir, "config_efivars"))
+					l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_efivars"))
 
 					return nil
 				}()

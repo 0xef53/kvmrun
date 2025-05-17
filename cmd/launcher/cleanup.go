@@ -82,7 +82,7 @@ func (l *launcher) Cleanup() error {
 					if err := fsutil.Copy(filepath.Join(chrootDir, fwflash.Path), fwflash.Path); err != nil {
 						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					fmt.Printf("DEBUG(cleanup) Copy from %s to %s\n", filepath.Join(chrootDir, fwflash.Path), fwflash.Path)
+					Info.Printf("(efivars: %s) Copy from %s\n", fwflash.Path, filepath.Join(chrootDir, fwflash.Path))
 
 					if err := os.Chown(fwflash.Path, 0, 0); err != nil {
 						return err
