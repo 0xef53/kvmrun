@@ -453,6 +453,10 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 
 			parts := strings.Fields(line)
 
+			if strings.Contains(line, "not found") {
+				return fmt.Errorf("unmet dependencies: %s", parts[0])
+			}
+
 			dstname := filepath.Join(vmChrootDir, parts[2])
 
 			if err := fsutil.Copy(filepath.Join(qemuRootDir, parts[2]), dstname); err != nil {

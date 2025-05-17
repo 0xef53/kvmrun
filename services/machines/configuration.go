@@ -99,12 +99,12 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 				if err != nil {
 					return err
 				}
-				l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
+				l.WithField("file", filepath.Base(fname)).Infof("Found at %s", fname)
 
 				if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
 					return fmt.Errorf("failed to copy config_eficode: %w", err)
 				}
-				l.WithField("file", filepath.Base(fname)).Info("Copy to %s", filepath.Join(vmdir, "config_eficode"))
+				l.WithField("file", filepath.Base(fname)).Infof("Copy to %s", filepath.Join(vmdir, "config_eficode"))
 
 				req.Options.Firmware.Image = filepath.Join(vmdir, "config_eficode")
 
@@ -115,12 +115,12 @@ func (s *ServiceServer) Create(ctx context.Context, req *pb.CreateMachineRequest
 						if err != nil {
 							return err
 						}
-						l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
+						l.WithField("file", filepath.Base(fname)).Infof("Found at %s", fname)
 
 						if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
 							return fmt.Errorf("failed to copy config_efivars: %w", err)
 						}
-						l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_efivars"))
+						l.WithField("file", filepath.Base(fname)).Infof("Copy to %s", fname, filepath.Join(vmdir, "config_efivars"))
 
 						return nil
 					}()
@@ -397,12 +397,12 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 			if err != nil {
 				return err
 			}
-			l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
+			l.WithField("file", filepath.Base(fname)).Infof("Found at %s", fname)
 
 			if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_eficode")); err != nil {
 				return fmt.Errorf("failed to copy config_eficode: %w", err)
 			}
-			l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_eficode"))
+			l.WithField("file", filepath.Base(fname)).Infof("Copy to %s", fname, filepath.Join(vmdir, "config_eficode"))
 
 			req.Image = filepath.Join(vmdir, "config_eficode")
 
@@ -412,12 +412,12 @@ func (s *ServiceServer) SetFirmware(ctx context.Context, req *pb.SetFirmwareRequ
 					if err != nil {
 						return err
 					}
-					l.WithField("file", filepath.Base(fname)).Info("Found at %s", fname)
+					l.WithField("file", filepath.Base(fname)).Infof("Found at %s", fname)
 
 					if err := fsutil.Copy(fname, filepath.Join(vmdir, "config_efivars")); err != nil {
 						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					l.WithField("file", filepath.Base(fname)).Info("Copy to %s", fname, filepath.Join(vmdir, "config_efivars"))
+					l.WithField("file", filepath.Base(fname)).Infof("Copy to %s", filepath.Join(vmdir, "config_efivars"))
 
 					return nil
 				}()
