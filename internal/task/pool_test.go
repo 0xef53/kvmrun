@@ -71,11 +71,11 @@ func TestConcurrentTasks(t *testing.T) {
 
 		if mustOK {
 			if err != nil {
-				t.Fatalf(resultStr(nil, err, id))
+				t.Fatal(resultStr(nil, err, id))
 			}
 		} else {
 			if _, ok := err.(*TaskAlreadyRunningError); !ok {
-				t.Fatalf(resultStr(&TaskAlreadyRunningError{Key: id}, err, id))
+				t.Fatal(resultStr(&TaskAlreadyRunningError{Key: id}, err, id))
 			}
 		}
 	}
@@ -121,7 +121,7 @@ func TestTaskWaiting(t *testing.T) {
 		task := DummyTask{new(GenericTask), "u202:::", 3, true, false, false}
 		id, err := pool.StartTask(context.Background(), &task, nil)
 		if err != nil {
-			t.Fatalf(resultStr(nil, err, id))
+			t.Fatal(resultStr(nil, err, id))
 		}
 		pool.Wait(id)
 	}
@@ -137,13 +137,13 @@ func TestTaskCanceling(t *testing.T) {
 
 	id, err := pool.StartTask(ctx, &task, nil)
 	if err != nil {
-		t.Fatalf(resultStr(nil, err, id))
+		t.Fatal(resultStr(nil, err, id))
 	}
 
 	pool.Wait(id)
 
 	if pool.Err(id) != context.DeadlineExceeded {
-		t.Fatalf(resultStr(context.DeadlineExceeded, pool.Err(id), id))
+		t.Fatal(resultStr(context.DeadlineExceeded, pool.Err(id), id))
 	}
 }
 
@@ -154,7 +154,7 @@ func TestBeforeStartFunctionFailure(t *testing.T) {
 
 	id, err := pool.StartTask(context.Background(), &task, nil)
 	if err != errSuccessfullyFailed {
-		t.Fatalf(resultStr(errSuccessfullyFailed, err, id))
+		t.Fatal(resultStr(errSuccessfullyFailed, err, id))
 	}
 
 	pool.Wait(id)
@@ -167,13 +167,13 @@ func TestOnSuccessFunctionFailure(t *testing.T) {
 
 	id, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
-		t.Fatalf(resultStr(nil, err, id))
+		t.Fatal(resultStr(nil, err, id))
 	}
 
 	pool.Wait(id)
 
 	if pool.Err(id) != errSuccessfullyFailed {
-		t.Fatalf(resultStr(errSuccessfullyFailed, pool.Err(id), id))
+		t.Fatal(resultStr(errSuccessfullyFailed, pool.Err(id), id))
 	}
 }
 
@@ -199,7 +199,7 @@ func TestPoolClosing(t *testing.T) {
 
 	for i := 0; i <= 10; i++ {
 		if id, err := start(i); err != nil {
-			t.Fatalf(resultStr(nil, err, id))
+			t.Fatal(resultStr(nil, err, id))
 		}
 	}
 
@@ -213,10 +213,10 @@ func TestPoolClosing(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatalf(resultStr(nil, fmt.Errorf("pool closing timeout (currently running: %d)", len(pool.List())), "<nil>"))
+		t.Fatal(resultStr(nil, fmt.Errorf("pool closing timeout (currently running: %d)", len(pool.List())), "<nil>"))
 	}
 
 	if id, err := start(5000); err != ErrPoolClosed {
-		t.Fatalf(resultStr(ErrPoolClosed, err, id))
+		t.Fatal(resultStr(ErrPoolClosed, err, id))
 	}
 }

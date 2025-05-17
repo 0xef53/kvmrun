@@ -171,7 +171,7 @@ func showMigrationProcessStatus(ctx context.Context, vmname string, c *cli.Conte
 				}
 
 				if resp.Task.State == pb_types.TaskInfo_FAILED {
-					err = fmt.Errorf(resp.Task.StateDesc)
+					err = fmt.Errorf("%s", resp.Task.StateDesc)
 				}
 			}
 

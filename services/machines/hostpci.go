@@ -23,7 +23,7 @@ func (s *ServiceServer) AttachHostPCIDevice(ctx context.Context, req *pb.AttachH
 	if req.StrictMode {
 		if _, err := pci.LookupDevice(hpci.Addr); err != nil {
 			if errors.Is(err, pci.ErrDeviceNotFound) {
-				return nil, grpc_status.Errorf(grpc_codes.NotFound, err.Error())
+				return nil, grpc_status.Error(grpc_codes.NotFound, err.Error())
 			}
 			return nil, err
 		}

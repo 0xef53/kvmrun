@@ -48,7 +48,7 @@ func (s *ServiceServer) BuildImage(ctx context.Context, req *pb.BuildImageReques
 
 	if _, err := os.Stat(vmconfdir); err != nil {
 		if os.IsNotExist(err) {
-			return nil, grpc_status.Errorf(grpc_codes.NotFound, req.MachineName)
+			return nil, grpc_status.Error(grpc_codes.NotFound, req.MachineName)
 		}
 		return nil, err
 	}

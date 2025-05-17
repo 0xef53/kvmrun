@@ -37,7 +37,7 @@ func usage() {
 	s += "  -f\n"
 	s += "      update existing server + client certificates \n\n"
 
-	fmt.Fprintf(os.Stderr, s)
+	fmt.Fprint(os.Stderr, s)
 
 	os.Exit(2)
 }

@@ -20,7 +20,9 @@ const (
 
 func parseBytes(src []byte, out map[string]string) error {
 	src = bytes.Replace(src, []byte("\r\n"), []byte("\n"), -1)
+
 	cutset := src
+
 	for {
 		cutset = getStatementStart(cutset)
 		if cutset == nil {
@@ -72,8 +74,10 @@ func getStatementStart(src []byte) []byte {
 func locateKeyName(src []byte) (key string, cutset []byte, err error) {
 	// trim "export" and space at beginning
 	src = bytes.TrimLeftFunc(src, isSpace)
+
 	if bytes.HasPrefix(src, []byte(exportPrefix)) {
 		trimmed := bytes.TrimPrefix(src, []byte(exportPrefix))
+
 		if bytes.IndexFunc(trimmed, isSpace) == 0 {
 			src = bytes.TrimLeftFunc(trimmed, isSpace)
 		}
@@ -93,6 +97,7 @@ loop:
 			// library also supports yaml-style value declaration
 			key = string(src[0:i])
 			offset = i + 1
+
 			break loop
 		case '_':
 		default:
@@ -114,12 +119,14 @@ loop:
 	// trim whitespace
 	key = strings.TrimRightFunc(key, unicode.IsSpace)
 	cutset = bytes.TrimLeftFunc(src[offset:], isSpace)
+
 	return key, cutset, nil
 }
 
 // extractVarValue extracts variable value and returns rest of slice
 func extractVarValue(src []byte, vars map[string]string) (value string, rest []byte, err error) {
 	quote, hasPrefix := hasQuotePrefix(src)
+
 	if !hasPrefix {
 		// unquoted value - read until end of line
 		endOfLine := bytes.IndexFunc(src, isLineEnd)
@@ -138,6 +145,7 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b
 
 		// Assume end of line is end of var
 		endOfVar := len(line)
+
 		if endOfVar == 0 {
 			return "", src[endOfLine:], nil
 		}
@@ -148,6 +156,7 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b
 			if line[i] == charComment && i < endOfVar {
 				if isSpace(line[i-1]) {
 					endOfVar = i
+
 					break
 				}
 			}
@@ -171,7 +180,9 @@ func extractVarValue(src []byte, vars map[string]string) (value string, rest []b
 
 		// trim quotes
 		trimFunc := isCharFunc(rune(quote))
+
 		value = string(bytes.TrimLeftFunc(bytes.TrimRightFunc(src[0:i], trimFunc), trimFunc))
+
 		if quote == prefixDoubleQuote {
 			// unescape newlines for double quote (this is compat feature)
 			// and expand environment variables
@@ -202,6 +213,7 @@ func expandEscapes(str string) string {
 			return match
 		}
 	})
+
 	return unescapeCharsRegex.ReplaceAllString(out, "$1")
 }
 
@@ -239,6 +251,7 @@ func isSpace(r rune) bool {
 	case '\t', '\v', '\f', '\r', ' ', 0x85, 0xA0:
 		return true
 	}
+
 	return false
 }
 
@@ -246,6 +259,7 @@ func isLineEnd(r rune) bool {
 	if r == '\n' || r == '\r' {
 		return true
 	}
+
 	return false
 }
 
@@ -262,6 +276,7 @@ func expandVariables(v string, m map[string]string) string {
 		if submatch == nil {
 			return s
 		}
+
 		if submatch[1] == "\\" || submatch[2] == "(" {
 			return submatch[0][1:]
 		} else if submatch[4] != "" {
@@ -273,6 +288,7 @@ func expandVariables(v string, m map[string]string) string {
 			}
 			return m[submatch[4]]
 		}
+
 		return s
 	})
 }

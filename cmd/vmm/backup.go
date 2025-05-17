@@ -164,7 +164,7 @@ func showBackupProcessStatus(ctx context.Context, vmname string, c *cli.Context,
 						delete(tasks, key)
 					case pb_types.TaskInfo_FAILED:
 						delete(tasks, key)
-						terrs[key] = fmt.Errorf(resp.Task.StateDesc)
+						terrs[key] = fmt.Errorf("%s", resp.Task.StateDesc)
 						progress = -1
 					}
 				}
@@ -204,7 +204,7 @@ func showBackupProcessStatus(ctx context.Context, vmname string, c *cli.Context,
 		for tid, err := range terrs {
 			errmsg += fmt.Sprintf("  * %s: %s\n", tid, err)
 		}
-		return fmt.Errorf(errmsg)
+		return fmt.Errorf("%s", errmsg)
 	}
 
 	return nil
