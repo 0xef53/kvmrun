@@ -373,31 +373,60 @@ func (t *MachineMigrationTask) migrateVMState(ctx context.Context, allDisksReady
 	}
 
 	t.Logger.Debug("migrateVMState(): disks are synchronized")
-	t.Logger.Debug("migrateVMState(): run QMP command: migrate-set-capabilities")
 
-	// Capabilities && Parameters
-	capsArgs := struct {
-		Capabilities []qemu_types.MigrationCapabilityStatus `json:"capabilities"`
-	}{
-		Capabilities: []qemu_types.MigrationCapabilityStatus{
-			{"xbzrle", true},
-			{"auto-converge", true},
-			{"compress", false},
-			{"block", false},
-			{"dirty-bitmaps", true},
-		},
-	}
-	if err := t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-capabilities", &capsArgs}, nil); err != nil {
+	var err error
+
+	// Set capabilities
+	err = func() error {
+		t.Logger.Debug("migrateVMState(): run QMP command: migrate-set-capabilities")
+
+		/*
+			TODO: need to improve
+				* first get a list,
+				* then change only specified parameters
+				* and then apply it uning migrate-set-capabilities
+		*/
+
+		args := struct {
+			Capabilities []qemu_types.MigrationCapabilityStatus `json:"capabilities"`
+		}{
+			Capabilities: []qemu_types.MigrationCapabilityStatus{
+				{"xbzrle", true},
+				{"auto-converge", true},
+				{"dirty-bitmaps", true},
+			},
+		}
+
+		if t.vm.R.GetQemuVersion().Int() < 90000 { // < 9.x.x
+			args.Capabilities = append(args.Capabilities, qemu_types.MigrationCapabilityStatus{"compress", false})
+			args.Capabilities = append(args.Capabilities, qemu_types.MigrationCapabilityStatus{"block", false})
+		}
+
+		return t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-capabilities", &args}, nil)
+	}()
+	if err != nil {
 		return err
 	}
 
-	t.Logger.Debug("migrateVMState(): run QMP command: migrate-set-parameters")
+	// Parameters
+	err = func() error {
+		t.Logger.Debug("migrateVMState(): run QMP command: migrate-set-parameters")
 
-	paramsArgs := qemu_types.MigrateSetParameters{
-		MaxBandwidth:    8589934592,
-		XbzrleCacheSize: 536870912,
-	}
-	if err := t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-parameters", &paramsArgs}, nil); err != nil {
+		/*
+			TODO: need to improve
+				* first get a list,
+				* then change only specified parameters
+				* and then apply it uning migrate-set-parameters
+		*/
+
+		args := qemu_types.MigrateSetParameters{
+			MaxBandwidth:    8589934592,
+			XbzrleCacheSize: 536870912,
+		}
+
+		return t.Mon.Run(t.req.Name, qmp.Command{"migrate-set-parameters", &args}, nil)
+	}()
+	if err != nil {
 		return err
 	}
 
