@@ -1,136 +1,38 @@
 package network
 
 import (
-	"context"
 	"fmt"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
-	"github.com/0xef53/kvmrun/internal/network"
 	"github.com/0xef53/kvmrun/services"
 
-	empty "github.com/golang/protobuf/ptypes/empty"
-	log "github.com/sirupsen/logrus"
+	pb "github.com/0xef53/kvmrun/api/services/network/v2"
+
+	grpcserver "github.com/0xef53/go-grpc/server"
+
+	grpc_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	grpc "google.golang.org/grpc"
-	grpc_codes "google.golang.org/grpc/codes"
-	grpc_status "google.golang.org/grpc/status"
 )
 
-var _ pb.NetworkServiceServer = &ServiceServer{}
+var _ = pb.NetworkServiceServer(new(service))
 
 func init() {
-	services.Register(&ServiceServer{})
+	grpcserver.Register(new(service), grpcserver.WithServiceBucket("kvmrun"))
 }
 
-type ServiceServer struct {
+type service struct {
 	*services.ServiceServer
 }
 
-func (s *ServiceServer) Init(inner *services.ServiceServer) {
+func (s *service) Init(inner *services.ServiceServer) {
 	s.ServiceServer = inner
 }
 
-func (s *ServiceServer) Name() string {
+func (s *service) Name() string {
 	return fmt.Sprintf("%T", s)
 }
 
-func (s *ServiceServer) Register(server *grpc.Server) {
+func (s *service) RegisterGRPC(server *grpc.Server) {
 	pb.RegisterNetworkServiceServer(server, s)
 }
 
-func (s *ServiceServer) Configure(ctx context.Context, req *pb.ConfigureRequest) (*empty.Empty, error) {
-	var taskKey string
-
-	switch v := req.Attrs.(type) {
-	case *pb.ConfigureRequest_Vxlan:
-		taskKey = fmt.Sprintf("network:%d:", v.Vxlan.VNI)
-	default:
-		taskKey = "network:unknown:"
-	}
-
-	err := s.RunFuncTask(ctx, taskKey, func(l *log.Entry) error {
-		switch v := req.Attrs.(type) {
-		case *pb.ConfigureRequest_Vlan:
-			attrs := network.VlanDeviceAttrs{VlanID: v.Vlan.VlanID}
-			return network.ConfigureVlanPort(req.LinkName, &attrs, req.SecondStage)
-		case *pb.ConfigureRequest_Vxlan:
-			if len(v.Vxlan.BindInterface) == 0 {
-				return fmt.Errorf("empty vxlan.bind_interface value")
-			}
-
-			ips, err := GetBindAddrs(v.Vxlan.BindInterface)
-			if err != nil {
-				return err
-			}
-			if len(ips) == 0 {
-				return fmt.Errorf("no IPv4 addresses found on the interface %s", v.Vxlan.BindInterface)
-			}
-
-			attrs := network.VxlanDeviceAttrs{
-				VNI:   v.Vxlan.VNI,
-				MTU:   v.Vxlan.MTU,
-				Local: ips[0],
-			}
-
-			return network.ConfigureVxlanPort(req.LinkName, &attrs, req.SecondStage)
-		case *pb.ConfigureRequest_Router:
-			attrs := network.RouterDeviceAttrs{
-				Addrs:          v.Router.Addrs,
-				MTU:            v.Router.MTU,
-				BindInterface:  v.Router.BindInterface,
-				DefaultGateway: v.Router.DefaultGateway,
-				InLimit:        v.Router.InLimit,
-				OutLimit:       v.Router.OutLimit,
-				MachineName:    v.Router.MachineName,
-			}
-
-			return network.ConfigureRouter(req.LinkName, &attrs, req.SecondStage)
-		case *pb.ConfigureRequest_Bridge:
-			attrs := network.BridgeDeviceAttrs{Ifname: v.Bridge.Ifname, MTU: v.Bridge.MTU}
-			return network.ConfigureBridgePort(req.LinkName, &attrs, req.SecondStage)
-		}
-
-		return grpc_status.Errorf(grpc_codes.Unimplemented, "unknown network scheme")
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return new(empty.Empty), nil
-}
-
-func (s *ServiceServer) Deconfigure(ctx context.Context, req *pb.DeconfigureRequest) (*empty.Empty, error) {
-	var taskKey string
-
-	switch v := req.Attrs.(type) {
-	case *pb.DeconfigureRequest_Vxlan:
-		taskKey = fmt.Sprintf("network:%d:", v.Vxlan.VNI)
-	default:
-		taskKey = "network:unknown:"
-	}
-
-	err := s.RunFuncTask(ctx, taskKey, func(l *log.Entry) error {
-		switch v := req.Attrs.(type) {
-		case *pb.DeconfigureRequest_Vlan:
-			return network.DeconfigureVlanPort(req.LinkName, v.Vlan.VlanID)
-		case *pb.DeconfigureRequest_Vxlan:
-			return network.DeconfigureVxlanPort(req.LinkName, v.Vxlan.VNI)
-		case *pb.DeconfigureRequest_Router:
-			return network.DeconfigureRouter(req.LinkName, v.Router.BindInterface)
-		case *pb.DeconfigureRequest_Bridge:
-			return network.DeconfigureBridgePort(req.LinkName, v.Bridge.Ifname)
-		}
-
-		return grpc_status.Errorf(grpc_codes.Unimplemented, "unknown network scheme")
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return new(empty.Empty), nil
-}
-
-func (s *ServiceServer) ListEndPoints(ctx context.Context, req *pb.ListEndPointsRequest) (*pb.ListEndPointsResponse, error) {
-	return new(pb.ListEndPointsResponse), nil
-}
+func (s *service) RegisterGW(_ *grpc_runtime.ServeMux, _ string, _ []grpc.DialOption) {}

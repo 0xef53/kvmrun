@@ -2,40 +2,16 @@ package machines
 
 import (
 	"context"
-	"strings"
 
-	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
-	"github.com/0xef53/kvmrun/kvmrun"
+	pb "github.com/0xef53/kvmrun/api/services/machines/v2"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
-	log "github.com/sirupsen/logrus"
 )
 
-func (s *ServiceServer) AttachCloudInitDrive(ctx context.Context, req *pb.AttachCloudInitRequest) (*empty.Empty, error) {
-	req.Driver = strings.TrimSpace(req.Driver)
+func (s *service) CloudInitDriveAttach(ctx context.Context, req *pb.CloudInitDriveAttachRequest) (*empty.Empty, error) {
+	opts := optsFromCloudInitDriveAttachRequest(req)
 
-	if len(req.Driver) == 0 {
-		req.Driver = "ide-cd"
-	} else {
-		req.Driver = strings.ReplaceAll(strings.ToLower(req.Driver), "_", "-")
-	}
-
-	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
-		vm, err := s.GetMachine(req.Name)
-		if err != nil {
-			return err
-		}
-
-		if err := vm.C.SetCloudInitMedia(req.Media); err != nil {
-			return err
-		}
-		if err := vm.C.SetCloudInitDriver(req.Driver); err != nil {
-			return err
-		}
-
-		return vm.C.Save()
-	})
-
+	err := s.ServiceServer.Machine.CloudInitDriveAttach(ctx, req.Name, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -43,20 +19,8 @@ func (s *ServiceServer) AttachCloudInitDrive(ctx context.Context, req *pb.Attach
 	return new(empty.Empty), nil
 }
 
-func (s *ServiceServer) DetachCloudInitDrive(ctx context.Context, req *pb.DetachCloudInitRequest) (*empty.Empty, error) {
-	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
-		vm, err := s.GetMachine(req.Name)
-		if err != nil {
-			return err
-		}
-
-		if err := vm.C.RemoveCloudInitConf(); err != nil {
-			return err
-		}
-
-		return vm.C.Save()
-	})
-
+func (s *service) CloudInitDriveDetach(ctx context.Context, req *pb.CloudInitDriveDetachRequest) (*empty.Empty, error) {
+	err := s.ServiceServer.Machine.CloudInitDriveDetach(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -64,43 +28,8 @@ func (s *ServiceServer) DetachCloudInitDrive(ctx context.Context, req *pb.Detach
 	return new(empty.Empty), nil
 }
 
-func (s *ServiceServer) ChangeCloudInitDrive(ctx context.Context, req *pb.ChangeCloudInitRequest) (*empty.Empty, error) {
-	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
-		vm, err := s.GetMachine(req.Name)
-		if err != nil {
-			return err
-		}
-
-		if req.Live && vm.R != nil {
-			if drive := vm.R.GetCloudInitDrive(); drive != nil {
-				if err := vm.R.SetCloudInitMedia(req.Media); err != nil {
-					return err
-				}
-			} else {
-				return &kvmrun.NotConnectedError{Source: "instance_qemu", Object: "cloud-init drive"}
-			}
-		}
-
-		var savingRequire bool
-
-		if drive := vm.C.GetCloudInitDrive(); drive != nil {
-			if req.Media != drive.Media {
-				if err := vm.C.SetCloudInitMedia(req.Media); err != nil {
-					return err
-				}
-				savingRequire = true
-			}
-		} else {
-			return &kvmrun.NotConnectedError{Source: "instance_conf", Object: "cloud-init drive"}
-		}
-
-		if savingRequire {
-			return vm.C.Save()
-		}
-
-		return nil
-	})
-
+func (s *service) CloudInitDriveChangeMedia(ctx context.Context, req *pb.CloudInitDriveChangeMediaRequest) (*empty.Empty, error) {
+	err := s.ServiceServer.Machine.CloudInitDriveChangeMedia(ctx, req.Name, req.Media, req.Live)
 	if err != nil {
 		return nil, err
 	}

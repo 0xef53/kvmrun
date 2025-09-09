@@ -7,11 +7,11 @@ import (
 type FuncTask struct {
 	*GenericTask
 
-	key string
-	fn  func(*log.Entry) error
+	targets map[string]OperationMode
+	fn      func(*log.Entry) error
 }
 
-func (t *FuncTask) GetKey() string { return t.key }
+func (t *FuncTask) Targets() map[string]OperationMode { return t.targets }
 
 func (t *FuncTask) Main() error {
 	return t.fn(t.Logger)

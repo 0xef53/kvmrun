@@ -3,144 +3,94 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
 	"runtime"
-	"strings"
 
-	"github.com/0xef53/kvmrun/internal/grpcclient"
+	"github.com/0xef53/kvmrun/client"
+	"github.com/0xef53/kvmrun/cmd/vmm/commands"
+	"github.com/0xef53/kvmrun/internal/appconf"
 	"github.com/0xef53/kvmrun/kvmrun"
 
-	cli "github.com/urfave/cli/v2"
-	grpc "google.golang.org/grpc"
-	grpc_codes "google.golang.org/grpc/codes"
-	grpc_status "google.golang.org/grpc/status"
+	cli "github.com/urfave/cli/v3"
 )
-
-var (
-	Error = log.New(os.Stdout, "Error: ", 0)
-)
-
-func init() {
-	cli.AppHelpTemplate = AppHelpTemplate
-	cli.CommandHelpTemplate = CommandHelpTemplate
-	cli.SubcommandHelpTemplate = SubcommandHelpTemplate
-}
 
 func main() {
-	app := cli.NewApp()
+	app := new(cli.Command)
 
 	app.Name = "vmm"
 	app.Usage = "CLI interface for managing virtual machines"
 	app.HideHelpCommand = true
 
-	app.EnableBashCompletion = true
+	app.EnableShellCompletion = true
+
+	// Build application config
+	app.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		appConf, err := appconf.NewClientConfig(c.String("config"))
+		if err != nil {
+			return nil, err
+		}
+
+		ctx = client.AppendAppConfToContext(ctx, appConf)
+
+		return ctx, nil
+	}
 
 	app.Flags = []cli.Flag{
-		&cli.BoolFlag{Name: "json", Aliases: []string{"j"}, Usage: "show output in the JSON format if possible"},
+		&cli.StringFlag{
+			Name:    "config",
+			Usage:   "path to the configuration file",
+			Sources: cli.EnvVars("KVMRUN_CONFIG"),
+			Value:   filepath.Join(kvmrun.CONFDIR, "kvmrun.ini"),
+		},
+		&cli.BoolFlag{
+			Name:    "json",
+			Usage:   "show output in the JSON format if possible",
+			Aliases: []string{"j"},
+		},
 	}
 
 	app.Commands = []*cli.Command{
-		cmdConfCreate,
-		cmdConfRemove,
-		cmdPrintList,
-		cmdInspect,
-		memoryCommands,
-		cpuCommands,
-		bootCommands,
-		hostpciCommands,
-		inputsCommands,
-		cdromCommands,
-		storageCommands,
-		networkCommands,
-		channelsCommands,
-		extkernelCommands,
-		cloudinitCommands,
-		vncCommands,
-		cmdConsole,
+		commands.CommandCreateConf,
+		commands.CommandRemoveConf,
+		commands.CommandPrintList,
+		commands.CommandInspect,
+		commands.MemoryCommands,
+		commands.CPUCommands,
+		commands.BootCommands,
+		commands.HostDeviceCommands,
+		commands.InputDeviceCommands,
+		commands.CdromCommands,
+		commands.DiskCommands,
+		commands.NetworkCommands,
+		commands.ChannelCommands,
+		commands.ExternalKernelCommands,
+		commands.CloudInitCommands,
+		commands.VNCCommands,
+		commands.CommandConsole,
 		// control actions
-		cmdStart,
-		cmdStop,
-		cmdRestart,
-		cmdReset,
+		commands.CommandStart,
+		commands.CommandStop,
+		commands.CommandRestart,
+		commands.CommandReset,
 		// migration & backup actions
-		backupCommands,
-		migrationCommands,
+		commands.BackupCommands,
+		commands.MigrationCommands,
 		// other actions
 		{
 			Name:     "version",
 			Usage:    "print the version information",
 			Category: "Other",
-			Action: func(c *cli.Context) error {
+			Action: func(_ context.Context, _ *cli.Command) error {
 				fmt.Printf("v%s, (built %s)\n", kvmrun.Version, runtime.Version())
 				return nil
 			},
 		},
 		// system actions
-		systemCommands,
+		commands.SystemCommands,
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		exitWithError(err)
 	}
-}
-
-func executeGRPC(c *cli.Context, f func(context.Context, string, *cli.Context, *grpc.ClientConn) error) error {
-	if c.Args().Len() < countRequiredArgs(c.Command.ArgsUsage) {
-		cli.ShowCommandHelpAndExit(c, c.Command.Name, 1)
-	}
-
-	vmname := c.Args().First()
-
-	// Unix socket client
-	conn, err := grpcclient.NewConn("unix:@/run/kvmrund.sock", nil, false)
-	if err != nil {
-		return cli.Exit(fmt.Errorf("grpc dial error: %s", err), 1)
-	}
-	defer conn.Close()
-
-	return f(context.Background(), vmname, c, conn)
-}
-
-func countRequiredArgs(s string) (c int) {
-	for _, v := range strings.Fields(s) {
-		if !strings.HasPrefix(v, "[") {
-			c++
-		}
-	}
-	return c
-}
-
-func exitWithError(err error) {
-	var exitcode int
-	var exitdesc string
-
-	if e, ok := grpc_status.FromError(err); ok {
-		switch e.Code() {
-		case grpc_codes.AlreadyExists, grpc_codes.NotFound:
-			exitcode = 2
-		case grpc_codes.Unimplemented:
-			exitcode = 3
-		default:
-			exitcode = 5
-		}
-
-		exitdesc = e.Message()
-	} else {
-		exitcode = 1
-		exitdesc = err.Error()
-	}
-
-	Error.Println(exitdesc)
-
-	os.Exit(exitcode)
-}
-
-func IsGRPCError(err error, wantCode grpc_codes.Code) bool {
-	if e, ok := grpc_status.FromError(err); ok {
-		if e.Code() == wantCode {
-			return true
-		}
-	}
-	return false
 }

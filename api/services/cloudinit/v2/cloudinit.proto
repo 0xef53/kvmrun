@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package kvmrun.api.services.cloudinit.v2;
+
+option go_package = "github.com/0xef53/kvmrun/api/services/cloudinit/v2;cloudinit";
+
+service CloudInitService {
+    rpc BuildImage(BuildImageRequest) returns (BuildImageResponse);
+}
+
+message BuildImageRequest {
+    string machine_name = 1;
+
+    // The instance-data keys
+    string platform = 101;
+    string subplatform = 102;
+    string cloudname = 103;
+    string region = 104;
+    string availability_zone = 105;
+
+    // These fields override the same name keys
+    // from user_config structure
+    string hostname = 201;
+    string domain = 202;
+    string timezone = 203;
+
+    bytes vendor_config = 298;
+    bytes user_config = 299;
+
+    string output_file = 301;
+}
+
+message BuildImageResponse {
+    string output_file = 1;
+}

@@ -2,13 +2,13 @@ Source: kvmrun
 Section: admin
 Priority: extra
 Maintainer: Sergey Zhuravlev <sergey@netangels.ru>
-Build-Depends: cdbs, debhelper (>= 9), dh-systemd
+Build-Depends: cdbs, debhelper (>= 12)
 Standards-Version: 3.9.4
 
 Package: kvmrun
 Architecture: any
-Depends: ${shlibs:Depends}, qemu-kvm | qemu (>= 1:2.5), qemu-kvm | qemu (<< 1:5.1), socat
-Recommends: bash-completion, ovmf, kvmrun-network, kvmrun-tools, kpartx
+Depends: ${shlibs:Depends}, socat
+Recommends: bash-completion, ovmf, qemu-kvm | qemu (>= 1:2.5), qemu-kvm | qemu (<< 1:5.1), kpartx
 Description: Interface for running and managing KVM virtual machines
  Kvmrun is a suite of tools that provide a command line interface
  for creating and managing virtual machines based on QEMU-KVM.

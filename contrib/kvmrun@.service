@@ -4,7 +4,15 @@ After=kvmrund.service network-online.target
 Requires=network-online.target
 
 [Service]
+Delegate=cpu cpuacct
+
+EnvironmentFile=-/etc/kvmrun/%i/config_envs
+Environment=SYSTEMD_UNITNAME=%n
+
 WorkingDirectory=/etc/kvmrun/%i
+
+LimitMEMLOCK=infinity
+
 ExecStart=/usr/lib/kvmrun/launcher start
 ExecStop=/usr/lib/kvmrun/launcher stop
 ExecStopPost=/usr/lib/kvmrun/launcher cleanup

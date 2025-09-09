@@ -2,17 +2,28 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 
-	"github.com/urfave/cli/v2"
+	grpcclient "github.com/0xef53/go-grpc/client"
+
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
+
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 )
 
-const kvmrundSock = "unix:@/run/kvmrund.sock"
+func init() {
+	logger := logrus.New()
+
+	logger.SetOutput(io.Discard)
+
+	grpcclient.SetLogger(logrus.NewEntry(logger))
+}
 
 var (
 	progname string

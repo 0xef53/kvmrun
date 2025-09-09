@@ -1,6 +1,9 @@
 PROJECT_NAME := kvmrun
 PROJECT_REPO := github.com/0xef53/$(PROJECT_NAME)
 
+GOLANG_IMAGE := golang:1.24-bullseye
+DEVTOOLS_IMAGE := 0xef53/devtools:debian-bullseye
+
 CWD := $(shell pwd)
 
 ifeq (,$(wildcard /etc/debian_version))
@@ -26,6 +29,19 @@ DOCKER_PB_ARGS := \
     -w /go/$(PROJECT_NAME) \
     -v $(CWD):/go/$(PROJECT_NAME)
 
+protofiles_grpc = \
+    types/v2/types.proto \
+    services/machines/v2/machines.proto \
+    services/tasks/v2/tasks.proto \
+    services/system/v2/system.proto \
+    services/network/v2/network.proto \
+    services/hardware/v2/hardware.proto \
+    services/cloudinit/v2/cloudinit.proto
+
+protofiles_grpc_gw = \
+    services/machines/v2/machines.proto \
+    services/tasks/v2/tasks.proto
+
 DOCKER_DEB_ARGS := \
     -w /root/source \
     -v $(CWD):/root/source:ro \
@@ -36,17 +52,11 @@ DOCKER_DEB_ARGS := \
 
 binaries = \
     bin/kvmrund bin/vmm bin/launcher \
-    bin/netinit bin/vnetctl bin/gencert bin/proxy-launcher \
+    bin/netinit bin/vnetctl bin/gencert \
     bin/printpci bin/update-kvmrun-package
 
-proto_files = \
-    api/types/types.proto \
-    api/services/machines/v1/machines.proto \
-    api/services/tasks/v1/tasks.proto \
-    api/services/system/v1/system.proto \
-    api/services/network/v1/network.proto \
-    api/services/hardware/v1/hardware.proto \
-    api/services/cloudinit/v1/cloudinit.proto
+scripts = \
+    scripts/delegate-cgroup-v1-controller
 
 .PHONY: all build clean protobufs $(proto_files)
 
@@ -58,7 +68,7 @@ $(binaries):
 	@echo "##########################"
 	@echo
 	install -d bin
-	docker run --rm -it $(DOCKER_BUILD_ARGS) golang:1.18-buster
+	docker run --rm -it $(DOCKER_BUILD_ARGS) $(GOLANG_IMAGE)
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"
@@ -72,32 +82,34 @@ tests:
 	@echo "#  Running tests         #"
 	@echo "##########################"
 	@echo
-	docker run --rm -i $(DOCKER_TESTS_ARGS) golang:latest go test ./...
+	docker run --rm -i $(DOCKER_TESTS_ARGS) $(GOLANG_IMAGE) go test ./...
 	@echo
 	@echo
 
-$(proto_files):
-	docker run --rm -i $(DOCKER_PB_ARGS) 0xef53/go-proto-compiler:latest \
+protobufs:
+	docker run --rm -it $(DOCKER_PB_ARGS) 0xef53/go-proto-compiler:v3.18 \
 		--proto_path api \
-		--proto_path /go/src/github.com/gogo/googleapis \
-		--proto_path /go/src \
-		--gogofast_out=plugins=grpc,paths=source_relative,\
-	Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,\
-	Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,\
-	Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types:\
-	./api $@
-
-protobufs: $(proto_files)
+		--go_opt "plugins=grpc,paths=source_relative" \
+		--go_out ./api \
+		$(protofiles_grpc)
+	docker run --rm -it $(DOCKER_PB_ARGS) 0xef53/go-proto-compiler:v3.18 \
+		--proto_path api \
+		--grpc-gateway_opt "logtostderr=true,paths=source_relative" \
+		--grpc-gateway_out ./api \
+		$(protofiles_grpc_gw)
+	scripts/fix-proto-names.sh $(shell find api/ -type f -name '*.pb.go')
 
 install: $(binaries)
 	install -d $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(DESTDIR)/etc/$(PROJECT_NAME)
 	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(binaries)
+	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(scripts)
+	cp -t $(DESTDIR)/usr/lib/$(PROJECT_NAME) contrib/qemu.wrapper
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifup
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifdown
 	mv -t $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME)/vmm
 	cp -t $(DESTDIR)/etc/$(PROJECT_NAME) contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
-	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service contrib/kvmrun-proxy@.service
+	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service
 	install -d $(DESTDIR)/etc/rsyslog.d
 	cp -t $(DESTDIR)/etc/rsyslog.d contrib/rsyslog/kvmrun.conf
 	install -d $(DESTDIR)/usr/share/kvmrun/tls
@@ -113,7 +125,7 @@ deb-package: $(binaries)
 	@echo "##########################"
 	@echo
 	install -d packages
-	docker run --rm -i $(DOCKER_DEB_ARGS) 0xef53/debian-dev:latest
+	docker run --rm -i $(DOCKER_DEB_ARGS) $(DEVTOOLS_IMAGE)
 	@echo
 	@echo "==================="
 	@echo "Successfully built:"

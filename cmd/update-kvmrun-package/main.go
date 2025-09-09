@@ -6,9 +6,10 @@ import (
 
 	"github.com/0xef53/kvmrun/internal/updater"
 
-	"github.com/urfave/cli/v2"
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
+
+	"github.com/urfave/cli/v2"
 )
 
 var (

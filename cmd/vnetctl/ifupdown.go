@@ -1,39 +1,49 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
-	"github.com/0xef53/kvmrun/internal/grpcclient"
+	"github.com/0xef53/kvmrun/internal/appconf"
+	"github.com/0xef53/kvmrun/kvmrun"
 
-	"github.com/urfave/cli/v2"
+	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
+
+	grpcclient "github.com/0xef53/go-grpc/client"
+
+	"github.com/urfave/cli/v3"
 	"github.com/vishvananda/netlink"
 )
 
 func ifupdownMain() error {
-	app := cli.NewApp()
+	app := new(cli.Command)
 
 	app.Name = progname
 	app.Usage = "interface for management virtual networks"
 	app.HideHelpCommand = true
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(ctx context.Context, c *cli.Command) error {
 		if c.IsSet("test-second-stage-feature") {
 			return nil
 		}
 
 		ifname := strings.TrimSpace(c.Args().First())
 
-		// Unix socket client
-		conn, err := grpcclient.NewConn(kvmrundSock, nil, true)
+		appConf, err := appconf.NewClientConfig(c.String("config"))
 		if err != nil {
-			return fmt.Errorf("grpc dial error: %s", err)
+			return err
+		}
+
+		conn, err := grpcclient.NewSecureConnection("unix:@/run/kvmrund.sock", appConf.TLSConfig)
+		if err != nil {
+			return err
 		}
 		defer conn.Close()
 
-		client := pb.NewNetworkServiceClient(conn)
+		client := pb_network.NewNetworkServiceClient(conn)
 
 		switch progname {
 		case "ifup":
@@ -48,22 +58,28 @@ func ifupdownMain() error {
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "second-stage",
-			EnvVars: []string{"SECOND_STAGE"},
+			Sources: cli.EnvVars("SECOND_STAGE"),
 		},
 		&cli.BoolFlag{
 			Name:    "test-second-stage-feature",
-			EnvVars: []string{"TEST_SECOND_STAGE_FEATURE"},
+			Sources: cli.EnvVars("TEST_SECOND_STAGE_FEATURE"),
+		},
+		&cli.StringFlag{
+			Name:    "config",
+			Usage:   "path to the configuration file",
+			Sources: cli.EnvVars("KVMRUN_CONFIG"),
+			Value:   filepath.Join(kvmrun.CONFDIR, "kvmrun.ini"),
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		exitWithError(err)
 	}
 
 	return nil
 }
 
-func ifup(client pb.NetworkServiceClient, ifname string, secondStage bool) error {
+func ifup(client pb_network.NetworkServiceClient, ifname string, secondStage bool) error {
 	if _, err := netlink.LinkByName(ifname); err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return fmt.Errorf("netlink: link not found: %s", ifname)
@@ -84,7 +100,7 @@ func ifup(client pb.NetworkServiceClient, ifname string, secondStage bool) error
 	return scheme.Configure(client, secondStage)
 }
 
-func ifdown(client pb.NetworkServiceClient, ifname string) error {
+func ifdown(client pb_network.NetworkServiceClient, ifname string) error {
 	/*
 		TODO: need to use config_network from the virt.machine chroot
 	*/

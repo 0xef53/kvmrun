@@ -5,38 +5,24 @@ import (
 
 	"github.com/0xef53/kvmrun/kvmrun"
 
-	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
+	pb "github.com/0xef53/kvmrun/api/services/machines/v2"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
-	log "github.com/sirupsen/logrus"
-	grpc_codes "google.golang.org/grpc/codes"
-	grpc_status "google.golang.org/grpc/status"
 )
 
-func (s *ServiceServer) AttachChannel(ctx context.Context, req *pb.AttachChannelRequest) (*empty.Empty, error) {
-	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
-		vm, err := s.GetMachine(req.Name)
-		if err != nil {
-			return err
+func (s *service) ChannelAttach(ctx context.Context, req *pb.ChannelAttachRequest) (*empty.Empty, error) {
+	var err error
+
+	switch v := req.Channel.(type) {
+	case *pb.ChannelAttachRequest_Vsock:
+		opts := &kvmrun.ChannelVSockProperties{
+			ContextID: v.Vsock.ContextID,
 		}
 
-		switch v := req.Channel.(type) {
-		case *pb.AttachChannelRequest_Vsock:
-			if req.Live && vm.R != nil {
-				if err := vm.R.AppendVSockDevice(v.Vsock.ContextID); err != nil && !kvmrun.IsAlreadyConnectedError(err) {
-					return err
-				}
-			}
-
-			if err := vm.C.AppendVSockDevice(v.Vsock.ContextID); err != nil && !kvmrun.IsAlreadyConnectedError(err) {
-				return err
-			}
-		case *pb.AttachChannelRequest_SerialPort:
-			return grpc_status.Errorf(grpc_codes.Unimplemented, "method is not available")
-		}
-
-		return vm.C.Save()
-	})
+		err = s.ServiceServer.Machine.ChannelAttach_VSock(ctx, req.Name, opts, req.Live)
+	case *pb.ChannelAttachRequest_SerialPort:
+		err = s.ServiceServer.Machine.ChannelAttach_SerialPort(ctx, req.Name, req.Live)
+	}
 
 	if err != nil {
 		return nil, err
@@ -45,30 +31,15 @@ func (s *ServiceServer) AttachChannel(ctx context.Context, req *pb.AttachChannel
 	return new(empty.Empty), nil
 }
 
-func (s *ServiceServer) DetachChannel(ctx context.Context, req *pb.DetachChannelRequest) (*empty.Empty, error) {
-	err := s.RunFuncTask(ctx, req.Name, func(l *log.Entry) error {
-		vm, err := s.GetMachine(req.Name)
-		if err != nil {
-			return err
-		}
+func (s *service) ChannelDetach(ctx context.Context, req *pb.ChannelDetachRequest) (*empty.Empty, error) {
+	var err error
 
-		switch req.Channel.(type) {
-		case *pb.DetachChannelRequest_Vsock:
-			if req.Live && vm.R != nil {
-				if err := vm.R.RemoveVSockDevice(); err != nil && !kvmrun.IsNotConnectedError(err) {
-					return err
-				}
-			}
-
-			if err := vm.C.RemoveVSockDevice(); err != nil && !kvmrun.IsNotConnectedError(err) {
-				return err
-			}
-		case *pb.DetachChannelRequest_SerialPort:
-			return grpc_status.Errorf(grpc_codes.Unimplemented, "method is not available")
-		}
-
-		return vm.C.Save()
-	})
+	switch req.Channel.(type) {
+	case *pb.ChannelDetachRequest_Vsock:
+		err = s.ServiceServer.Machine.ChannelDetach_VSock(ctx, req.Name, req.Live)
+	case *pb.ChannelDetachRequest_SerialPort:
+		err = s.ServiceServer.Machine.ChannelDetach_SerialPort(ctx, req.Name, req.Live)
+	}
 
 	if err != nil {
 		return nil, err

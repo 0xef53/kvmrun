@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
+	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
 )
 
 type vlanSchemeOptions struct {
@@ -16,11 +16,11 @@ type vlanScheme struct {
 	opts     *vlanSchemeOptions
 }
 
-func (sc *vlanScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
-	req := pb.ConfigureRequest{
+func (sc *vlanScheme) Configure(client pb_network.NetworkServiceClient, secondStage bool) error {
+	req := pb_network.ConfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.ConfigureRequest_Vlan{
-			Vlan: &pb.ConfigureRequest_VlanAttrs{
+		Attrs: &pb_network.ConfigureRequest_Vlan{
+			Vlan: &pb_network.ConfigureRequest_VlanAttrs{
 				VlanID: sc.opts.VlanID,
 				MTU:    sc.opts.MTU,
 			},
@@ -37,11 +37,11 @@ func (sc *vlanScheme) Configure(client pb.NetworkServiceClient, secondStage bool
 	return nil
 }
 
-func (sc *vlanScheme) Deconfigure(client pb.NetworkServiceClient) error {
-	req := pb.DeconfigureRequest{
+func (sc *vlanScheme) Deconfigure(client pb_network.NetworkServiceClient) error {
+	req := pb_network.DeconfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.DeconfigureRequest_Vlan{
-			Vlan: &pb.DeconfigureRequest_VlanAttrs{
+		Attrs: &pb_network.DeconfigureRequest_Vlan{
+			Vlan: &pb_network.DeconfigureRequest_VlanAttrs{
 				VlanID: sc.opts.VlanID,
 			},
 		},

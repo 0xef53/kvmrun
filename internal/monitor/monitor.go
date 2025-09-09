@@ -78,7 +78,7 @@ func (p *Pool) getMonitor(vmname string) (*qmp.Monitor, error) {
 
 	m, found := p.table[vmname]
 	if !found {
-		return nil, &net.OpError{Op: "read/write", Net: "unix", Err: &os.SyscallError{"syscall", syscall.ENOENT}}
+		return nil, &net.OpError{Op: "read/write", Net: "unix", Err: &os.SyscallError{Syscall: "syscall", Err: syscall.ENOENT}}
 	}
 
 	return m, nil

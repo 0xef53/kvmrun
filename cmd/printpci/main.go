@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	pb_types "github.com/0xef53/kvmrun/api/types"
 	"github.com/0xef53/kvmrun/internal/pci"
+
+	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 )
 
 func pciDeviceToProto(dev *pci.Device) *pb_types.PCIDevice {

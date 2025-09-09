@@ -3,15 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	pb "github.com/0xef53/kvmrun/api/services/system/v1"
+	"github.com/0xef53/kvmrun/internal/fsutil"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
+
+	pb_system "github.com/0xef53/kvmrun/api/services/system/v2"
 )
 
 func (l *launcher) Cleanup() error {
@@ -39,7 +40,7 @@ func (l *launcher) Cleanup() error {
 			cmd.Stdout = os.Stdout
 
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("external script failed: %s: %s\n", iface.Ifname, err)
+				return fmt.Errorf("external script failed: %s: %s", iface.Ifname, err)
 			}
 		}
 
@@ -67,8 +68,8 @@ func (l *launcher) Cleanup() error {
 			return fmt.Errorf("unable to load startup config: %w", err)
 		}
 
-		if fwflash := vmconf.GetFirmwareFlash(); fwflash != nil {
-			if inner, ok := fwflash.Backend.(*kvmrun.FirmwareBackend); ok {
+		if fwflash := vmconf.FirmwareGetFlash(); fwflash != nil {
+			if inner, ok := fwflash.Backend.(*kvmrun.FirmwareFlashBackend); ok {
 				if _, ok := inner.DiskBackend.(*file.Device); ok {
 					if b, err := file.New(filepath.Join(chrootDir, fwflash.Path)); err == nil {
 						if size, err := b.Size(); size == 0 && err != nil {
@@ -79,23 +80,16 @@ func (l *launcher) Cleanup() error {
 					}
 
 					// In case the machine turns off for the first time after migration to this host
-					src, err := os.Open(filepath.Join(chrootDir, fwflash.Path))
-					if err != nil {
-						return err
+					if err := fsutil.Copy(filepath.Join(chrootDir, fwflash.Path), fwflash.Path); err != nil {
+						return fmt.Errorf("failed to copy config_efivars: %w", err)
 					}
-					defer src.Close()
+					Info.Printf("(efivars: %s) Copy from %s\n", fwflash.Path, filepath.Join(chrootDir, fwflash.Path))
 
-					dst, err := os.Create(fwflash.Path)
-					if err != nil {
-						return err
-					}
-					defer dst.Close()
-
-					if _, err := io.Copy(dst, src); err != nil {
+					if err := os.Chown(fwflash.Path, 0, 0); err != nil {
 						return err
 					}
 
-					return nil
+					return os.Chmod(fwflash.Path, 0644)
 				}
 			}
 		}
@@ -119,12 +113,10 @@ func (l *launcher) Cleanup() error {
 		os.Remove(filepath.Join(kvmrun.QMPMONDIR, l.vmname+ext))
 	}
 
-	if _, err := l.client.UnregisterQemuInstance(l.ctx, &pb.UnregisterQemuInstanceRequest{Name: l.vmname}); err != nil {
-		Error.Println("cleanup: failed to release resources:", err)
-	}
+	req := pb_system.QemuInstanceDeregisterRequest{Name: l.vmname}
 
-	if _, err := l.client.StopDiskBackendProxy(l.ctx, &pb.DiskBackendProxyRequest{Name: l.vmname}); err != nil {
-		Error.Println("cleanup: failed to deconfigure disk backends proxy servers:", err)
+	if _, err := l.client.QemuInstanceDeregister(l.ctx, &req); err != nil {
+		Error.Println("cleanup: failed to release resources:", err)
 	}
 
 	return nil

@@ -6,8 +6,10 @@ import (
 )
 
 var (
+	ErrAlreadyExists  = errors.New("already exists")
+	ErrNotFound       = errors.New("not found")
+	ErrNotRunning     = errors.New("machine not running")
 	ErrNotImplemented = errors.New("not implemented")
-	ErrTimedOut       = errors.New("timeout error")
 )
 
 type AlreadyConnectedError struct {
@@ -42,28 +44,4 @@ func IsNotConnectedError(err error) bool {
 	}
 
 	return false
-}
-
-type NotRunningError struct {
-	Name string
-}
-
-func (e *NotRunningError) Error() string {
-	return "not running: " + e.Name
-}
-
-func IsNotRunningError(err error) bool {
-	if _, ok := err.(*NotRunningError); ok {
-		return true
-	}
-
-	return false
-}
-
-type NotFoundError struct {
-	Name string
-}
-
-func (e *NotFoundError) Error() string {
-	return "not found: " + e.Name
 }

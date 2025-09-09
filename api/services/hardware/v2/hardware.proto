@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package kvmrun.api.services.hardware.v2;
+
+import "types/v2/types.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/hardware/v2;hardware";
+
+service HardwareService {
+    rpc ListPCI(ListPCIRequest) returns (ListPCIResponse);
+}
+
+message ListPCIRequest {
+}
+
+message ListPCIResponse {
+    repeated types.v2.PCIDevice devices = 1;
+}

@@ -55,8 +55,6 @@ func (l *FileLocker) Acquire(timeout time.Duration) error {
 		close(timedOut)
 		return ErrAcquireLock
 	}
-
-	return nil
 }
 
 // Release releases the lock on the file.

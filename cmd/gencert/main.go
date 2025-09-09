@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/0xef53/kvmrun/internal/appconf"
+
+	grpcutils "github.com/0xef53/go-grpc/utils"
 )
 
 var (
@@ -37,7 +39,7 @@ func usage() {
 	s += "  -f\n"
 	s += "      update existing server + client certificates \n\n"
 
-	fmt.Fprintf(os.Stderr, s)
+	fmt.Fprint(os.Stderr, s)
 
 	os.Exit(2)
 }
@@ -52,12 +54,12 @@ func main() {
 	flag.BoolVar(&rewrite, "f", rewrite, "")
 	flag.Parse()
 
-	appConf, err := appconf.NewConfig(confFile)
+	appConf, err := appconf.NewServerConfig(confFile)
 	if err != nil {
 		Error.Fatalln(err)
 	}
 
-	if err := os.MkdirAll(appConf.Common.CertDir, 0700); err != nil {
+	if err := os.MkdirAll(appConf.Kvmrun.CertDir, 0700); err != nil {
 		Error.Fatalln(err)
 	}
 
@@ -73,7 +75,7 @@ func main() {
 			return err
 		}
 
-		ipaddrs, err := appConf.Server.BindAddrs()
+		ipaddrs, err := grpcutils.ParseBindings(appConf.Server.Bindings...)
 		if err != nil {
 			return err
 		}
@@ -82,32 +84,38 @@ func main() {
 			hosts = append(hosts, addr.String())
 		}
 
-		if _, err := os.Stat(appConf.Common.ServerCrt); err == nil && !rewrite {
-			return fmt.Errorf("Found an existing server certificate: %s", appConf.Common.ServerCrt)
+		if _, err := os.Stat(appConf.ServerCrt); err == nil && !rewrite {
+			return fmt.Errorf("found an existing server certificate: %s", appConf.ServerCrt)
 		}
 
-		if _, err := os.Stat(appConf.Common.ClientCrt); err == nil && !rewrite {
-			return fmt.Errorf("Found an existing client certificate: %s", appConf.Common.ClientCrt)
+		if _, err := os.Stat(appConf.ClientCrt); err == nil && !rewrite {
+			return fmt.Errorf("found an existing client certificate: %s", appConf.ClientCrt)
 		}
+
+		caCertFile := filepath.Join(filepath.Dir(appConf.ServerCrt), "CA.crt")
+		caKeyFile := filepath.Join(filepath.Dir(appConf.ServerCrt), "CA.key")
 
 		// Check CA
 		caCert, caKey, err := func() ([]byte, crypto.PrivateKey, error) {
-			if _, err := os.Stat(appConf.Common.CACrt); err == nil {
-				fmt.Println("Using an existing CA to generate server + client certificates:", appConf.Common.CACrt)
-				return loadCA(appConf.Common.CACrt, appConf.Common.CAKey)
+			if _, err := os.Stat(caCertFile); err == nil {
+				fmt.Println("Using an existing CA to generate server + client certificates:", caCertFile)
+				return loadCA(caCertFile, caKeyFile)
 			}
 			crt, key, err := generateCA()
 			if err != nil {
 				return nil, nil, err
 			}
-			if err := saveCerts(appConf.Common.CACrt, crt); err != nil {
+			if err := saveCerts(caCertFile, crt); err != nil {
 				return nil, nil, err
 			}
-			if err := saveKey(appConf.Common.CAKey, key); err != nil {
+			if err := saveKey(caKeyFile, key); err != nil {
 				return nil, nil, err
 			}
 			return crt, key, nil
 		}()
+		if err != nil {
+			return err
+		}
 
 		ca, err := parseCA(caCert)
 		if err != nil {
@@ -119,16 +127,16 @@ func main() {
 		if err != nil {
 			return err
 		}
-		if err := saveCerts(appConf.Common.ServerCrt, serverCert, caCert); err != nil {
+		if err := saveCerts(appConf.ServerCrt, serverCert, caCert); err != nil {
 			return err
 		}
-		if err := saveKey(appConf.Common.ServerKey, serverKey); err != nil {
+		if err := saveKey(appConf.ServerKey, serverKey); err != nil {
 			return err
 		}
 		if rewrite {
-			Info.Println("Updated an existing", appConf.Common.ServerCrt)
+			Info.Println("Updated an existing", appConf.ServerCrt)
 		} else {
-			Info.Println("Generated new", appConf.Common.ServerCrt)
+			Info.Println("Generated new", appConf.ServerCrt)
 		}
 
 		// Gen client.crt
@@ -136,16 +144,16 @@ func main() {
 		if err != nil {
 			return err
 		}
-		if err := saveCerts(appConf.Common.ClientCrt, clientCert, caCert); err != nil {
+		if err := saveCerts(appConf.ClientCrt, clientCert, caCert); err != nil {
 			return err
 		}
-		if err := saveKey(appConf.Common.ClientKey, clientKey); err != nil {
+		if err := saveKey(appConf.ClientKey, clientKey); err != nil {
 			return err
 		}
 		if rewrite {
-			Info.Println("Updated an existing", appConf.Common.ClientCrt)
+			Info.Println("Updated an existing", appConf.ClientCrt)
 		} else {
-			Info.Println("Generated new", appConf.Common.ClientCrt)
+			Info.Println("Generated new", appConf.ClientCrt)
 		}
 
 		return nil

@@ -20,7 +20,7 @@ type StrID struct {
 	ID string `json:"id"`
 }
 
-// StrID is a string representation of the ID argument.
+// DeviceName is a string representation of the device name.
 type DeviceName struct {
 	Device string `json:"device"`
 }
@@ -172,23 +172,25 @@ type ChardevBackend struct {
 
 // ChardevSocket describes a (stream) socket character device.
 type ChardevSocket struct {
-	Addr   SocketAddressLegacy `json:"addr"`
-	Server bool                `json:"server"`
-	Wait   bool                `json:"wait"`
+	Addr   UnixSocketAddressLegacy `json:"addr"`
+	Server bool                    `json:"server"`
+	Wait   bool                    `json:"wait"`
 }
 
-type SocketAddressLegacy struct {
-	Type string            `json:"type"`
-	Data UnixSocketAddress `json:"data"`
+// UnixSocketAddressLegacy represents an address of an unix socket.
+type UnixSocketAddressLegacy struct {
+	Type string                `json:"type"`
+	Data UnixSocketAddressBase `json:"data"`
 }
 
+type UnixSocketAddressBase struct {
+	Path string `json:"path"`
+}
+
+// InetSocketAddressLegacy represents an address of an inet socket.
 type InetSocketAddressLegacy struct {
 	Type string                `json:"type"`
 	Data InetSocketAddressBase `json:"data"`
-}
-
-type UnixSocketAddress struct {
-	Path string `json:"path"`
 }
 
 type InetSocketAddressBase struct {
@@ -196,31 +198,57 @@ type InetSocketAddressBase struct {
 	Port string `json:"port"`
 }
 
-// DeviceOptions is a common structure for different types of devices.
-type DeviceOptions struct {
-	Driver       string `json:"driver"`
-	Id           string `json:"id"`
-	Bus          string `json:"bus,omitempty"`
-	Addr         string `json:"addr,omitempty"`
-	Drive        string `json:"drive,omitempty"`
-	Netdev       string `json:"netdev,omitempty"`
-	Mac          string `json:"mac,omitempty"`
-	MQ           bool   `json:"mq,omitempty"`
-	Vectors      int    `json:"vectors,omitempty"`
-	Bootindex    int    `json:"bootindex,omitempty"`
-	Chardev      string `json:"chardev,omitempty"`
-	Name         string `json:"name,omitempty"`
-	GuestID      uint32 `json:"guest-cid,omitempty"`
-	SCSI_Channel int    `json:"channel,omitempty"`
-	SCSI_ID      int    `json:"scsi-id,omitempty"`
-	SCSI_Lun     int    `json:"lun,omitempty"`
-}
-
+// CPUDeviceOptions represents a set of common parameters of CPU devices.
 type CPUDeviceOptions struct {
 	Driver   string `json:"driver"`
 	SocketID int    `json:"socket-id"`
 	CoreID   int    `json:"core-id"`
 	ThreadID int    `json:"thread-id"`
+}
+
+// VSockDeviceOptions represents a set of various "vhost-vsock-pci" parameters.
+type VSockDeviceOptions struct {
+	Driver   string `json:"driver"`
+	ID       string `json:"id"`
+	GuestCID uint32 `json:"guest-cid,omitempty"`
+}
+
+// SCSIHostBusDeviceOptions represents a set of various "virtio-scsi-pci" parameters.
+type SCSIHostBusDeviceOptions struct {
+	Driver string `json:"driver"`
+	ID     string `json:"id"`
+}
+
+// CdromDeviceOptions is a set of common parameters for a CD-ROM compatible storage device.
+type CdromDeviceOptions struct {
+	Driver       string `json:"driver"`
+	ID           string `json:"id"`
+	Bus          string `json:"bus,omitempty"`
+	Drive        string `json:"drive,omitempty"`
+	SCSI_Channel int    `json:"channel,omitempty"`
+	SCSI_ID      int    `json:"scsi-id,omitempty"`
+	SCSI_Lun     int    `json:"lun,omitempty"`
+}
+
+// BlockDeviceOptions is a set of common parameters for a block storage device.
+type BlockDeviceOptions struct {
+	Driver       string `json:"driver"`
+	ID           string `json:"id"`
+	Bus          string `json:"bus,omitempty"`
+	Drive        string `json:"drive,omitempty"`
+	SCSI_Channel int    `json:"channel,omitempty"`
+	SCSI_ID      int    `json:"scsi-id,omitempty"`
+	SCSI_Lun     int    `json:"lun,omitempty"`
+}
+
+// NetDeviceOptions is a set of common parameters for a network device.
+type NetDeviceOptions struct {
+	Driver  string `json:"driver"`
+	ID      string `json:"id"`
+	Netdev  string `json:"netdev,omitempty"`
+	Mac     string `json:"mac,omitempty"`
+	MQ      bool   `json:"mq,omitempty"`
+	Vectors int    `json:"vectors,omitempty"`
 }
 
 // MigrationCapabilityStatus describes the state (enabled/disabled) of migration capability.

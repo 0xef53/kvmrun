@@ -1,0 +1,615 @@
+syntax = "proto3";
+
+package kvmrun.api.services.machines.v2;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "types/v2/types.proto";
+import "github.com/0xef53/go-grpc/options/field_options.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/machines/v2;machines";
+
+service MachineService {
+    rpc Create(CreateRequest) returns (CreateResponse) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}"
+            body: "*"
+        };
+    }
+    rpc Delete(DeleteRequest) returns (DeleteResponse) {
+        option (google.api.http).delete = "/v2/machine/{name}";
+    }
+
+    rpc Get(GetRequest) returns (GetResponse) {
+        option (google.api.http).get = "/v2/machine/{name}";
+    }
+    rpc GetEvents(GetEventsRequest) returns (GetEventsResponse) {
+        option (google.api.http).get = "/v2/machine/{name}/events";
+    }
+
+    rpc Start(StartRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/start"
+            body: "*"
+        };
+    }
+    rpc Stop(StopRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/stop"
+            body: "*"
+        };
+    }
+    rpc Restart(RestartRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/restart"
+            body: "*"
+        };
+    }
+    rpc Reset(ResetRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/reset"
+            body: "*"
+        };
+    }
+
+    rpc List(ListRequest) returns (ListResponse) {
+        option (google.api.http).get = "/v2/machines";
+    }
+    rpc ListNames(ListNamesRequest) returns (ListNamesResponse) {
+        option (google.api.http).get = "/v2/machines/names";
+    }
+
+    rpc FirmwareSet(FirmwareSetRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/firmware"
+            body: "*"
+        };
+    }
+    rpc FirmwareRemove(FirmwareRemoveRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/firmware";
+    }
+
+    rpc MemorySetLimits(MemorySetLimitsRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/memory"
+            body: "*"
+        };
+    }
+
+    rpc CPUSetLimits(CPUSetLimitsRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cpu"
+            body: "*"
+        };
+    }
+    rpc CPUSetSockets(CPUSetSocketsRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cpu/sockets"
+            body: "*"
+        };
+    }
+    rpc CPUSetQuota(CPUSetQuotaRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cpu/quota"
+            body: "*"
+        };
+    }
+    rpc CPUSetModel(CPUSetModelRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cpu/model"
+            body: "*"
+        };
+    }
+
+    rpc HostDeviceAttach(HostDeviceAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/hostpci"
+            body: "*"
+        };
+    }
+    rpc HostDeviceDetach(HostDeviceDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/hostpci";
+    }
+    rpc HostDeviceSetMultifunctionOption(HostDeviceSetMultifunctionOptionRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/hostpci/mf"
+            body: "*"
+        };
+    }
+    rpc HostDeviceSetPrimaryGPUOption(HostDeviceSetPrimaryGPUOptionRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/hostpci/primary-gpu"
+            body: "*"
+        };
+    }
+
+    rpc VNCActivate(VNCActivateRequest) returns (VNCActivateResponse) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/vnc"
+            body: "*"
+        };
+    }
+
+    rpc InputDeviceAttach(InputDeviceAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/input-device"
+            body: "*"
+        };
+    }
+    rpc InputDeviceDetach(InputDeviceDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/input-device";
+    }
+
+    rpc CdromAttach(CdromAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/cdrom/{device_name}"
+            body: "*"
+        };
+    }
+    rpc CdromDetach(CdromDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/cdrom/{device_name}";
+    }
+    rpc CdromChangeMedia(CdromChangeMediaRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cdrom/{device_name}/media"
+            body: "*"
+        };
+    }
+    rpc CdromRemoveMedia(CdromRemoveMediaRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/cdrom/{device_name}/media";
+    }
+
+    rpc DiskAttach(DiskAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/disk"
+            body: "*"
+        };
+    }
+    rpc DiskDetach(DiskDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/disk";
+    }
+    rpc DiskSetReadLimit(DiskSetIOLimitRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/disk/{disk_name}/iops-rd"
+            body: "*"
+        };
+    }
+    rpc DiskSetWriteLimit(DiskSetIOLimitRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/disk/{disk_name}/iops-wr"
+            body: "*"
+        };
+    }
+    rpc DiskRemoveQemuBitmap(DiskRemoveQemuBitmapRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/disk/{disk_name}/qemu-bitmap";
+    }
+    rpc DiskResizeQemuBlockdev(DiskResizeQemuBlockdevRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/disk/{disk_name}/qemu-resize"
+            body: "*"
+        };
+    }
+
+    rpc NetIfaceAttach(NetIfaceAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/net-iface/{ifname}"
+            body: "*"
+        };
+    }
+    rpc NetIfaceDetach(NetIfaceDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/net-iface/{ifname}";
+    }
+    rpc NetIfaceSetLinkState(NetIfaceSetLinkStateRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/net-iface/{ifname}/link"
+            body: "*"
+        };
+    }
+    rpc NetIfaceSetUpScript(NetIfaceSetScriptRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/net-iface/{ifname}/up-script"
+            body: "*"
+        };
+    }
+    rpc NetIfaceSetDownScript(NetIfaceSetScriptRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/net-iface/{ifname}/down-script"
+            body: "*"
+        };
+    }
+    rpc NetIfaceSetQueues(NetIfaceSetQueuesRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/net-iface/{ifname}/queues"
+            body: "*"
+        };
+    }
+
+    rpc ChannelAttach(ChannelAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/channel"
+            body: "*"
+        };
+    }
+    rpc ChannelDetach(ChannelDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/channel";
+    }
+
+    rpc CloudInitDriveAttach(CloudInitDriveAttachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/cloud-init"
+            body: "*"
+        };
+    }
+    rpc CloudInitDriveDetach(CloudInitDriveDetachRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/cloud-init";
+    }
+    rpc CloudInitDriveChangeMedia(CloudInitDriveChangeMediaRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/cloud-init/media"
+            body: "*"
+        };
+    }
+
+    rpc StartDiskBackupProcess(StartDiskBackupRequest) returns (StartDiskBackupResponse) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/start-disk-backup"
+            body: "*"
+        };
+    }
+    rpc StartMigrationProcess(StartMigrationRequest) returns (StartMigrationResponse) {
+        option (google.api.http) = {
+            post: "/v2/machine/{name}/start-migration"
+            body: "*"
+        };
+    }
+
+    rpc ExternalKernelSet(ExternalKernelSetRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/external-kernel"
+            body: "*"
+        };
+    }
+    rpc ExternalKernelRemove(ExternalKernelRemoveRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/machine/{name}/external-kernel";
+    }
+}
+
+message CreateRequest {
+    string name = 1;
+    types.v2.MachineOpts options = 2;
+    bool persistent = 3;
+    map<string, bytes> extra_files = 4 [(grpc.options.v1.log_formatting).display = Hide];
+    string qemu_rootdir = 110;
+}
+
+message CreateResponse {
+    types.v2.Machine machine = 1;
+}
+
+message DeleteRequest {
+    string name = 1;
+    bool force = 2;
+}
+
+message DeleteResponse {
+    types.v2.Machine machine = 1;
+}
+
+message GetRequest {
+    string name = 1;
+}
+
+message GetResponse {
+    types.v2.Machine machine = 1;
+}
+
+message GetEventsRequest {
+    string name = 1;
+}
+
+message GetEventsResponse {
+    repeated types.v2.MachineEvent events = 1;
+}
+
+message StartRequest {
+    string name = 1;
+    uint32 wait_interval = 2;
+}
+
+message StopRequest {
+    string name = 1;
+    bool wait = 2;
+    bool force = 3;
+}
+
+message RestartRequest {
+    string name = 1;
+    bool wait = 2;
+}
+
+message ResetRequest {
+    string name = 1;
+    bool wait = 2;
+}
+
+message ListRequest {
+    repeated string names = 1;
+}
+
+message ListResponse {
+    repeated types.v2.Machine machines = 1;
+}
+
+message ListNamesRequest {
+    repeated string names = 1;
+}
+
+message ListNamesResponse {
+    repeated string machines = 1;
+}
+
+message FirmwareSetRequest {
+    string name = 1;
+    string image = 2;
+    string flash = 3;
+    string qemu_rootdir = 110;
+}
+
+message FirmwareRemoveRequest {
+    string name = 1;
+}
+
+message MemorySetLimitsRequest {
+    string name = 1;
+    uint32 actual = 2;
+    uint32 total = 3;
+    bool live = 100;
+}
+
+message CPUSetLimitsRequest {
+    string name = 1;
+    uint32 actual = 2;
+    uint32 total = 3;
+    bool live = 100;
+}
+
+message CPUSetSocketsRequest {
+    string name = 1;
+    uint32 sockets = 2;
+}
+
+message CPUSetQuotaRequest {
+    string name = 1;
+    uint32 quota = 2;
+    bool live = 100;
+}
+
+message CPUSetModelRequest {
+    string name = 1;
+    string model = 2;
+}
+
+message HostDeviceAttachRequest {
+    string name = 1;
+    string pci_addr = 2;
+    bool multifunction = 3;
+    bool primary_gpu = 4;
+    bool strict_mode = 90;
+}
+
+message HostDeviceDetachRequest {
+    string name = 1;
+    string pci_addr = 2;
+}
+
+message HostDeviceSetMultifunctionOptionRequest {
+    string name = 1;
+    string pci_addr = 2;
+    bool enabled = 3;
+}
+
+message HostDeviceSetPrimaryGPUOptionRequest {
+    string name = 1;
+    string pci_addr = 2;
+    bool enabled = 3;
+}
+
+message VNCActivateRequest {
+    string name = 1;
+    string password = 2;
+}
+
+message VNCActivateResponse {
+    types.v2.VNCRequisites requisites = 1;
+}
+
+message InputDeviceAttachRequest {
+    string name = 1;
+    types.v2.InputDeviceType type = 2;
+}
+
+message InputDeviceDetachRequest {
+    string name = 1;
+    types.v2.InputDeviceType type = 2;
+}
+
+message CdromAttachRequest {
+    string name = 1;
+    string device_name = 2;
+    string device_media = 3;
+    types.v2.CdromDriver driver = 4;
+    bool readonly = 5;
+    int32 bootindex = 6;
+    int32 position = 7;
+    bool live = 100;
+}
+
+message CdromDetachRequest {
+    string name = 1;
+    string device_name = 2;
+    bool live = 100;
+}
+
+message CdromChangeMediaRequest {
+    string name = 1;
+    string device_name = 2;
+    string device_media = 3;
+    bool live = 100;
+}
+
+message CdromRemoveMediaRequest {
+    string name = 1;
+    string device_name = 2;
+    bool live = 100;
+}
+
+message DiskAttachRequest {
+    string name = 1;
+    string disk_path = 2;
+    types.v2.DiskDriver driver = 3;
+    uint32 iops_rd = 4;
+    uint32 iops_wr = 5;
+    int32 bootindex = 6;
+    int32 position = 7;
+    bool live = 100;
+}
+
+message DiskDetachRequest {
+    string name = 1;
+    string disk_name = 2;
+    bool live = 100;
+}
+
+message DiskSetIOLimitRequest {
+    string name = 1;
+    string disk_name = 2;
+    uint32 iops = 3;
+    bool live = 100;
+}
+
+message DiskRemoveQemuBitmapRequest {
+    string name = 1;
+    string disk_name = 2;
+}
+
+message DiskResizeQemuBlockdevRequest {
+    string name = 1;
+    string disk_name = 2;
+}
+
+message NetIfaceAttachRequest {
+    string name = 1;
+    string ifname = 2;
+    types.v2.NetIfaceDriver driver = 3;
+    string hw_addr = 4;
+    string ifup_script = 5;
+    string ifdown_script = 6;
+    uint32 queues = 7;
+    bool live = 100;
+}
+
+message NetIfaceDetachRequest {
+    string name = 1;
+    string ifname = 2;
+    bool live = 100;
+}
+
+message NetIfaceSetScriptRequest {
+    string name = 1;
+    string ifname = 2;
+    string path = 3;
+}
+
+message NetIfaceSetLinkStateRequest {
+    string name = 1;
+    string ifname = 2;
+    types.v2.NetIfaceLinkState state = 3;
+}
+
+message NetIfaceSetQueuesRequest {
+    string name = 1;
+    string ifname = 2;
+    uint32 queues = 3;
+}
+
+message ChannelAttachRequest {
+    message VirtioVSock {
+        uint32 context_id = 1;
+    }
+    message VirtioSerialPort {
+        string port_id = 1;
+        string port_guest_name = 2;
+    }
+    string name = 1;
+    oneof channel {
+        VirtioVSock vsock = 2;
+        VirtioSerialPort serial_port = 3;
+    };
+    bool live = 100;
+}
+
+message ChannelDetachRequest {
+    message VirtioVSock { }
+    message VirtioSerialPort {
+        string port_id = 1;
+    }
+    string name = 1;
+    oneof channel {
+        VirtioVSock vsock = 2;
+        VirtioSerialPort serial_port = 3;
+    };
+    bool live = 100;
+}
+
+message CloudInitDriveAttachRequest {
+    string name = 1;
+    string media = 2;
+    types.v2.CloudInitDriver driver = 3;
+}
+
+message CloudInitDriveDetachRequest {
+    string name = 1;
+}
+
+message CloudInitDriveChangeMediaRequest {
+    string name = 1;
+    string media = 2;
+    bool live = 100;
+}
+
+message StartDiskBackupRequest {
+    string name = 1;
+    string disk_name = 2;
+    string target = 3;
+    bool incremental = 4;
+    bool clear_bitmap = 5;
+}
+
+message StartDiskBackupResponse {
+    string task_key = 1;
+}
+
+message StartMigrationRequest {
+    string name = 1;
+    string dst_server = 2;
+    repeated string disks = 3;
+    types.v2.MigrationOverrides overrides = 4;
+    bool create_disks = 5;
+    bool remove_after = 6;
+}
+
+message StartMigrationResponse {
+    string task_key = 1;
+}
+
+message ExternalKernelSetRequest {
+    string name = 1;
+    string image = 2;
+    string initrd = 3;
+    string cmdline = 4;
+    string modiso = 5;
+}
+
+message ExternalKernelRemoveRequest {
+    string name = 1;
+}

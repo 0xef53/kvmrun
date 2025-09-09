@@ -1,29 +1,60 @@
 package qemu
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
-	"os"
 	"os/exec"
+	"regexp"
 	"strings"
+
+	"github.com/0xef53/kvmrun/internal/version"
 )
 
-const (
-	BINARY = "/usr/bin/qemu-system-x86_64"
+var (
+	ErrUnsupportedVersion = errors.New("unsupported QEMU version")
 )
 
-func DefaultMachineType() (string, error) {
-	if _, err := os.Stat(BINARY); os.IsNotExist(err) {
-		return "", fmt.Errorf("qemu binary not found: %s", BINARY)
-	}
-	outBytes, err := exec.Command(BINARY, "-M", "help").CombinedOutput()
+func VerifyVersion(strver string) error {
+	v, err := version.Parse(strver)
 	if err != nil {
-		return "", fmt.Errorf(string(outBytes))
+		return err
 	}
-	lines := strings.Split(string(outBytes), "\n")
-	for _, line := range lines {
-		if strings.HasSuffix(line, "(default)") {
-			return strings.Fields(line)[0], nil
+
+	if mtypes := getSuitableTypes(v); mtypes != nil {
+		return nil
+	}
+
+	return fmt.Errorf("%w: %s", ErrUnsupportedVersion, strver)
+}
+
+func GetVersion(rootdir, binary string) (*version.Version, error) {
+	qemuCommand := exec.Command(binary, "-version")
+
+	qemuCommand.Env = append(qemuCommand.Environ(), fmt.Sprintf("QEMU_ROOTDIR=%s", rootdir))
+
+	out, err := qemuCommand.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("QEMU binary failed (%s): %s", err, strings.TrimSpace(string(out)))
+	}
+
+	r := regexp.MustCompile(`^qemu\semulator\sversion\s([0-9\.]{3,})`)
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	for scanner.Scan() {
+		line := strings.ToLower(strings.TrimSpace(scanner.Text()))
+
+		fields := r.FindStringSubmatch(line)
+
+		if len(fields) == 2 {
+			return version.Parse(fields[1])
 		}
 	}
-	return "", fmt.Errorf("cannot determine default qemu machine type")
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("could not determine QEMU version: bad output")
 }

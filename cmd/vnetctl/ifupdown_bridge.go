@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
+	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
 )
 
 type bridgeSchemeOptions struct {
@@ -16,11 +16,11 @@ type bridgeScheme struct {
 	opts     *bridgeSchemeOptions
 }
 
-func (sc *bridgeScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
-	req := pb.ConfigureRequest{
+func (sc *bridgeScheme) Configure(client pb_network.NetworkServiceClient, secondStage bool) error {
+	req := pb_network.ConfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.ConfigureRequest_Bridge{
-			Bridge: &pb.ConfigureRequest_BridgeAttrs{
+		Attrs: &pb_network.ConfigureRequest_Bridge{
+			Bridge: &pb_network.ConfigureRequest_BridgeAttrs{
 				Ifname: sc.opts.BrName,
 				MTU:    sc.opts.MTU,
 			},
@@ -37,11 +37,11 @@ func (sc *bridgeScheme) Configure(client pb.NetworkServiceClient, secondStage bo
 	return nil
 }
 
-func (sc *bridgeScheme) Deconfigure(client pb.NetworkServiceClient) error {
-	req := pb.DeconfigureRequest{
+func (sc *bridgeScheme) Deconfigure(client pb_network.NetworkServiceClient) error {
+	req := pb_network.DeconfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.DeconfigureRequest_Bridge{
-			Bridge: &pb.DeconfigureRequest_BridgeAttrs{
+		Attrs: &pb_network.DeconfigureRequest_Bridge{
+			Bridge: &pb_network.DeconfigureRequest_BridgeAttrs{
 				Ifname: sc.opts.BrName,
 			},
 		},

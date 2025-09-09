@@ -6,46 +6,66 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	test_utils "github.com/0xef53/kvmrun/internal/task/internal/testing"
 )
 
-var errSuccessfullyFailed = errors.New("function is failed")
+const (
+	modeChangePropertyName OperationMode = 1 << (16 - 1 - iota)
+	modeChangePropertyDiskName
+	modeChangePropertyDiskSize
+	modeChangePropertyNetName
+	modeChangePropertyNetLink
+	modePowerUp
+	modePowerDown
+	modePowerCycle
 
-type DummyTask struct {
+	modeAny                = ^OperationMode(0)
+	modeChangePropertyDisk = modeChangePropertyDiskName | modeChangePropertyDiskSize
+	modeChangePropertyNet  = modeChangePropertyNetName | modeChangePropertyNetLink
+	modeChangeProperties   = modeChangePropertyDisk | modeChangePropertyNet
+	modePowerManagement    = modePowerUp | modePowerDown | modePowerCycle
+)
+
+type poolTest_dummyTask struct {
 	*GenericTask
 
 	id      string
 	timeout time.Duration
+
+	ops map[string]OperationMode
 
 	SleepBeforeStart        bool
 	FailBeforeStartFunction bool
 	FailOnSuccessFunction   bool
 }
 
-func (t *DummyTask) GetKey() string { return t.id }
+func (t *poolTest_dummyTask) Targets() map[string]OperationMode { return t.ops }
 
-func (t *DummyTask) BeforeStart(a interface{}) error {
+func (t *poolTest_dummyTask) BeforeStart(a interface{}) error {
 	if t.SleepBeforeStart {
 		time.Sleep(t.timeout * time.Second)
 	}
 
 	if t.FailBeforeStartFunction {
-		return errSuccessfullyFailed
+		return test_utils.ErrSuccessfullyFailed
 	}
 
 	return nil
 }
 
-func (t *DummyTask) OnSuccess() error {
+func (t *poolTest_dummyTask) OnSuccess() error {
 	if t.FailOnSuccessFunction {
-		return errSuccessfullyFailed
+		return test_utils.ErrSuccessfullyFailed
 	}
 
 	return nil
 }
 
-func (t *DummyTask) Main() error {
+func (t *poolTest_dummyTask) Main() error {
 	if t.timeout > 0 {
 		select {
 		case <-t.ctx.Done():
@@ -57,149 +77,218 @@ func (t *DummyTask) Main() error {
 	return nil
 }
 
-func resultStr(want, got error, id string) string {
-	return fmt.Sprintf("got unexpected result:\n\twant:\t%v\n\tgot:\t%v\n\tid:\t%s", want, got, id)
+type poolTest_target map[string]OperationMode
+
+func (t poolTest_target) String() string {
+	pairs := make([]string, 0, len(t))
+
+	for k, v := range t {
+		pairs = append(pairs, fmt.Sprintf("%s:%b", k, v))
+	}
+
+	return strings.Join(pairs, ", ")
+}
+
+func poolTest_Format(want, got interface{}, tgt poolTest_target) string {
+	return fmt.Sprintf("%s\n\ttarget:\t%s\n", test_utils.FormatResultString(want, got), tgt)
 }
 
 func TestConcurrentTasks(t *testing.T) {
-	pool := NewPool(4)
+	pool := NewPool()
 
-	tryStart := func(id string, timeout time.Duration, mustOK bool) {
-		task := DummyTask{new(GenericTask), id, timeout, false, false, false}
+	tryStart := func(tgt poolTest_target, timeout time.Duration, mustOK bool) {
+		tid := strconv.FormatUint(uint64(rand.Uint32()), 16)
+
+		task := poolTest_dummyTask{new(GenericTask), tid, timeout, tgt, false, false, false}
 
 		_, err := pool.StartTask(context.Background(), &task, nil)
 
 		if mustOK {
 			if err != nil {
-				t.Fatalf(resultStr(nil, err, id))
+				t.Fatal(poolTest_Format(nil, err, tgt))
 			}
 		} else {
-			if _, ok := err.(*TaskAlreadyRunningError); !ok {
-				t.Fatalf(resultStr(&TaskAlreadyRunningError{Key: id}, err, id))
+			if _, ok := err.(*ConcurrentRunningError); !ok {
+				t.Fatal(poolTest_Format(&ConcurrentRunningError{"DummyTask", tgt}, err, tgt))
 			}
 		}
 	}
 
-	// We run these tasks just to prepare the pool
-	basicIDs := []string{
-		"u221:vm123:20060102:",
-		"u345:vm325:20060102:aabbccdd",
-		"u876:vm224::",
-		"u555:::",
+	// We run some tasks with these targets just to prepare the pool
+	basicTargets := []poolTest_target{
+		{
+			// blocks any other actions with virt.machine
+			"machine_alice": modeChangeProperties | modePowerManagement,
+		},
+		{
+			// blocks only the disk actions
+			"machine_bob": modeChangePropertyDisk,
+			// and blocks any actions with specified disk
+			"machine_bob:disk_A": modeAny,
+		},
+		{
+			// blocks only the net actions
+			"machine_carol": modeChangePropertyNet,
+			// and blocks any actions with specified netif
+			"machine_carol:net_A": modeAny,
+		},
 	}
 
-	for _, id := range basicIDs {
-		tryStart(id, 3, true)
+	for _, tgt := range basicTargets {
+		tryStart(tgt, 3, true)
 	}
 
 	// And now we will check for collisions between them and new tasks
-	for _, id := range []string{"u221:::", "u221:vm123::", "u221:vm123:20060102:", "u221:vm123:20060102:suffix"} {
-		tryStart(id, 0, false)
+	aliceTargets := []poolTest_target{
+		{"machine_alice": modePowerDown},         // false
+		{"machine_alice": modeChangePropertyNet}, // false
+	}
+	for _, tgt := range aliceTargets {
+		tryStart(tgt, 0, false)
 	}
 
-	for _, id := range []string{"u345:vm123::", "u345:vm325:20060103:", "u345:vm325:20060102:suffix"} {
-		tryStart(id, 0, true)
+	bobTargets := []poolTest_target{
+		{"machine_bob": modeChangePropertyNet, "machine_bob:net_A": modeAny},
+		{"machine_bob": modeChangePropertyName},
+		{"machine_bob:disk_B": modeChangePropertyDiskSize},
+	}
+	for _, tgt := range bobTargets {
+		tryStart(tgt, 0, true)
 	}
 
-	for _, id := range []string{"u876:::", "u876:vm224::"} {
-		tryStart(id, 0, false)
+	carolTargets := []poolTest_target{
+		{"machine_carol": modeChangeProperties | modePowerDown},
+		{"machine_carol:net_A": modeChangePropertyNetLink},
 	}
-
-	for _, id := range []string{"u876:vm225:20060102:", "u876:vm225:20060103:suffix"} {
-		tryStart(id, 0, true)
-	}
-
-	for _, id := range []string{"u555:::", "u555:vm123::", "u555:vm124:20060102:", "u555:vm124:20060103:suffix"} {
-		tryStart(id, 0, false)
+	for _, tgt := range carolTargets {
+		tryStart(tgt, 0, false)
 	}
 }
 
 func TestTaskWaiting(t *testing.T) {
-	pool := NewPool(4)
+	pool := NewPool()
+
+	tgt := poolTest_target{"machine_eve": modeAny}
 
 	for i := 0; i < 2; i++ {
-		task := DummyTask{new(GenericTask), "u202:::", 3, true, false, false}
-		id, err := pool.StartTask(context.Background(), &task, nil)
+		task := poolTest_dummyTask{new(GenericTask), "1234567890", 3, tgt, true, false, false}
+
+		tid, err := pool.StartTask(context.Background(), &task, nil)
 		if err != nil {
-			t.Fatalf(resultStr(nil, err, id))
+			t.Fatal(poolTest_Format(nil, err, tgt))
 		}
-		pool.Wait(id)
+
+		pool.Wait(tid)
 	}
 }
 
-func TestTaskCanceling(t *testing.T) {
-	pool := NewPool(4)
+func TestTaskContextCanceling(t *testing.T) {
+	pool := NewPool()
+
+	tgt := poolTest_target{"machine_frank": modeAny}
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 	defer cancel()
 
-	task := DummyTask{new(GenericTask), "u232:::", 3, false, false, false}
+	task := poolTest_dummyTask{new(GenericTask), "1234567890", 3, tgt, false, false, false}
 
-	id, err := pool.StartTask(ctx, &task, nil)
+	tid, err := pool.StartTask(ctx, &task, nil)
 	if err != nil {
-		t.Fatalf(resultStr(nil, err, id))
+		t.Fatal(poolTest_Format(nil, err, tgt))
 	}
 
-	pool.Wait(id)
+	pool.Wait(tid)
 
-	if pool.Err(id) != context.DeadlineExceeded {
-		t.Fatalf(resultStr(context.DeadlineExceeded, pool.Err(id), id))
+	if !errors.Is(pool.Err(tid), context.DeadlineExceeded) {
+		t.Fatal(poolTest_Format(context.DeadlineExceeded, pool.Err(tid), tgt))
+	}
+}
+
+func TestTaskCanceling(t *testing.T) {
+	pool := NewPool()
+
+	tgt := poolTest_target{"machine_frank": modeAny}
+
+	task := poolTest_dummyTask{new(GenericTask), "1234567890", 4, tgt, false, false, false}
+
+	tid, err := pool.StartTask(context.Background(), &task, nil)
+	if err != nil {
+		t.Fatal(poolTest_Format(nil, err, tgt))
+	}
+
+	go func() {
+		time.Sleep(2 * time.Second)
+
+		pool.Cancel(tid)
+	}()
+
+	pool.Wait(tid)
+
+	if !errors.Is(pool.Err(tid), ErrTaskInterrupted) {
+		t.Fatal(poolTest_Format(ErrTaskInterrupted, pool.Err(tid), tgt))
 	}
 }
 
 func TestBeforeStartFunctionFailure(t *testing.T) {
-	pool := NewPool(4)
+	pool := NewPool()
 
-	task := DummyTask{new(GenericTask), "u262:::", 0, true, true, false}
+	tgt := poolTest_target{"machine_grace": modeAny}
 
-	id, err := pool.StartTask(context.Background(), &task, nil)
-	if err != errSuccessfullyFailed {
-		t.Fatalf(resultStr(errSuccessfullyFailed, err, id))
+	task := poolTest_dummyTask{new(GenericTask), "1234567890", 0, tgt, true, true, false}
+
+	tid, err := pool.StartTask(context.Background(), &task, nil)
+
+	if err != test_utils.ErrSuccessfullyFailed {
+		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, err, tgt))
 	}
 
-	pool.Wait(id)
+	pool.Wait(tid)
 }
 
 func TestOnSuccessFunctionFailure(t *testing.T) {
-	pool := NewPool(4)
+	pool := NewPool()
 
-	task := DummyTask{new(GenericTask), "u282:::", 0, false, false, true}
+	tgt := poolTest_target{"machine_grace": modeAny}
 
-	id, err := pool.StartTask(context.Background(), &task, nil)
+	task := poolTest_dummyTask{new(GenericTask), "1234567890", 0, tgt, false, false, true}
+
+	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
-		t.Fatalf(resultStr(nil, err, id))
+		t.Fatal(poolTest_Format(nil, err, tgt))
 	}
 
-	pool.Wait(id)
+	pool.Wait(tid)
 
-	if pool.Err(id) != errSuccessfullyFailed {
-		t.Fatalf(resultStr(errSuccessfullyFailed, pool.Err(id), id))
+	if !errors.Is(pool.Err(tid), test_utils.ErrSuccessfullyFailed) {
+		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, pool.Err(tid), tgt))
 	}
 }
 
 func TestPoolClosing(t *testing.T) {
-	pool := NewPool(4)
+	pool := NewPool()
 
-	rand.Seed(time.Now().UnixNano())
-
-	start := func(idx int) (string, error) {
-		return pool.StartTask(
+	start := func(idx int) (poolTest_target, error) {
+		tgt := poolTest_target{"machine_vm" + strconv.Itoa(idx): modeAny}
+		_, err := pool.StartTask(
 			context.Background(),
-			&DummyTask{
+			&poolTest_dummyTask{
 				new(GenericTask),
-				strconv.Itoa(idx) + ":::",
+				"id" + strconv.Itoa(idx),
 				time.Duration(rand.Intn(5)),
+				tgt,
 				false,
 				false,
 				false,
 			},
 			nil,
 		)
+
+		return tgt, err
 	}
 
 	for i := 0; i <= 10; i++ {
-		if id, err := start(i); err != nil {
-			t.Fatalf(resultStr(nil, err, id))
+		if tgt, err := start(i); err != nil {
+			t.Fatal(poolTest_Format(nil, err, tgt))
 		}
 	}
 
@@ -213,10 +302,10 @@ func TestPoolClosing(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
-		t.Fatalf(resultStr(nil, fmt.Errorf("pool closing timeout (currently running: %d)", len(pool.List())), "<nil>"))
+		t.Fatal(poolTest_Format(nil, fmt.Errorf("pool closing timeout (currently running: %d)", len(pool.List())), nil))
 	}
 
-	if id, err := start(5000); err != ErrPoolClosed {
-		t.Fatalf(resultStr(ErrPoolClosed, err, id))
+	if tgt, err := start(5000); !errors.Is(err, ErrPoolClosed) {
+		t.Fatal(poolTest_Format(ErrPoolClosed, err, tgt))
 	}
 }

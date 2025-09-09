@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
+	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
 )
 
 type routerSchemeOptions struct {
@@ -13,7 +13,7 @@ type routerSchemeOptions struct {
 	DefaultGateway string   `json:"default_gateway"`
 	InLimit        uint32   `json:"bwlim_in"`
 	OutLimit       uint32   `json:"bwlim_out"`
-	MachineName    string
+	ProcessID      uint32
 }
 
 type routerScheme struct {
@@ -21,18 +21,18 @@ type routerScheme struct {
 	opts     *routerSchemeOptions
 }
 
-func (sc *routerScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
-	req := pb.ConfigureRequest{
+func (sc *routerScheme) Configure(client pb_network.NetworkServiceClient, secondStage bool) error {
+	req := pb_network.ConfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.ConfigureRequest_Router{
-			Router: &pb.ConfigureRequest_RouterAttrs{
+		Attrs: &pb_network.ConfigureRequest_Router{
+			Router: &pb_network.ConfigureRequest_RouterAttrs{
 				Addrs:          sc.opts.Addrs,
 				MTU:            sc.opts.MTU,
 				BindInterface:  sc.opts.BindInterface,
 				DefaultGateway: sc.opts.DefaultGateway,
 				InLimit:        sc.opts.InLimit,
 				OutLimit:       sc.opts.OutLimit,
-				MachineName:    sc.opts.MachineName,
+				ProcessID:      sc.opts.ProcessID,
 			},
 		},
 		SecondStage: secondStage,
@@ -47,11 +47,11 @@ func (sc *routerScheme) Configure(client pb.NetworkServiceClient, secondStage bo
 	return nil
 }
 
-func (sc *routerScheme) Deconfigure(client pb.NetworkServiceClient) error {
-	req := pb.DeconfigureRequest{
+func (sc *routerScheme) Deconfigure(client pb_network.NetworkServiceClient) error {
+	req := pb_network.DeconfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.DeconfigureRequest_Router{
-			Router: &pb.DeconfigureRequest_RouterAttrs{
+		Attrs: &pb_network.DeconfigureRequest_Router{
+			Router: &pb_network.DeconfigureRequest_RouterAttrs{
 				BindInterface: sc.opts.BindInterface,
 			},
 		},

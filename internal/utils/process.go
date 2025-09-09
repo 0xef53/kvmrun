@@ -1,0 +1,63 @@
+package utils
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
+
+const SC_CLK_TCK int64 = 100 // C.sysconf(C._SC_CLK_TCK)
+
+// GetCmdline returns the command line arguments of the process
+// with the specified pid as a slice.
+func GetCmdline(pid int) ([]string, error) {
+	c, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "cmdline"))
+	if err != nil {
+		return nil, err
+	}
+
+	ret := strings.FieldsFunc(string(c), func(r rune) bool {
+		return r == '\u0000'
+	})
+
+	return ret, nil
+}
+
+// GetProcessLifeTime returns the life time of the specified pid in seconds.
+func GetProcessLifeTime(pid int) (time.Duration, error) {
+	sysinfo := syscall.Sysinfo_t{}
+	if err := syscall.Sysinfo(&sysinfo); err != nil {
+		return 0, err
+	}
+
+	c, err := os.ReadFile(filepath.Join("/proc", fmt.Sprintf("%d", pid), "stat"))
+	if err != nil {
+		return 0, err
+	}
+
+	fields := strings.Fields(string(c))
+	ticks, err := strconv.ParseInt(fields[21], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	t := int64(sysinfo.Uptime) - ticks/SC_CLK_TCK
+
+	return time.Duration(t) * time.Second, err
+}
+
+// GetProcessCreatedTime returns the creation time of the specified pid in seconds.
+func GetProcessCreateTime(pid int) (*time.Time, error) {
+	lifeTime, err := GetProcessLifeTime(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	createTime := time.Now().Add(-lifeTime)
+
+	return &createTime, nil
+}

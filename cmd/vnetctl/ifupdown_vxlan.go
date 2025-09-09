@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	pb "github.com/0xef53/kvmrun/api/services/network/v1"
+	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
 )
 
 type vxlanSchemeOptions struct {
@@ -17,11 +17,11 @@ type vxlanScheme struct {
 	opts     *vxlanSchemeOptions
 }
 
-func (sc *vxlanScheme) Configure(client pb.NetworkServiceClient, secondStage bool) error {
-	req := pb.ConfigureRequest{
+func (sc *vxlanScheme) Configure(client pb_network.NetworkServiceClient, secondStage bool) error {
+	req := pb_network.ConfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.ConfigureRequest_Vxlan{
-			Vxlan: &pb.ConfigureRequest_VxlanAttrs{
+		Attrs: &pb_network.ConfigureRequest_Vxlan{
+			Vxlan: &pb_network.ConfigureRequest_VxlanAttrs{
 				VNI:           sc.opts.VNI,
 				MTU:           sc.opts.MTU,
 				BindInterface: sc.opts.BindInterface,
@@ -39,11 +39,11 @@ func (sc *vxlanScheme) Configure(client pb.NetworkServiceClient, secondStage boo
 	return nil
 }
 
-func (sc *vxlanScheme) Deconfigure(client pb.NetworkServiceClient) error {
-	req := pb.DeconfigureRequest{
+func (sc *vxlanScheme) Deconfigure(client pb_network.NetworkServiceClient) error {
+	req := pb_network.DeconfigureRequest{
 		LinkName: sc.linkname,
-		Attrs: &pb.DeconfigureRequest_Vxlan{
-			Vxlan: &pb.DeconfigureRequest_VxlanAttrs{
+		Attrs: &pb_network.DeconfigureRequest_Vxlan{
+			Vxlan: &pb_network.DeconfigureRequest_VxlanAttrs{
 				VNI: sc.opts.VNI,
 			},
 		},

@@ -3,14 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 
-	pb "github.com/0xef53/kvmrun/api/services/system/v1"
-	"github.com/0xef53/kvmrun/internal/grpcclient"
+	"github.com/0xef53/kvmrun/internal/appconf"
 	"github.com/0xef53/kvmrun/kvmrun"
+
+	pb_system "github.com/0xef53/kvmrun/api/services/system/v2"
+
+	grpcclient "github.com/0xef53/go-grpc/client"
+
+	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	logger := logrus.New()
+
+	logger.SetOutput(io.Discard)
+
+	grpcclient.SetLogger(logrus.NewEntry(logger))
+}
 
 var (
 	Info  = log.New(os.Stdout, "", 0)
@@ -70,33 +84,23 @@ func run() error {
 type launcher struct {
 	ctx    context.Context
 	vmname string
-	client pb.SystemServiceClient
+	client pb_system.SystemServiceClient
 }
 
 func newLauncher(vmname string) (*launcher, error) {
-	// Unix socket client
-	conn, err := grpcclient.NewConn("unix:@/run/kvmrund.sock", nil, true)
+	appConf, err := appconf.NewClientConfig(filepath.Join(kvmrun.CONFDIR, "kvmrun.ini"))
 	if err != nil {
-		return nil, fmt.Errorf("grpc dial error: %s", err)
+		return nil, err
+	}
+
+	conn, err := grpcclient.NewSecureConnection("unix:@/run/kvmrund.sock", appConf.TLSConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	return &launcher{
 		ctx:    context.Background(),
 		vmname: vmname,
-		client: pb.NewSystemServiceClient(conn),
+		client: pb_system.NewSystemServiceClient(conn),
 	}, nil
-}
-
-type NonFatalError struct {
-	msg string
-}
-
-func (e *NonFatalError) Error() string {
-	return e.msg
-}
-
-func IsNonFatalError(err error) bool {
-	_, ok := err.(*NonFatalError)
-
-	return ok
 }

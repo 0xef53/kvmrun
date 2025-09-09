@@ -113,6 +113,7 @@ func (m *Manager) StartAndTest(unitname string, interval time.Duration, ch chan<
 			case "active":
 				if unit.SubState == "running" {
 					lastStateChangeTime = unit.StateChangeTime
+
 					return nil
 				}
 			case "failed":
@@ -128,8 +129,6 @@ func (m *Manager) StartAndTest(unitname string, interval time.Duration, ch chan<
 				}
 			}
 		}
-
-		return nil
 	}
 
 	test := func() error {
@@ -166,8 +165,6 @@ func (m *Manager) StartAndTest(unitname string, interval time.Duration, ch chan<
 				return fmt.Errorf("the main process is crashed")
 			}
 		}
-
-		return nil
 	}
 
 	if err := waitActivation(); err != nil {

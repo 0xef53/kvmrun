@@ -1,26 +1,45 @@
 package services
 
 import (
-	"sync"
+	"fmt"
 
-	"github.com/0xef53/kvmrun/internal/grpcserver"
+	"github.com/0xef53/kvmrun/server"
+	"github.com/0xef53/kvmrun/server/cloudinit"
+	"github.com/0xef53/kvmrun/server/hardware"
+	"github.com/0xef53/kvmrun/server/machine"
+	"github.com/0xef53/kvmrun/server/network"
+	"github.com/0xef53/kvmrun/server/system"
+
+	grpcserver "github.com/0xef53/go-grpc/server"
 )
 
-var pool = struct {
-	sync.Mutex
-	services []grpcserver.Registration
-}{}
+type ServiceServer struct {
+	*server.Server
 
-func Register(s grpcserver.Registration) {
-	pool.Lock()
-	defer pool.Unlock()
-
-	pool.services = append(pool.services, s)
+	Machine   *machine.Server
+	System    *system.Server
+	Network   *network.Server
+	Hardware  *hardware.Server
+	CloudInit *cloudinit.Server
 }
 
-func Services() []grpcserver.Registration {
-	pool.Lock()
-	defer pool.Unlock()
+func NewServiceServer(base *server.Server) (*ServiceServer, error) {
+	h := &ServiceServer{
+		Server:    base,
+		Machine:   &machine.Server{Server: base},
+		System:    &system.Server{Server: base},
+		Network:   &network.Server{Server: base},
+		Hardware:  &hardware.Server{Server: base},
+		CloudInit: &cloudinit.Server{Server: base},
+	}
 
-	return pool.services
+	for _, s := range grpcserver.Services("kvmrun") {
+		if x, ok := s.(interface{ Init(*ServiceServer) }); ok {
+			x.Init(h)
+		} else {
+			return nil, fmt.Errorf("invalid 'kvmrun' interface: %T", s)
+		}
+	}
+
+	return h, nil
 }

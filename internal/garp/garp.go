@@ -159,9 +159,7 @@ func send(ctx context.Context, iface *net.Interface, msg *arpMessage, count, int
 
 	target := msg.TargetHardwareAddr
 
-	for i := 0; i < len(target); i++ {
-		ll.Addr[i] = target[i]
-	}
+	copy(ll.Addr[:], target)
 
 	b, err := msg.Bytes()
 	if err != nil {
