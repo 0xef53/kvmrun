@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,8 +15,10 @@ var (
 	ErrPoolClosed = errors.New("pool is closed")
 )
 
+// TaskOption represents a generic option that can be passed when starting a new task.
 type TaskOption interface{}
 
+// Pool manages a collection of concurrent tasks, providing thread-safe operations on them.
 type Pool struct {
 	mu    sync.Mutex
 	table map[string]Task
@@ -30,6 +31,7 @@ type Pool struct {
 	isClosed bool
 }
 
+// NewPool returns a new instance of a task pool.
 func NewPool() *Pool {
 	return &Pool{
 		table:      make(map[string]Task),
@@ -37,6 +39,8 @@ func NewPool() *Pool {
 	}
 }
 
+// SetReporter sets the given Reporter instance as the main reporter.
+// This reporter will receive task status and progress updates.
 func (p *Pool) SetReporter(r Reporter) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -44,6 +48,7 @@ func (p *Pool) SetReporter(r Reporter) {
 	p.reporter = r
 }
 
+// sendReport sends the current status of the given task to the main reporter (if it set).
 func (p *Pool) sendReport(ctx context.Context, t Task) {
 	if p.reporter == nil {
 		return
@@ -52,6 +57,12 @@ func (p *Pool) sendReport(ctx context.Context, t Task) {
 	p.reporter.Send(ctx, t.Stat())
 }
 
+// RegisterClassifier registers a new TaskClassifier under one or more names.
+// If multiple names are specified, the first one will be the primary one,
+// and the rest will be aliases.
+// If no names are provided, a default name is generated based on the classifier's type.
+//
+// Returns the registered names or an error if registration fails.
 func (p *Pool) RegisterClassifier(c TaskClassifier, names ...string) ([]string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -59,6 +70,15 @@ func (p *Pool) RegisterClassifier(c TaskClassifier, names ...string) ([]string, 
 	return p.classifier.Register(c, names...)
 }
 
+// StartTask initializes and starts the provided Task with optional configuration options.
+// It performs concurrency checks, assigns classification labels, and runs the task asynchronously.
+// Parameters:
+//   - ctx: context for cancellation and deadlines
+//   - t: the Task to start
+//   - resp: optional response structure passed to the task's BeforeStart hook
+//   - opts: optional TaskOption values for additional configuration
+//
+// Returns the task ID or an error if starting fails.
 func (p *Pool) StartTask(ctx context.Context, t Task, resp interface{}, opts ...TaskOption) (string, error) {
 	err := func() error {
 		if p.isClosed {
@@ -203,6 +223,9 @@ func (p *Pool) StartTask(ctx context.Context, t Task, resp interface{}, opts ...
 	return t.ID(), nil
 }
 
+// Stat returns the current status (ID, progress, state, any error information)
+// of the task identified by tid.
+// Returns nil if the task is not found in the pool.
 func (p *Pool) Stat(tid string) *TaskStat {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -214,6 +237,7 @@ func (p *Pool) Stat(tid string) *TaskStat {
 	return nil
 }
 
+// StatByLabel retrieves statistics for all tasks matching the specified classification labels.
 func (p *Pool) StatByLabel(labels ...string) []*TaskStat {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -231,6 +255,8 @@ func (p *Pool) StatByLabel(labels ...string) []*TaskStat {
 	return stats
 }
 
+// Metadata returns user-defined metadata associated with the task identified by tid.
+// Returns nil if the task is not found.
 func (p *Pool) Metadata(tid string) interface{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -242,6 +268,7 @@ func (p *Pool) Metadata(tid string) interface{} {
 	return nil
 }
 
+// MetadataByLabel returns metadata for all tasks matching the specified classification labels.
 func (p *Pool) MetadataByLabel(labels ...string) []interface{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -259,6 +286,8 @@ func (p *Pool) MetadataByLabel(labels ...string) []interface{} {
 	return data
 }
 
+// Err returns the error associated with the task identified by tid, if any.
+// Returns nil if the task is not found or has no error.
 func (p *Pool) Err(tid string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -270,6 +299,7 @@ func (p *Pool) Err(tid string) error {
 	return nil
 }
 
+// Cancel cancels the task identified by tid if it exists in the pool.
 func (p *Pool) Cancel(tid string) {
 	t := func() Task {
 		p.mu.Lock()
@@ -287,6 +317,7 @@ func (p *Pool) Cancel(tid string) {
 	}
 }
 
+// CancelByLabel cancels all tasks matching the specified classification labels.
 func (p *Pool) CancelByLabel(labels ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -300,6 +331,8 @@ func (p *Pool) CancelByLabel(labels ...string) {
 	}
 }
 
+// Wait blocks until the task identified by tid is released (completed or cancelled or failed),
+// if it exists in the pool.
 func (p *Pool) Wait(tid string) {
 	t := func() Task {
 		p.mu.Lock()
@@ -315,6 +348,7 @@ func (p *Pool) Wait(tid string) {
 	}
 }
 
+// List returns a slice of all task IDs currently managed by the pool.
 func (p *Pool) List() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -328,12 +362,18 @@ func (p *Pool) List() []string {
 	return tasks
 }
 
+// WaitAndClosePool waits for all running tasks to complete and marks the pool as closed,
+// preventing new tasks from being started.
 func (p *Pool) WaitAndClosePool() {
 	p.wg.Wait()
 
 	p.isClosed = true
 }
 
+// RunFunc creates and starts a function-based task with the specified target and options.
+// If wait is true, it blocks until the task completes.
+//
+// Returns the task ID and any error encountered during execution.
 func (p *Pool) RunFunc(ctx context.Context, tgt map[string]OperationMode, wait bool, opts []TaskOption, fn func(*log.Entry) error) (string, error) {
 	task := FuncTask{new(GenericTask), tgt, fn}
 
@@ -347,13 +387,4 @@ func (p *Pool) RunFunc(ctx context.Context, tgt map[string]OperationMode, wait b
 	}
 
 	return tid, task.Err()
-}
-
-func GetShortID(tid string) (string, error) {
-	uuid, err := uuid.Parse(tid)
-	if err != nil {
-		return "", fmt.Errorf("broken UUID: %w", err)
-	}
-
-	return strings.Split(uuid.String(), "-")[0], nil
 }

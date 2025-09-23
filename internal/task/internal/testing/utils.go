@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+// FormatResultString returns a formatted string highlighting the discrepancy
+// between the expected value and the received value.
+//
+// Parameters:
+//   - want: the expected value
+//   - got:  the actual value received
+//   - name: optional variadic string slice representing test or context names
 func FormatResultString(want, got interface{}, name ...string) string {
 	lines := make([]string, 0, 3)
 

@@ -7,14 +7,17 @@ import (
 	"sync"
 )
 
+// UniqueLabelOptions contains properties of the unique label classifier.
 type UniqueLabelOptions struct {
 	Label string
 }
 
+// GetLabel returns the unique label for a new task.
 func (o *UniqueLabelOptions) GetLabel() string {
 	return o.Label
 }
 
+// Validate normalizes and validates the classifier options.
 func (o *UniqueLabelOptions) Validate() error {
 	o.Label = strings.ToLower(strings.TrimSpace(o.Label))
 
@@ -25,17 +28,21 @@ func (o *UniqueLabelOptions) Validate() error {
 	return nil
 }
 
+// UniqueLabelClassifier is designed to store one-to-one mapping between
+// unique labels and task IDs.
 type UniqueLabelClassifier struct {
 	mu    sync.Mutex
 	items map[string]string
 }
 
+// NewUniqueLabelClassifier returns a new UniqueLabelClassifier instance.
 func NewUniqueLabelClassifier() *UniqueLabelClassifier {
 	return &UniqueLabelClassifier{
 		items: make(map[string]string),
 	}
 }
 
+// Assign associates the given task ID (tid) with the unique label specified in opts.
 func (c *UniqueLabelClassifier) Assign(ctx context.Context, opts Options, tid string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -63,6 +70,7 @@ func (c *UniqueLabelClassifier) Assign(ctx context.Context, opts Options, tid st
 	return nil
 }
 
+// Unassign removes the task entry from the table.
 func (c *UniqueLabelClassifier) Unassign(tid string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -80,6 +88,7 @@ func (c *UniqueLabelClassifier) Unassign(tid string) {
 	}
 }
 
+// Get returns a slice of task IDs assigned to the classifier.
 func (c *UniqueLabelClassifier) Get(labels ...string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -95,6 +104,7 @@ func (c *UniqueLabelClassifier) Get(labels ...string) []string {
 	return tids
 }
 
+// Len returns the number of entries in the classifier table.
 func (c *UniqueLabelClassifier) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()

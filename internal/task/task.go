@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xef53/kvmrun/internal/task/metadata"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,8 +20,28 @@ var (
 	ErrUninterruptibleTask = errors.New("unable to cancel uninterruptible process")
 )
 
+// OperationMode defines bit flags representing different operation modes
+// or actions that can be applied to a target or component within a task.
+//
+// Example:
+//
+//	modeChangePropertyName OperationMode = 1 << (16 - 1 - iota)
+//	modeChangePropertyDiskName
+//	modeChangePropertyDiskSize
+//	modeChangePropertyNetName
+//	modeChangePropertyNetLink
+//	modePowerUp
+//	modePowerDown
+//	modePowerCycle
+//
+//	modeAny                = ^OperationMode(0)
+//	modeChangePropertyDisk = modeChangePropertyDiskName | modeChangePropertyDiskSize
+//	modeChangePropertyNet  = modeChangePropertyNetName | modeChangePropertyNetLink
+//	modeChangeProperties   = modeChangePropertyDisk | modeChangePropertyNet
+//	modePowerManagement    = modePowerUp | modePowerDown | modePowerCycle
 type OperationMode uint32
 
+// Task defines the interface for asynchronous task.
 type Task interface {
 	Main() error
 
@@ -48,7 +69,33 @@ type Task interface {
 	Metadata() interface{}
 }
 
-// It's an implementation of a generic task
+type taskInfoKey struct{}
+
+type taskInfo struct {
+	TaskID      string    `json:"task_id"`
+	TaskShortID string    `json:"task_short_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// InfoFromContext returns the task info from ctx.
+func InfoFromContext(ctx context.Context) (*taskInfo, bool) {
+	if a := ctx.Value(taskInfoKey{}); a != nil {
+		if v, ok := a.(*taskInfo); ok {
+			return v, true
+		}
+	}
+
+	return nil, false
+}
+
+// GenericTask is a thread-safe implementation of a generic task.
+//
+// This struct is designed to be embedded in custom task types to leverage
+// common fields and methods.
+//
+// Example:
+//
+//	...
 type GenericTask struct {
 	sync.Mutex
 
@@ -70,6 +117,10 @@ type GenericTask struct {
 	err error
 }
 
+// Function initializes the task instance with the provided context, task ID
+// and progress channel.
+//
+// It panics if the given progress channel is unbuffered.
 func (t *GenericTask) init(ctx context.Context, id string, progressCh chan<- int) {
 	t.Lock()
 	defer t.Unlock()
@@ -80,21 +131,20 @@ func (t *GenericTask) init(ctx context.Context, id string, progressCh chan<- int
 
 	t.id = id
 
-	//ctx = context.WithValue(ctx, "task-id", id)
-	//ctx = context.WithValue(ctx, "task-short-id", t.shortID())
+	t.createdAt = time.Now()
+	t.modifiedAt = t.createdAt
+
+	ctx = context.WithValue(ctx, taskInfoKey{}, &taskInfo{
+		TaskID:      id,
+		TaskShortID: t.shortID(),
+		CreatedAt:   t.createdAt,
+	})
 
 	t.ctx, t.cancel = context.WithCancel(ctx)
 
 	t.released = make(chan struct{})
 
 	t.Logger = log.WithField("task-id", t.shortID())
-
-	//if v := ctx.Value("request-id"); v != nil {
-	//	t.Logger = t.Logger.WithField("request-id", v.(string))
-	//}
-
-	t.createdAt = time.Now()
-	t.modifiedAt = t.createdAt
 
 	t.progressCh = progressCh
 }
@@ -124,22 +174,44 @@ func (t *GenericTask) release(err error) {
 	close(t.released)
 }
 
-func (t *GenericTask) BeforeStart(a interface{}) error {
+// BeforeStart is a hook called before the task starts.
+// It should be overridden to perform any setup or validation.
+//
+// By default, it does nothing and returns nil.
+//
+// Example:
+//
+//	...
+func (t *GenericTask) BeforeStart(_ interface{}) error {
 	return nil
 }
 
+// OnSuccess is a hook called after successful task completion.
+// It can be overridden to perform any post-processing.
+//
+// By default, it does nothing and returns nil.
 func (t *GenericTask) OnSuccess() error {
 	return nil
 }
 
+// OnFailure is a hook called after task failure with the encountered error.
+// It can be overridden to handle failure scenarios. For example, to call
+// the clean-up code.
+//
+// By default, it does nothing.
 func (t *GenericTask) OnFailure(_ error) {
 	// return
 }
 
+// Wait blocks until the task is released, i.e., completed or cancelled or failed.
 func (t *GenericTask) Wait() {
 	<-t.released
 }
 
+// Cancel attempts to cancel the running task by invoking its cancel function.
+// Returns ErrTaskNotRunning if the task is not currently running.
+//
+// Sets the task error to ErrTaskInterrupted to indicate manual cancellation.
 func (t *GenericTask) Cancel() error {
 	t.Lock()
 	defer t.Unlock()
@@ -156,22 +228,27 @@ func (t *GenericTask) Cancel() error {
 	return nil
 }
 
+// IsRunning returns true if the task is currently running.
 func (t *GenericTask) IsRunning() bool {
 	return t.Stat().State == StateRunning
 }
 
+// IsCompleted returns true if the task has completed successfully.
 func (t *GenericTask) IsCompleted() bool {
 	return t.Stat().State == StateCompleted
 }
 
+// IsFailed returns true if the task has completed with a failure.
 func (t *GenericTask) IsFailed() bool {
 	return t.Stat().State == StateFailed
 }
 
+// IsInterrupted returns true if the task was interrupted (manually cancelled).
 func (t *GenericTask) IsInterrupted() bool {
 	return t.Stat().Interrupted
 }
 
+// Err returns the error associated with the task, if any.
 func (t *GenericTask) Err() error {
 	t.Lock()
 	defer t.Unlock()
@@ -179,6 +256,10 @@ func (t *GenericTask) Err() error {
 	return t.err
 }
 
+// Stat returns the current status of the task, including ID, progress,
+// state, and any error information.
+//
+// It is safe for concurrent use.
 func (t *GenericTask) Stat() *TaskStat {
 	t.Lock()
 	defer t.Unlock()
@@ -216,6 +297,8 @@ func (t *GenericTask) Stat() *TaskStat {
 	return &st
 }
 
+// Metadata returns user-defined data extracted from the task's context.
+// Returns nil if no metadata is found.
 func (t *GenericTask) Metadata() interface{} {
 	md, ok := metadata.FromContext(t.ctx)
 	if ok {
@@ -225,6 +308,7 @@ func (t *GenericTask) Metadata() interface{} {
 	return nil
 }
 
+// SetProgress updates the progress value and sends it to the progress channel (if available).
 func (t *GenericTask) SetProgress(v int) {
 	t.Lock()
 	defer t.Unlock()
@@ -242,6 +326,7 @@ func (t *GenericTask) SetProgress(v int) {
 	}
 }
 
+// Ctx returns the context associated with the task.
 func (t *GenericTask) Ctx() context.Context {
 	t.Lock()
 	defer t.Unlock()
@@ -249,6 +334,7 @@ func (t *GenericTask) Ctx() context.Context {
 	return t.ctx
 }
 
+// ID returns the full task ID.
 func (t *GenericTask) ID() string {
 	t.Lock()
 	defer t.Unlock()
@@ -257,9 +343,16 @@ func (t *GenericTask) ID() string {
 }
 
 func (t *GenericTask) shortID() string {
-	return strings.Split(t.id, "-")[0]
+	if err := uuid.Validate(t.id); err == nil {
+		return strings.Split(t.id, "-")[0]
+	}
+
+	return t.id
 }
 
+// ShortID returns a short version of the task ID.
+// If the task ID is a valid UUID, it returns the prefix before the first hyphen.
+// Otherwise, it returns the full task ID as is.
 func (t *GenericTask) ShortID() string {
 	t.Lock()
 	defer t.Unlock()
@@ -267,6 +360,7 @@ func (t *GenericTask) ShortID() string {
 	return t.shortID()
 }
 
+// CreationTime returns the time when the task was created.
 func (t *GenericTask) CreationTime() time.Time {
 	t.Lock()
 	defer t.Unlock()
@@ -274,6 +368,10 @@ func (t *GenericTask) CreationTime() time.Time {
 	return t.createdAt
 }
 
+// ModifiedTime returns the time of the last task state or progress update.
+// This value is refreshed whenever the task status or progress changes.
+//
+// It is safe for concurrent use.
 func (t *GenericTask) ModifiedTime() time.Time {
 	t.Lock()
 	defer t.Unlock()
@@ -281,15 +379,24 @@ func (t *GenericTask) ModifiedTime() time.Time {
 	return t.modifiedAt
 }
 
+// Targets returns a map of target names to their blocking modes for the task.
+//
+// By default, it returns nil and should be overridden if any locks are needed
+// during the execution.
 func (t *GenericTask) Targets() map[string]OperationMode {
 	return nil
 }
 
+// ConcurrentRunningError represents an error indicating that there is
+// an existing task in the pool whose targets partially or completely
+// match the new one.
 type ConcurrentRunningError struct {
 	Name    string
 	Targets map[string]OperationMode
 }
 
+// Error implements the error interface for ConcurrentRunningError.
+// It returns a formatted error message including the task name and a list of target objects.
 func (e *ConcurrentRunningError) Error() string {
 	objects := make([]string, 0, len(e.Targets))
 
@@ -304,9 +411,11 @@ func (e *ConcurrentRunningError) Error() string {
 	return fmt.Sprintf("concurrent process is already running: task = %s, objects = %q", basename, objects)
 }
 
+// IsConcurrentRunningError checks if the given error is of type ConcurrentRunningError.
 func IsConcurrentRunningError(err error) bool {
 	if _, ok := err.(*ConcurrentRunningError); ok {
 		return true
 	}
+
 	return false
 }

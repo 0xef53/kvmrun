@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TaskClassifier defines the interface for managing task classification.
 type TaskClassifier interface {
 	Assign(context.Context, classifiers.Options, string) error
 	Unassign(string)
@@ -18,11 +19,13 @@ type TaskClassifier interface {
 	Len() int
 }
 
+// TaskClassifierDefinition represents the configuration of a classifier for a specific task.
 type TaskClassifierDefinition struct {
 	Name string
 	Opts classifiers.Options
 }
 
+// Validate checks the TaskClassifierDefinition for correctness.
 func (o *TaskClassifierDefinition) Validate() error {
 	o.Name = strings.TrimSpace(o.Name)
 
@@ -37,12 +40,14 @@ func (o *TaskClassifierDefinition) Validate() error {
 	return nil
 }
 
+// rootClassifier manages a set of TaskClassifier instances.
 type rootClassifier struct {
 	mu      sync.Mutex
 	table   map[string]TaskClassifier
 	aliases map[string]string
 }
 
+// newRootClassifier returns a new rootClassifier instance.
 func newRootClassifier() *rootClassifier {
 	return &rootClassifier{
 		table:   make(map[string]TaskClassifier),
@@ -50,6 +55,13 @@ func newRootClassifier() *rootClassifier {
 	}
 }
 
+// Register registers a TaskClassifier instance under one or more names.
+// If multiple names are specified, the first one will be the primary one,
+// and the rest will be aliases.
+// If no names are provided, a default name is generated based on the classifier's type.
+//
+// Returns the list of registered names or an error if any name already exists
+// or the classifier is nil.
 func (r *rootClassifier) Register(c TaskClassifier, names ...string) ([]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -81,6 +93,7 @@ func (r *rootClassifier) Register(c TaskClassifier, names ...string) ([]string, 
 	return names, nil
 }
 
+// Deregister removes the TaskClassifier and all associated aliases from the list.
 func (r *rootClassifier) Deregister(name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -108,6 +121,7 @@ func (r *rootClassifier) Deregister(name string) error {
 	return nil
 }
 
+// Assign associates a task identified by tid with a classifier defined by def.
 func (r *rootClassifier) Assign(ctx context.Context, def *TaskClassifierDefinition, tid string) error {
 	if err := def.Validate(); err != nil {
 		return fmt.Errorf("cannot assign: %w", err)
@@ -126,6 +140,7 @@ func (r *rootClassifier) Assign(ctx context.Context, def *TaskClassifierDefiniti
 	return fmt.Errorf("cannot assign: classifier not found: %s", def.Name)
 }
 
+// Unassign removes the association for the task identified by tid from all registered classifiers.
 func (r *rootClassifier) Unassign(tid string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -135,6 +150,8 @@ func (r *rootClassifier) Unassign(tid string) {
 	}
 }
 
+// Get returns a slice of task IDs from all registered classifiers
+// that match the provided labels.
 func (r *rootClassifier) Get(labels ...string) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()

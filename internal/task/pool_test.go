@@ -33,21 +33,21 @@ const (
 type poolTest_dummyTask struct {
 	*GenericTask
 
-	id      string
-	timeout time.Duration
+	targets map[string]OperationMode
 
-	ops map[string]OperationMode
+	id       string
+	lifetime time.Duration
 
 	SleepBeforeStart        bool
 	FailBeforeStartFunction bool
 	FailOnSuccessFunction   bool
 }
 
-func (t *poolTest_dummyTask) Targets() map[string]OperationMode { return t.ops }
+func (t *poolTest_dummyTask) Targets() map[string]OperationMode { return t.targets }
 
 func (t *poolTest_dummyTask) BeforeStart(a interface{}) error {
 	if t.SleepBeforeStart {
-		time.Sleep(t.timeout * time.Second)
+		time.Sleep(t.lifetime * time.Second)
 	}
 
 	if t.FailBeforeStartFunction {
@@ -66,11 +66,11 @@ func (t *poolTest_dummyTask) OnSuccess() error {
 }
 
 func (t *poolTest_dummyTask) Main() error {
-	if t.timeout > 0 {
+	if t.lifetime > 0 {
 		select {
 		case <-t.ctx.Done():
 			return t.ctx.Err()
-		case <-time.After(t.timeout * time.Second):
+		case <-time.After(t.lifetime * time.Second):
 		}
 	}
 
@@ -96,10 +96,18 @@ func poolTest_Format(want, got interface{}, tgt poolTest_target) string {
 func TestConcurrentTasks(t *testing.T) {
 	pool := NewPool()
 
-	tryStart := func(tgt poolTest_target, timeout time.Duration, mustOK bool) {
+	tryStart := func(tgt poolTest_target, lifetime time.Duration, mustOK bool) {
 		tid := strconv.FormatUint(uint64(rand.Uint32()), 16)
 
-		task := poolTest_dummyTask{new(GenericTask), tid, timeout, tgt, false, false, false}
+		task := poolTest_dummyTask{
+			GenericTask:             new(GenericTask),
+			targets:                 tgt,
+			id:                      tid,
+			lifetime:                lifetime,
+			SleepBeforeStart:        false,
+			FailBeforeStartFunction: false,
+			FailOnSuccessFunction:   false,
+		}
 
 		_, err := pool.StartTask(context.Background(), &task, nil)
 
@@ -171,7 +179,15 @@ func TestTaskWaiting(t *testing.T) {
 	tgt := poolTest_target{"machine_eve": modeAny}
 
 	for i := 0; i < 2; i++ {
-		task := poolTest_dummyTask{new(GenericTask), "1234567890", 3, tgt, true, false, false}
+		task := poolTest_dummyTask{
+			GenericTask:             new(GenericTask),
+			targets:                 tgt,
+			id:                      "id-1234567890",
+			lifetime:                3,
+			SleepBeforeStart:        true,
+			FailBeforeStartFunction: false,
+			FailOnSuccessFunction:   false,
+		}
 
 		tid, err := pool.StartTask(context.Background(), &task, nil)
 		if err != nil {
@@ -190,7 +206,15 @@ func TestTaskContextCanceling(t *testing.T) {
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 	defer cancel()
 
-	task := poolTest_dummyTask{new(GenericTask), "1234567890", 3, tgt, false, false, false}
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		targets:                 tgt,
+		id:                      "id-1234567890",
+		lifetime:                3,
+		SleepBeforeStart:        false,
+		FailBeforeStartFunction: false,
+		FailOnSuccessFunction:   false,
+	}
 
 	tid, err := pool.StartTask(ctx, &task, nil)
 	if err != nil {
@@ -209,7 +233,15 @@ func TestTaskCanceling(t *testing.T) {
 
 	tgt := poolTest_target{"machine_frank": modeAny}
 
-	task := poolTest_dummyTask{new(GenericTask), "1234567890", 4, tgt, false, false, false}
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		targets:                 tgt,
+		id:                      "id-1234567890",
+		lifetime:                4,
+		SleepBeforeStart:        false,
+		FailBeforeStartFunction: false,
+		FailOnSuccessFunction:   false,
+	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
@@ -234,7 +266,15 @@ func TestBeforeStartFunctionFailure(t *testing.T) {
 
 	tgt := poolTest_target{"machine_grace": modeAny}
 
-	task := poolTest_dummyTask{new(GenericTask), "1234567890", 0, tgt, true, true, false}
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		targets:                 tgt,
+		id:                      "id-1234567890",
+		lifetime:                0,
+		SleepBeforeStart:        true,
+		FailBeforeStartFunction: true,
+		FailOnSuccessFunction:   false,
+	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 
@@ -250,7 +290,15 @@ func TestOnSuccessFunctionFailure(t *testing.T) {
 
 	tgt := poolTest_target{"machine_grace": modeAny}
 
-	task := poolTest_dummyTask{new(GenericTask), "1234567890", 0, tgt, false, false, true}
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		targets:                 tgt,
+		id:                      "id-1234567890",
+		lifetime:                0,
+		SleepBeforeStart:        false,
+		FailBeforeStartFunction: false,
+		FailOnSuccessFunction:   true,
+	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
@@ -272,13 +320,13 @@ func TestPoolClosing(t *testing.T) {
 		_, err := pool.StartTask(
 			context.Background(),
 			&poolTest_dummyTask{
-				new(GenericTask),
-				"id" + strconv.Itoa(idx),
-				time.Duration(rand.Intn(5)),
-				tgt,
-				false,
-				false,
-				false,
+				GenericTask:             new(GenericTask),
+				targets:                 tgt,
+				id:                      "id-" + strconv.Itoa(idx),
+				lifetime:                time.Duration(rand.Intn(5)),
+				SleepBeforeStart:        false,
+				FailBeforeStartFunction: false,
+				FailOnSuccessFunction:   false,
 			},
 			nil,
 		)
@@ -309,3 +357,69 @@ func TestPoolClosing(t *testing.T) {
 		t.Fatal(poolTest_Format(ErrPoolClosed, err, tgt))
 	}
 }
+
+func TestTaskInfoExtracting(t *testing.T) {
+	pool := NewPool()
+
+	tgt := poolTest_target{"machine_alice": modeAny}
+
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		id:                      "1234567890",
+		targets:                 tgt,
+		lifetime:                1,
+		SleepBeforeStart:        true,
+		FailBeforeStartFunction: false,
+		FailOnSuccessFunction:   false,
+	}
+
+	tid, err := pool.StartTask(context.Background(), &task, nil)
+	if err != nil {
+		t.Fatal(poolTest_Format(nil, err, tgt))
+	}
+
+	info, ok := InfoFromContext(task.Ctx())
+	if info == nil {
+		t.Fatal(poolTest_Format(true, ok, tgt))
+	}
+
+	pool.Wait(tid)
+}
+
+func TestTaskMetadata(t *testing.T) { // TODO
+	pool := NewPool()
+
+	tgt := poolTest_target{"machine_alice": modeAny}
+
+	task := poolTest_dummyTask{
+		GenericTask:             new(GenericTask),
+		id:                      "1234567890",
+		targets:                 tgt,
+		lifetime:                1,
+		SleepBeforeStart:        true,
+		FailBeforeStartFunction: false,
+		FailOnSuccessFunction:   false,
+	}
+
+	tid, err := pool.StartTask(context.Background(), &task, nil)
+	if err != nil {
+		t.Fatal(poolTest_Format(nil, err, tgt))
+	}
+
+	info, ok := InfoFromContext(task.Ctx())
+	if info == nil {
+		t.Fatal(poolTest_Format(true, ok, tgt))
+	}
+
+	pool.Wait(tid)
+}
+
+// Регистрация классификатора по десколькими именами
+// * попрбобовать также повторно зарегистрировать
+// * регистрация таски в нормальном существующем
+// * регситрация в несуществующем
+
+// Дерегистрация классификатора
+// * попробовать также удалить повторно
+// * регистрация таски в несуществующем
+// * удаление классификатора с таской

@@ -7,14 +7,17 @@ import (
 	"sync"
 )
 
+// GroupLabelOptions contains properties of the group label classifier.
 type GroupLabelOptions struct {
 	Label string
 }
 
+// GetLabel returns the label associated with the group.
 func (o *GroupLabelOptions) GetLabel() string {
 	return o.Label
 }
 
+// Validate normalizes and validates the classifier options.
 func (o *GroupLabelOptions) Validate() error {
 	o.Label = strings.ToLower(strings.TrimSpace(o.Label))
 
@@ -25,17 +28,20 @@ func (o *GroupLabelOptions) Validate() error {
 	return nil
 }
 
+// GroupLabelClassifier is designed to store tasks with the same group label.
 type GroupLabelClassifier struct {
 	mu    sync.Mutex
 	items map[string]map[string]struct{}
 }
 
+// NewGroupLabelClassifier returns a new GroupLabelClassifier instance.
 func NewGroupLabelClassifier() *GroupLabelClassifier {
 	return &GroupLabelClassifier{
 		items: make(map[string]map[string]struct{}),
 	}
 }
 
+// Assign adds the specified task ID to the table if the task label matches the group label.
 func (c *GroupLabelClassifier) Assign(ctx context.Context, opts Options, tid string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -61,13 +67,14 @@ func (c *GroupLabelClassifier) Assign(ctx context.Context, opts Options, tid str
 		group[tid] = struct{}{}
 	} else {
 		c.items[opts.GetLabel()] = map[string]struct{}{
-			tid: struct{}{},
+			tid: {},
 		}
 	}
 
 	return nil
 }
 
+// Unassign removes the task entry from the table.
 func (c *GroupLabelClassifier) Unassign(tid string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -87,6 +94,7 @@ func (c *GroupLabelClassifier) Unassign(tid string) {
 	}
 }
 
+// Get returns a slice of task IDs assigned to the classifier.
 func (c *GroupLabelClassifier) Get(labels ...string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -104,6 +112,7 @@ func (c *GroupLabelClassifier) Get(labels ...string) []string {
 	return tids
 }
 
+// Len returns the number of entries in the classifier table.
 func (c *GroupLabelClassifier) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
