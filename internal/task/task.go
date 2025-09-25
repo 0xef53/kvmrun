@@ -25,7 +25,7 @@ var (
 //
 // Example:
 //
-//	modeChangePropertyName OperationMode = 1 << (16 - 1 - iota)
+//	modeChangePropertyName task.OperationMode = 1 << (16 - 1 - iota)
 //	modeChangePropertyDiskName
 //	modeChangePropertyDiskSize
 //	modeChangePropertyNetName
@@ -34,7 +34,7 @@ var (
 //	modePowerDown
 //	modePowerCycle
 //
-//	modeAny                = ^OperationMode(0)
+//	modeAny                = ^task.OperationMode(0)
 //	modeChangePropertyDisk = modeChangePropertyDiskName | modeChangePropertyDiskSize
 //	modeChangePropertyNet  = modeChangePropertyNetName | modeChangePropertyNetLink
 //	modeChangeProperties   = modeChangePropertyDisk | modeChangePropertyNet
@@ -95,7 +95,25 @@ func InfoFromContext(ctx context.Context) (*taskInfo, bool) {
 //
 // Example:
 //
-//	...
+//	type VirtMachineMigrationTask struct {
+//		*task.GenericTask
+//
+//		targets map[string]task.OperationMode
+//
+//		// Arguments
+//		vmname    string
+//		dstServer string
+//	}
+//
+//	func NewVirtMachineMigrationTask(vmname, dstServer string) *VirtMachineMigrationTask {
+//		return &VirtMachineMigrationTask{
+//			GenericTask: new(task.GenericTask),
+//
+//			targets:   server.BlockAnyOperations(vmname),
+//			vmname:    vmname,
+//			dstServer: dstServer,
+//		}
+//	}
 type GenericTask struct {
 	sync.Mutex
 
@@ -181,7 +199,44 @@ func (t *GenericTask) release(err error) {
 //
 // Example:
 //
-//	...
+//	func init() {
+//		Pool = task.NewPool()
+//	}
+//
+//	func StartIncomingMigrationProcess(ctx context.Context, vmname string) (*Requisites, error) {
+//		requisites := Requisites{}
+//
+//		t := IncomingMigrationTask{
+//			GenericTask: new(task.GenericTask),
+//			vmname: vmname,
+//		}
+//
+//		_, err := Pool.TaskStart(ctx, &t, &requisites)
+//		if err != nil {
+//			return nil, fmt.Errorf("cannot start incoming instance: %w", err)
+//		}
+//
+//		return &requisites, nil
+//	}
+//
+//	type IncomingMigrationTask struct {
+//		*task.GenericTask
+//
+//		vmname string
+//	}
+//
+//	func (t *IncomingMigrationTask) BeforeStart(resp interface{}) error {
+//		// some code here ...
+//
+//		if v, ok := resp.(*Requisites); ok && resp != nil {
+//			v.IncomingAddr = incomingAddr
+//			v.IncomingPort = incomingPort
+//		} else {
+//			return fmt.Errorf("invalid type of resp interface")
+//		}
+//
+//		return nil
+//	}
 func (t *GenericTask) BeforeStart(_ interface{}) error {
 	return nil
 }

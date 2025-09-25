@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -9,6 +10,11 @@ import (
 	"github.com/0xef53/kvmrun/internal/task/classifiers"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrRegistrationFailed = errors.New("cannot register")
+	ErrAssignmentFailed   = errors.New("cannot assign")
 )
 
 // TaskClassifier defines the interface for managing task classification.
@@ -67,7 +73,7 @@ func (r *rootClassifier) Register(c TaskClassifier, names ...string) ([]string, 
 	defer r.mu.Unlock()
 
 	if c == nil {
-		return nil, fmt.Errorf("cannot register: empty classifier interface")
+		return nil, fmt.Errorf("%w: empty classifier interface", ErrRegistrationFailed)
 	}
 
 	if len(names) == 0 {
@@ -80,7 +86,7 @@ func (r *rootClassifier) Register(c TaskClassifier, names ...string) ([]string, 
 
 	for _, n := range names {
 		if _, found := r.aliases[n]; found {
-			return nil, fmt.Errorf("cannot register: name already exists: %s", n)
+			return nil, fmt.Errorf("%w: name already exists: %s", ErrRegistrationFailed, n)
 		}
 	}
 
@@ -123,8 +129,12 @@ func (r *rootClassifier) Deregister(name string) error {
 
 // Assign associates a task identified by tid with a classifier defined by def.
 func (r *rootClassifier) Assign(ctx context.Context, def *TaskClassifierDefinition, tid string) error {
+	if def == nil {
+		return fmt.Errorf("%w: empty classifier definition", ErrAssignmentFailed)
+	}
+
 	if err := def.Validate(); err != nil {
-		return fmt.Errorf("cannot assign: %w", err)
+		return fmt.Errorf("%w: %w", ErrAssignmentFailed, err)
 	}
 
 	r.mu.Lock()
@@ -137,7 +147,7 @@ func (r *rootClassifier) Assign(ctx context.Context, def *TaskClassifierDefiniti
 
 	r.mu.Unlock()
 
-	return fmt.Errorf("cannot assign: classifier not found: %s", def.Name)
+	return fmt.Errorf("%w: classifier not found: %s", ErrAssignmentFailed, def.Name)
 }
 
 // Unassign removes the association for the task identified by tid from all registered classifiers.

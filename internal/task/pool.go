@@ -70,15 +70,53 @@ func (p *Pool) RegisterClassifier(c TaskClassifier, names ...string) ([]string, 
 	return p.classifier.Register(c, names...)
 }
 
-// StartTask initializes and starts the provided Task with optional configuration options.
-// It performs concurrency checks, assigns classification labels, and runs the task asynchronously.
-// Parameters:
-//   - ctx: context for cancellation and deadlines
-//   - t: the Task to start
-//   - resp: optional response structure passed to the task's BeforeStart hook
-//   - opts: optional TaskOption values for additional configuration
+// StartTask starts the provided task asynchronously with optional configuration options.
+//
+// Before start:
+//   - if the task contains target locks, it will be checked for conflicts with
+//     currently running tasks.
+//   - if classifiers are specified in options, they will be attached to the task and
+//     may affect whether the task can start immediately, for example by limiting the number
+//     of concurrent tasks in a group.
+//
+// The optional parameter resp can be used to return data from the BeforeStart function.
 //
 // Returns the task ID or an error if starting fails.
+//
+// Example:
+//
+//	pool := task.NewPool()
+//
+//	requisites := Requisites{}
+//
+//	t := IncomingMigrationTask{
+//		GenericTask: new(task.GenericTask),
+//		vmname: vmname,
+//	}
+//
+//	taskOpts := []task.TaskOption{
+//		&task.TaskClassifierDefinition{
+//			Name: "unique-labels",
+//			Opts: &classifiers.UniqueLabelOptions{Label: vmname+"/migration"},
+//		},
+//		&task.TaskClassifierDefinition{
+//			Name: "group-migrations",
+//			Opts: &classifiers.LimitedGroupOptions{},
+//		},
+//	}
+//
+//	ctx = context.WithoutCancel(ctx)
+//
+//	md := reporter.Metadata{
+//		DisplayName: fmt.Sprintf("%T", t),
+//	}
+//
+//	ctx = task_metadata.AppendToContext(ctx, &md)
+//
+//	_, err := s.TaskStart(ctx, &t, &requisites)
+//	if err != nil {
+//		panic("cannot start incoming instance: " + err.Error())
+//	}
 func (p *Pool) StartTask(ctx context.Context, t Task, resp interface{}, opts ...TaskOption) (string, error) {
 	err := func() error {
 		if p.isClosed {
@@ -374,6 +412,20 @@ func (p *Pool) WaitAndClosePool() {
 // If wait is true, it blocks until the task completes.
 //
 // Returns the task ID and any error encountered during execution.
+//
+// Example:
+//
+//	pool := task.NewPool()
+//
+//	taskOpts := []task.TaskOption{
+//		// ...
+//	}
+//
+//	blockUntilCompleted := true
+//
+//	err := pool.TaskRunFunc(ctx, tgt, blockUntilCompleted, taskOpts, func(l *log.Entry) error {
+//		return doSomething()
+//	})
 func (p *Pool) RunFunc(ctx context.Context, tgt map[string]OperationMode, wait bool, opts []TaskOption, fn func(*log.Entry) error) (string, error) {
 	task := FuncTask{new(GenericTask), tgt, fn}
 

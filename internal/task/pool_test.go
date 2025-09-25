@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xef53/kvmrun/internal/task/classifiers"
 	test_utils "github.com/0xef53/kvmrun/internal/task/internal/testing"
+	"github.com/0xef53/kvmrun/internal/task/metadata"
 )
 
 const (
@@ -93,20 +95,17 @@ func poolTest_Format(want, got interface{}, tgt poolTest_target) string {
 	return fmt.Sprintf("%s\n\ttarget:\t%s\n", test_utils.FormatResultString(want, got), tgt)
 }
 
-func TestConcurrentTasks(t *testing.T) {
+func TestPool_ConcurrentTasks(t *testing.T) {
 	pool := NewPool()
 
 	tryStart := func(tgt poolTest_target, lifetime time.Duration, mustOK bool) {
 		tid := strconv.FormatUint(uint64(rand.Uint32()), 16)
 
 		task := poolTest_dummyTask{
-			GenericTask:             new(GenericTask),
-			targets:                 tgt,
-			id:                      tid,
-			lifetime:                lifetime,
-			SleepBeforeStart:        false,
-			FailBeforeStartFunction: false,
-			FailOnSuccessFunction:   false,
+			GenericTask: new(GenericTask),
+			targets:     tgt,
+			id:          tid,
+			lifetime:    lifetime,
 		}
 
 		_, err := pool.StartTask(context.Background(), &task, nil)
@@ -173,20 +172,18 @@ func TestConcurrentTasks(t *testing.T) {
 	}
 }
 
-func TestTaskWaiting(t *testing.T) {
+func TestPool_TaskWaiting(t *testing.T) {
 	pool := NewPool()
 
 	tgt := poolTest_target{"machine_eve": modeAny}
 
 	for i := 0; i < 2; i++ {
 		task := poolTest_dummyTask{
-			GenericTask:             new(GenericTask),
-			targets:                 tgt,
-			id:                      "id-1234567890",
-			lifetime:                3,
-			SleepBeforeStart:        true,
-			FailBeforeStartFunction: false,
-			FailOnSuccessFunction:   false,
+			GenericTask:      new(GenericTask),
+			targets:          tgt,
+			id:               "id-1234567890",
+			lifetime:         2,
+			SleepBeforeStart: true,
 		}
 
 		tid, err := pool.StartTask(context.Background(), &task, nil)
@@ -198,54 +195,42 @@ func TestTaskWaiting(t *testing.T) {
 	}
 }
 
-func TestTaskContextCanceling(t *testing.T) {
+func TestPool_TaskContextCanceling(t *testing.T) {
 	pool := NewPool()
-
-	tgt := poolTest_target{"machine_frank": modeAny}
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
 	defer cancel()
 
 	task := poolTest_dummyTask{
-		GenericTask:             new(GenericTask),
-		targets:                 tgt,
-		id:                      "id-1234567890",
-		lifetime:                3,
-		SleepBeforeStart:        false,
-		FailBeforeStartFunction: false,
-		FailOnSuccessFunction:   false,
+		GenericTask: new(GenericTask),
+		id:          "id-1234567890",
+		lifetime:    3,
 	}
 
 	tid, err := pool.StartTask(ctx, &task, nil)
 	if err != nil {
-		t.Fatal(poolTest_Format(nil, err, tgt))
+		t.Fatal(poolTest_Format(nil, err, nil))
 	}
 
 	pool.Wait(tid)
 
 	if !errors.Is(pool.Err(tid), context.DeadlineExceeded) {
-		t.Fatal(poolTest_Format(context.DeadlineExceeded, pool.Err(tid), tgt))
+		t.Fatal(poolTest_Format(context.DeadlineExceeded, pool.Err(tid), nil))
 	}
 }
 
-func TestTaskCanceling(t *testing.T) {
+func TestPool_TaskCanceling(t *testing.T) {
 	pool := NewPool()
 
-	tgt := poolTest_target{"machine_frank": modeAny}
-
 	task := poolTest_dummyTask{
-		GenericTask:             new(GenericTask),
-		targets:                 tgt,
-		id:                      "id-1234567890",
-		lifetime:                4,
-		SleepBeforeStart:        false,
-		FailBeforeStartFunction: false,
-		FailOnSuccessFunction:   false,
+		GenericTask: new(GenericTask),
+		id:          "id-1234567890",
+		lifetime:    4,
 	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
-		t.Fatal(poolTest_Format(nil, err, tgt))
+		t.Fatal(poolTest_Format(nil, err, nil))
 	}
 
 	go func() {
@@ -257,62 +242,50 @@ func TestTaskCanceling(t *testing.T) {
 	pool.Wait(tid)
 
 	if !errors.Is(pool.Err(tid), ErrTaskInterrupted) {
-		t.Fatal(poolTest_Format(ErrTaskInterrupted, pool.Err(tid), tgt))
+		t.Fatal(poolTest_Format(ErrTaskInterrupted, pool.Err(tid), nil))
 	}
 }
 
-func TestBeforeStartFunctionFailure(t *testing.T) {
+func TestPool_BeforeStartFunctionFailure(t *testing.T) {
 	pool := NewPool()
-
-	tgt := poolTest_target{"machine_grace": modeAny}
 
 	task := poolTest_dummyTask{
 		GenericTask:             new(GenericTask),
-		targets:                 tgt,
 		id:                      "id-1234567890",
-		lifetime:                0,
-		SleepBeforeStart:        true,
 		FailBeforeStartFunction: true,
-		FailOnSuccessFunction:   false,
 	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 
 	if err != test_utils.ErrSuccessfullyFailed {
-		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, err, tgt))
+		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, err, nil))
 	}
 
 	pool.Wait(tid)
 }
 
-func TestOnSuccessFunctionFailure(t *testing.T) {
+func TestPool_OnSuccessFunctionFailure(t *testing.T) {
 	pool := NewPool()
 
-	tgt := poolTest_target{"machine_grace": modeAny}
-
 	task := poolTest_dummyTask{
-		GenericTask:             new(GenericTask),
-		targets:                 tgt,
-		id:                      "id-1234567890",
-		lifetime:                0,
-		SleepBeforeStart:        false,
-		FailBeforeStartFunction: false,
-		FailOnSuccessFunction:   true,
+		GenericTask:           new(GenericTask),
+		id:                    "id-1234567890",
+		FailOnSuccessFunction: true,
 	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
-		t.Fatal(poolTest_Format(nil, err, tgt))
+		t.Fatal(poolTest_Format(nil, err, nil))
 	}
 
 	pool.Wait(tid)
 
 	if !errors.Is(pool.Err(tid), test_utils.ErrSuccessfullyFailed) {
-		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, pool.Err(tid), tgt))
+		t.Fatal(poolTest_Format(test_utils.ErrSuccessfullyFailed, pool.Err(tid), nil))
 	}
 }
 
-func TestPoolClosing(t *testing.T) {
+func TestPool_Closing(t *testing.T) {
 	pool := NewPool()
 
 	start := func(idx int) (poolTest_target, error) {
@@ -320,13 +293,10 @@ func TestPoolClosing(t *testing.T) {
 		_, err := pool.StartTask(
 			context.Background(),
 			&poolTest_dummyTask{
-				GenericTask:             new(GenericTask),
-				targets:                 tgt,
-				id:                      "id-" + strconv.Itoa(idx),
-				lifetime:                time.Duration(rand.Intn(5)),
-				SleepBeforeStart:        false,
-				FailBeforeStartFunction: false,
-				FailOnSuccessFunction:   false,
+				GenericTask: new(GenericTask),
+				targets:     tgt,
+				id:          "id-" + strconv.Itoa(idx),
+				lifetime:    time.Duration(rand.Intn(5)),
 			},
 			nil,
 		)
@@ -358,68 +328,129 @@ func TestPoolClosing(t *testing.T) {
 	}
 }
 
-func TestTaskInfoExtracting(t *testing.T) {
+func TestPool_TaskInfoExtracting(t *testing.T) {
 	pool := NewPool()
 
-	tgt := poolTest_target{"machine_alice": modeAny}
-
 	task := poolTest_dummyTask{
-		GenericTask:             new(GenericTask),
-		id:                      "1234567890",
-		targets:                 tgt,
-		lifetime:                1,
-		SleepBeforeStart:        true,
-		FailBeforeStartFunction: false,
-		FailOnSuccessFunction:   false,
+		GenericTask: new(GenericTask),
 	}
 
 	tid, err := pool.StartTask(context.Background(), &task, nil)
 	if err != nil {
-		t.Fatal(poolTest_Format(nil, err, tgt))
+		t.Fatal(poolTest_Format(nil, err, nil))
 	}
 
 	info, ok := InfoFromContext(task.Ctx())
 	if info == nil {
-		t.Fatal(poolTest_Format(true, ok, tgt))
+		t.Fatal(poolTest_Format(true, ok, nil))
 	}
 
 	pool.Wait(tid)
 }
 
-func TestTaskMetadata(t *testing.T) { // TODO
+func TestPool_TaskWithMetadata(t *testing.T) {
 	pool := NewPool()
 
-	tgt := poolTest_target{"machine_alice": modeAny}
-
 	task := poolTest_dummyTask{
-		GenericTask:             new(GenericTask),
-		id:                      "1234567890",
-		targets:                 tgt,
-		lifetime:                1,
-		SleepBeforeStart:        true,
-		FailBeforeStartFunction: false,
-		FailOnSuccessFunction:   false,
+		GenericTask: new(GenericTask),
 	}
 
-	tid, err := pool.StartTask(context.Background(), &task, nil)
+	type testMeta struct {
+		Name string
+	}
+
+	md := testMeta{"some meta"}
+
+	ctx := metadata.AppendToContext(context.Background(), &md)
+
+	tid, err := pool.StartTask(ctx, &task, nil)
 	if err != nil {
-		t.Fatal(poolTest_Format(nil, err, tgt))
+		t.Fatal(poolTest_Format(nil, err, nil))
 	}
 
-	info, ok := InfoFromContext(task.Ctx())
-	if info == nil {
-		t.Fatal(poolTest_Format(true, ok, tgt))
+	if a, _ := metadata.FromContext(task.Ctx()); a != nil {
+		if v, ok := a.(*testMeta); !ok {
+			t.Fatal(poolTest_Format(md, v, nil))
+		}
+	} else {
+		t.Fatal(poolTest_Format(md, a, nil))
 	}
 
 	pool.Wait(tid)
 }
 
-// Регистрация классификатора по десколькими именами
-// * попрбобовать также повторно зарегистрировать
-// * регистрация таски в нормальном существующем
-// * регситрация в несуществующем
+func TestPool_ClassifierRegistartion(t *testing.T) {
+	pool := NewPool()
 
-// Дерегистрация классификатора
-// * попробовать также удалить повторно
-// * регистрация таски в несуществующем
-// * удаление классификатора с таской
+	clsA := classifiers.NewUniqueLabelClassifier()
+
+	if _, err := pool.RegisterClassifier(clsA, "unique-labels"); err != nil {
+		t.Fatal(poolTest_Format(nil, err, nil))
+	}
+
+	if _, err := pool.RegisterClassifier(clsA, "single-labels", "unique-labels"); !errors.Is(err, ErrRegistrationFailed) {
+		t.Fatal(poolTest_Format(ErrRegistrationFailed, err, nil))
+	}
+
+	clsB := classifiers.NewGroupLabelClassifier()
+
+	if _, err := pool.RegisterClassifier(clsB, "group-labels", "x-group-labels"); err != nil {
+		t.Fatal(poolTest_Format(nil, err, nil))
+	}
+
+	if _, err := pool.RegisterClassifier(clsB, "x-group-labels"); !errors.Is(err, ErrRegistrationFailed) {
+		t.Fatal(poolTest_Format(ErrRegistrationFailed, err, nil))
+	}
+}
+
+func TestPool_TaskWithClassifier(t *testing.T) {
+	pool := NewPool()
+
+	cls := classifiers.NewUniqueLabelClassifier()
+
+	if _, err := pool.RegisterClassifier(cls, "unique-labels"); err != nil {
+		t.Fatal(poolTest_Format(nil, err, nil))
+	}
+
+	opts := []TaskOption{
+		&TaskClassifierDefinition{
+			Name: "unique-labels",
+			Opts: &classifiers.UniqueLabelOptions{Label: "task"},
+		},
+	}
+
+	task := poolTest_dummyTask{
+		GenericTask: new(GenericTask),
+	}
+
+	_, err := pool.StartTask(context.Background(), &task, nil, opts...)
+	if err != nil {
+		t.Fatal(poolTest_Format(nil, err, nil))
+	}
+}
+
+func TestPool_TaskWithUnknownClassifier(t *testing.T) {
+	pool := NewPool()
+
+	cls := classifiers.NewUniqueLabelClassifier()
+
+	if _, err := pool.RegisterClassifier(cls, "unique-labels"); err != nil {
+		t.Fatal(poolTest_Format(nil, err, nil))
+	}
+
+	opts := []TaskOption{
+		&TaskClassifierDefinition{
+			Name: "non-existent-classifier-name",
+			Opts: &classifiers.UniqueLabelOptions{Label: "task"},
+		},
+	}
+
+	task := poolTest_dummyTask{
+		GenericTask: new(GenericTask),
+	}
+
+	_, err := pool.StartTask(context.Background(), &task, nil, opts...)
+	if !errors.Is(err, ErrAssignmentFailed) {
+		t.Fatal(poolTest_Format(ErrAssignmentFailed, err, nil))
+	}
+}
