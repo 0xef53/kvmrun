@@ -1,10 +1,11 @@
 package tasks
 
 import (
-	"github.com/0xef53/kvmrun/internal/task"
 	"github.com/0xef53/kvmrun/server/machine"
 
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
+
+	"github.com/0xef53/go-task"
 )
 
 func taskStatToProto(st *task.TaskStat) *pb_types.TaskInfo {
