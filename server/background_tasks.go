@@ -11,12 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xef53/kvmrun/internal/task"
-	"github.com/0xef53/kvmrun/internal/task/classifiers"
-	"github.com/0xef53/kvmrun/internal/task/metadata"
 	"github.com/0xef53/kvmrun/kvmrun"
 
 	grpcutils "github.com/0xef53/go-grpc/utils"
+
+	"github.com/0xef53/go-task"
+	"github.com/0xef53/go-task/classifiers"
+	"github.com/0xef53/go-task/metadata"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"

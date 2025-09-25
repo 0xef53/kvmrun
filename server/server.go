@@ -11,9 +11,10 @@ import (
 	"github.com/0xef53/kvmrun/internal/appconf"
 	"github.com/0xef53/kvmrun/internal/monitor"
 	"github.com/0xef53/kvmrun/internal/systemd"
-	"github.com/0xef53/kvmrun/internal/task"
-	"github.com/0xef53/kvmrun/internal/task/classifiers"
 	"github.com/0xef53/kvmrun/kvmrun"
+
+	"github.com/0xef53/go-task"
+	"github.com/0xef53/go-task/classifiers"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"

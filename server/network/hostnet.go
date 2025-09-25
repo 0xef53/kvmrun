@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/hostnet"
-	"github.com/0xef53/kvmrun/internal/task"
 	"github.com/0xef53/kvmrun/internal/utils"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/server"
 
+	"github.com/0xef53/go-task"
 	log "github.com/sirupsen/logrus"
 )
 

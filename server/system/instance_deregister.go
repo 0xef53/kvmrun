@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/0xef53/kvmrun/internal/task"
 	"github.com/0xef53/kvmrun/server"
+
+	"github.com/0xef53/go-task"
 )
 
 func (s *Server) StartInstanceDeregistration(ctx context.Context, vmname string) (string, error) {

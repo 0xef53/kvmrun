@@ -10,12 +10,12 @@ import (
 	"time"
 
 	qemu_types "github.com/0xef53/kvmrun/internal/qemu/types"
-	"github.com/0xef53/kvmrun/internal/task"
 	"github.com/0xef53/kvmrun/internal/utils"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/server"
 
 	qmp "github.com/0xef53/go-qmp/v2"
+	"github.com/0xef53/go-task"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
