@@ -39,7 +39,7 @@ func NewPool() *Pool {
 	}
 }
 
-// SetReporter sets the given Reporter instance as the main reporter.
+// SetReporter sets the given [Reporter] instance as the main reporter.
 // This reporter will receive task status and progress updates.
 func (p *Pool) SetReporter(r Reporter) {
 	p.mu.Lock()
@@ -57,7 +57,7 @@ func (p *Pool) sendReport(ctx context.Context, t Task) {
 	p.reporter.Send(ctx, t.Stat())
 }
 
-// RegisterClassifier registers a new TaskClassifier under one or more names.
+// RegisterClassifier registers a new [TaskClassifier] under one or more names.
 // If multiple names are specified, the first one will be the primary one,
 // and the rest will be aliases.
 // If no names are provided, a default name is generated based on the classifier's type.

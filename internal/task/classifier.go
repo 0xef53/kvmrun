@@ -31,7 +31,7 @@ type TaskClassifierDefinition struct {
 	Opts classifiers.Options
 }
 
-// Validate checks the TaskClassifierDefinition for correctness.
+// Validate checks the [TaskClassifierDefinition] for correctness.
 func (o *TaskClassifierDefinition) Validate() error {
 	o.Name = strings.TrimSpace(o.Name)
 
@@ -46,14 +46,14 @@ func (o *TaskClassifierDefinition) Validate() error {
 	return nil
 }
 
-// rootClassifier manages a set of TaskClassifier instances.
+// rootClassifier manages a set of [TaskClassifier] instances.
 type rootClassifier struct {
 	mu      sync.Mutex
 	table   map[string]TaskClassifier
 	aliases map[string]string
 }
 
-// newRootClassifier returns a new rootClassifier instance.
+// newRootClassifier returns a new [rootClassifier] instance.
 func newRootClassifier() *rootClassifier {
 	return &rootClassifier{
 		table:   make(map[string]TaskClassifier),
@@ -61,7 +61,7 @@ func newRootClassifier() *rootClassifier {
 	}
 }
 
-// Register registers a TaskClassifier instance under one or more names.
+// Register registers a [TaskClassifier] instance under one or more names.
 // If multiple names are specified, the first one will be the primary one,
 // and the rest will be aliases.
 // If no names are provided, a default name is generated based on the classifier's type.
@@ -99,7 +99,7 @@ func (r *rootClassifier) Register(c TaskClassifier, names ...string) ([]string, 
 	return names, nil
 }
 
-// Deregister removes the TaskClassifier and all associated aliases from the list.
+// Deregister removes the [TaskClassifier] and all associated aliases from the list.
 func (r *rootClassifier) Deregister(name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

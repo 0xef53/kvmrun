@@ -5,7 +5,7 @@ import (
 )
 
 // FuncTask is a task implementation that executes a given function.
-// It embeds GenericTask to reuse common task fields and behavior.
+// It embeds [GenericTask] to reuse common task fields and behavior.
 type FuncTask struct {
 	*GenericTask
 
