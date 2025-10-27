@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xef53/kvmrun/client"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -29,7 +31,7 @@ var CommandChannelAttach_VSock = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineChannelAttach_VSock)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineChannelAttach_VSock)
 	},
 }
 
@@ -42,6 +44,6 @@ var CommandChannelDetach_VSock = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineChannelDetach_VSock)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineChannelDetach_VSock)
 	},
 }

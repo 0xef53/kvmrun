@@ -6,10 +6,12 @@ import (
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineCdromAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCdromAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CdromAttachRequest{
 		Name:        vmname,
 		DeviceName:  c.Args().Tail()[0],
@@ -31,7 +33,7 @@ func MachineCdromAttach(ctx context.Context, vmname string, c *cli.Command, grpc
 	return err
 }
 
-func MachineCdromDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCdromDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CdromDetachRequest{
 		Name:       vmname,
 		DeviceName: c.Args().Tail()[0],
@@ -43,7 +45,7 @@ func MachineCdromDetach(ctx context.Context, vmname string, c *cli.Command, grpc
 	return err
 }
 
-func MachineCdromChangeMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCdromChangeMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("media") {
 		req := pb_machines.CdromChangeMediaRequest{
 			Name:        vmname,
@@ -60,7 +62,7 @@ func MachineCdromChangeMedia(ctx context.Context, vmname string, c *cli.Command,
 	return nil
 }
 
-func MachineCdromRemoveMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCdromRemoveMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("remove-media") && c.Bool("remove-media") {
 		req := pb_machines.CdromRemoveMediaRequest{
 			Name:       vmname,

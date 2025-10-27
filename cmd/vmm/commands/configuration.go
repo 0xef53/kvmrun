@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -24,7 +26,7 @@ var CommandCreateConf = &cli.Command{
 		&cli.StringFlag{Name: "flash-device", Value: "", DefaultText: "not set", Usage: "firmware flash device `file`"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCreateConf)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCreateConf)
 	},
 }
 
@@ -35,7 +37,7 @@ var CommandRemoveConf = &cli.Command{
 	HideHelp:  true,
 	Category:  "Configuration",
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineRemoveConf)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineRemoveConf)
 	},
 }
 
@@ -53,7 +55,7 @@ var CommandInspect = &cli.Command{
 		if c.Bool("events") {
 			fn = client.MachineListEvents
 		}
-		return client.WithGRPC(ctx, c, fn)
+		return grpc_client.CommandGRPC(ctx, c, fn)
 	},
 }
 
@@ -70,6 +72,6 @@ var CommandPrintList = &cli.Command{
 		if c.Bool("short") {
 			fn = client.MachineListNames
 		}
-		return client.WithGRPC(ctx, c, fn)
+		return grpc_client.CommandGRPC(ctx, c, fn)
 	},
 }

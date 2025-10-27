@@ -15,10 +15,12 @@ import (
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineCreateConf(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCreateConf(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CreateRequest{
 		Name: vmname,
 		Options: &pb_types.MachineOpts{
@@ -98,7 +100,7 @@ func MachineCreateConf(ctx context.Context, vmname string, c *cli.Command, grpcC
 	return nil
 }
 
-func MachineRemoveConf(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineRemoveConf(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.DeleteRequest{
 		Name:  vmname,
 		Force: true,
@@ -123,7 +125,7 @@ func MachineRemoveConf(ctx context.Context, vmname string, c *cli.Command, grpcC
 	return nil
 }
 
-func MachineInspect(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineInspect(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.GetRequest{
 		Name: vmname,
 	}
@@ -143,7 +145,7 @@ func MachineInspect(ctx context.Context, vmname string, c *cli.Command, grpcClie
 	return nil
 }
 
-func MachineListEvents(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineListEvents(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.GetEventsRequest{
 		Name: vmname,
 	}
@@ -178,7 +180,7 @@ func MachineListEvents(ctx context.Context, vmname string, c *cli.Command, grpcC
 	return nil
 }
 
-func MachineList(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineList(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.ListRequest{
 		Names: c.Args().Slice(),
 	}
@@ -271,7 +273,7 @@ func MachineList(ctx context.Context, vmname string, c *cli.Command, grpcClient 
 	return nil
 }
 
-func MachineListNames(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineListNames(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.ListNamesRequest{
 		Names: c.Args().Slice(),
 	}

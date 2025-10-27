@@ -5,10 +5,12 @@ import (
 
 	pb_mahines "github.com/0xef53/kvmrun/api/services/machines/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_mahines.StartRequest{
 		Name:         vmname,
 		WaitInterval: uint32(c.Uint("wait")),
@@ -19,7 +21,7 @@ func MachineStart(ctx context.Context, vmname string, c *cli.Command, grpcClient
 	return err
 }
 
-func MachineStop(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineStop(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_mahines.StopRequest{
 		Name:  vmname,
 		Wait:  c.Bool("wait"),
@@ -31,7 +33,7 @@ func MachineStop(ctx context.Context, vmname string, c *cli.Command, grpcClient 
 	return err
 }
 
-func MachineRestart(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineRestart(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_mahines.RestartRequest{
 		Name: vmname,
 		Wait: c.Bool("wait"),
@@ -42,7 +44,7 @@ func MachineRestart(ctx context.Context, vmname string, c *cli.Command, grpcClie
 	return err
 }
 
-func MachineReset(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineReset(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_mahines.ResetRequest{
 		Name: vmname,
 	}

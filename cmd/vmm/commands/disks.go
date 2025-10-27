@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -36,7 +38,7 @@ var CommandDiskAttach = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineDiskAttach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineDiskAttach)
 	},
 }
 
@@ -49,7 +51,7 @@ var CommandDiskDetach = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineDiskDetach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineDiskDetach)
 	},
 }
 
@@ -65,7 +67,7 @@ var CommandDiskSetParameters = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineDiskRemoveQemuBitmap, client.MachineDiskSetReadLimit, client.MachineDiskSetWriteLimit)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineDiskRemoveQemuBitmap, client.MachineDiskSetReadLimit, client.MachineDiskSetWriteLimit)
 	},
 }
 
@@ -75,6 +77,6 @@ var CommandDiskResizeQemuBlockdev = &cli.Command{
 	ArgsUsage: "VMNAME DISK",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineDiskResizeQemuBlockdev)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineDiskResizeQemuBlockdev)
 	},
 }

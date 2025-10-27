@@ -165,7 +165,7 @@ func (s *Server) MachineGetEvents(vmname string) ([]qmp.Event, error) {
 }
 
 func machineDownFile(vmname string) string {
-	return filepath.Join(filepath.Join(kvmrun.CONFDIR, vmname, "down"))
+	return filepath.Join(kvmrun.CONFDIR, vmname, "down")
 }
 
 func machineUnitFile(vmname string) string {

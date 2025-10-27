@@ -3,15 +3,21 @@ package network
 import (
 	"context"
 
+	"github.com/0xef53/kvmrun/server/network"
+
 	pb "github.com/0xef53/kvmrun/api/services/network/v2"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
 
 func (s *service) Configure(ctx context.Context, req *pb.ConfigureRequest) (*empty.Empty, error) {
-	opts := optsFromConfigureRequest(req)
+	stage := network.ConfifureStage_FIRST
 
-	err := s.ServiceServer.Network.ConfigureHostNetwork(ctx, req.LinkName, opts)
+	if req.SecondStage {
+		stage = network.ConfifureStage_SECOND
+	}
+
+	err := s.ServiceServer.Network.ConfigureHostNetwork(ctx, req.Name, req.Ifname, stage)
 	if err != nil {
 		return nil, err
 	}
@@ -20,9 +26,7 @@ func (s *service) Configure(ctx context.Context, req *pb.ConfigureRequest) (*emp
 }
 
 func (s *service) Deconfigure(ctx context.Context, req *pb.DeconfigureRequest) (*empty.Empty, error) {
-	opts := optsFromDeconfigureRequest(req)
-
-	err := s.ServiceServer.Network.DeconfigureHostNetwork(ctx, req.LinkName, opts)
+	err := s.ServiceServer.Network.DeconfigureHostNetwork(ctx, req.Name, req.Ifname)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,8 @@ import (
 	pb_tasks "github.com/0xef53/kvmrun/api/services/tasks/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	qmp "github.com/0xef53/go-qmp/v2"
 	"github.com/0xef53/go-task"
 	log "github.com/sirupsen/logrus"
@@ -355,7 +357,7 @@ func (t *MachineMigrationTask) OnSuccess() error {
 	testRemoteMachine := func() error {
 		var resp *pb_machines.GetResponse
 
-		err := t.KvmrunGRPC(t.dstServer, func(client *server.Kvmrun_Interfaces) (err error) {
+		err := t.KvmrunGRPC(t.dstServer, func(client *grpc_interfaces.Kvmrun) (err error) {
 			resp, err = client.Machines().Get(t.Ctx(), &pb_machines.GetRequest{Name: t.vmname})
 
 			return err
@@ -443,7 +445,7 @@ func (t *MachineMigrationTask) OnFailure(taskErr error) {
 		t.Logger.Warnf("OnFailureHook: forced migrate_cancel failed: %s", err)
 	}
 
-	err := t.Server.KvmrunGRPC(t.dstServer, func(client *server.Kvmrun_Interfaces) (err error) {
+	err := t.Server.KvmrunGRPC(t.dstServer, func(client *grpc_interfaces.Kvmrun) (err error) {
 		req := pb_tasks.CancelRequest{
 			Key: t.vmname + "/incoming-migration",
 		}
@@ -680,7 +682,7 @@ func (t *MachineMigrationTask) requestIncomingMigration() (*pb_types.IncomingMig
 
 	var requisites *pb_types.IncomingMigrationRequisites
 
-	err = t.Server.KvmrunGRPC(t.dstServer, func(client *server.Kvmrun_Interfaces) error {
+	err = t.Server.KvmrunGRPC(t.dstServer, func(client *grpc_interfaces.Kvmrun) error {
 		resp, err := client.System().StartIncomingMigration(t.Ctx(), &req)
 		if err != nil {
 			return err

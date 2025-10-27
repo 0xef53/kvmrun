@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xef53/kvmrun/client"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -29,7 +31,7 @@ var CommandMemorySetParameters = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineMemorySetParameters)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineMemorySetParameters)
 	},
 }
 
@@ -57,6 +59,6 @@ var CommandCPUSetParameters = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCPUSetParameters)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCPUSetParameters)
 	},
 }

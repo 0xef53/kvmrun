@@ -14,7 +14,7 @@ func RemoveLinkIfExist(linkname string) error {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return nil
 		}
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	switch link.(type) {

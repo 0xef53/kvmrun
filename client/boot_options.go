@@ -8,10 +8,12 @@ import (
 
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func BootParametersSet(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func BootParametersSet(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("remove-conf") && c.Bool("remove-conf") {
 		req := pb_machines.FirmwareRemoveRequest{
 			Name: vmname,

@@ -13,13 +13,15 @@ import (
 
 	bar "github.com/0xef53/kvmrun/client/progress_bar"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
 
 	cli "github.com/urfave/cli/v3"
 )
 
-func BackupProcessStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func BackupProcessStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	var err error
 
 	if len(c.Args().Tail()) >= 2 {
@@ -51,7 +53,7 @@ func BackupProcessStart(ctx context.Context, vmname string, c *cli.Command, grpc
 	return nil
 }
 
-func BackupProcessShowStatus(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func BackupProcessShowStatus(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	resp, err := grpcClient.Machines().Get(ctx, &pb_machines.GetRequest{Name: vmname})
 	if err != nil {
 		return err
@@ -185,7 +187,7 @@ func BackupProcessShowStatus(ctx context.Context, vmname string, c *cli.Command,
 	return nil
 }
 
-func BackupProcessCancel(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func BackupProcessCancel(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_tasks.CancelRequest{}
 
 	if len(c.Args().Tail()) >= 1 {

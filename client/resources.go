@@ -5,10 +5,12 @@ import (
 
 	pb_mahines "github.com/0xef53/kvmrun/api/services/machines/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineMemorySetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineMemorySetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_mahines.MemorySetLimitsRequest{
 		Name:   vmname,
 		Actual: uint32(c.Int("actual")),
@@ -22,7 +24,7 @@ func MachineMemorySetParameters(ctx context.Context, vmname string, c *cli.Comma
 
 }
 
-func MachineCPUSetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCPUSetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("actual") || c.IsSet("total") {
 		req := pb_mahines.CPUSetLimitsRequest{
 			Name:   vmname,

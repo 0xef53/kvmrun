@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -31,7 +33,7 @@ var CommandCloudInitDriveAttach = &cli.Command{
 		&cli.GenericFlag{Name: "driver", Value: flag_types.DefaultCloudInitDriver(), Usage: "cloud-init device driver `name`"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCloudInitDriveAttach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCloudInitDriveAttach)
 	},
 }
 
@@ -41,7 +43,7 @@ var CommandCloudInitDriveDetach = &cli.Command{
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCloudInitDriveDetach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCloudInitDriveDetach)
 	},
 }
 
@@ -54,7 +56,7 @@ var CommandCloudInitDriveChangeMedia = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "apply changes to the running machine instance"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCloudInitDriveChangeMedia)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCloudInitDriveChangeMedia)
 	},
 }
 
@@ -76,6 +78,6 @@ var CommandCloudInitDriveBuildImage = &cli.Command{
 		&cli.StringFlag{Name: "timezone", Usage: "set the system timezone"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineCloudInitDriveBuildImage)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineCloudInitDriveBuildImage)
 	},
 }

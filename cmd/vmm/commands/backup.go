@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xef53/kvmrun/client"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -31,7 +33,7 @@ var CommandBackupProcessStart = &cli.Command{
 		&cli.BoolFlag{Name: "clear-bitmap", Usage: "clear/reset a dirty bitmap (if exists) before starting"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.BackupProcessStart)
+		return grpc_client.CommandGRPC(ctx, c, client.BackupProcessStart)
 	},
 }
 
@@ -41,7 +43,7 @@ var CommandBackupProcessShowStatus = &cli.Command{
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.BackupProcessShowStatus)
+		return grpc_client.CommandGRPC(ctx, c, client.BackupProcessShowStatus)
 	},
 }
 
@@ -51,6 +53,6 @@ var CommandBackupProcessCancel = &cli.Command{
 	ArgsUsage: "VMNAME [DISKNAME]",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.BackupProcessCancel)
+		return grpc_client.CommandGRPC(ctx, c, client.BackupProcessCancel)
 	},
 }

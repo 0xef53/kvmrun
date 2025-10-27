@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xef53/kvmrun/client"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -15,6 +17,6 @@ var CommandConsole = &cli.Command{
 	HideHelp:  true,
 	Category:  "Configuration",
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineConsoleConnect)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineConsoleConnect)
 	},
 }

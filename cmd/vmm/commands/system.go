@@ -5,6 +5,8 @@ import (
 
 	"github.com/0xef53/kvmrun/client"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -25,7 +27,7 @@ var CommandPrintTasks = &cli.Command{
 	Usage:    "print a list of background tasks",
 	HideHelp: true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.TaskPrintList)
+		return grpc_client.CommandGRPC(ctx, c, client.TaskPrintList)
 	},
 }
 
@@ -34,6 +36,6 @@ var CommandPrintPCI = &cli.Command{
 	Usage:    "print a list of host PCI devices",
 	HideHelp: true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.PCI_PrintList)
+		return grpc_client.CommandGRPC(ctx, c, client.PCI_PrintList)
 	},
 }

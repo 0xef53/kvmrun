@@ -3,7 +3,7 @@ syntax = "proto3";
 package kvmrun.api.services.network.v2;
 
 import "google/protobuf/empty.proto";
-import "types/v2/types.proto";
+import "types/v2/network.proto";
 
 option go_package = "github.com/0xef53/kvmrun/api/services/network/v2;network";
 
@@ -12,6 +12,10 @@ service NetworkService {
 
     rpc Configure(ConfigureRequest) returns (google.protobuf.Empty) { }
     rpc Deconfigure(DeconfigureRequest) returns (google.protobuf.Empty) { }
+
+    rpc CreateConf(CreateConfRequest) returns (google.protobuf.Empty) { }
+    rpc UpdateConf(UpdateConfRequest) returns (google.protobuf.Empty) { }
+    rpc DeleteConf(DeleteConfRequest) returns (google.protobuf.Empty) { }
 }
 
 message ListEndpointsRequest {
@@ -26,57 +30,60 @@ message ListEndpointsResponse {
 }
 
 message ConfigureRequest {
-    message VlanAttrs {
-        uint32 vlan_id = 1;
-        uint32 mtu = 2;
-        string parent_interface = 3;
-    }
-    message VxlanAttrs {
-        uint32 vni = 1;
-        uint32 mtu = 2;
-        string bind_interface = 3;
-    }
-    message RouterAttrs {
-        repeated string addrs = 1;
-        uint32 mtu = 2;
-        string bind_interface = 3;
-        string default_gateway = 4;
-        uint32 in_limit = 5;
-        uint32 out_limit = 6;
-        uint32 process_id = 100;
-    }
-    message BridgeAttrs {
-        string ifname = 1;
-        uint32 mtu = 2;
-    }
-    string link_name = 1;
-    oneof attrs {
-        VlanAttrs vlan = 2;
-        VxlanAttrs vxlan = 3;
-        RouterAttrs router = 4;
-        BridgeAttrs bridge = 5;
-    }
-    bool second_stage = 100;
+    string name = 1;
+    string ifname = 2;
+    bool second_stage = 11;
 }
 
 message DeconfigureRequest {
-    message VlanAttrs {
-        uint32 vlan_id = 1;
+    string name = 1;
+    string ifname = 2;
+}
+
+message CreateConfRequest {
+    string name = 1;
+    types.v2.NetworkSchemeOpts options = 2;
+    bool configure = 100;
+}
+
+message UpdateConfRequest {
+    message Addr {
+        enum Action {
+            UNKNOWN = 0;
+            APPEND = 1;
+            REMOVE = 2;
+        }
+        string addr = 1;
+        Action action = 2;
     }
-    message VxlanAttrs {
-        uint32 vni = 1;
+    message Limit {
+        uint32 value = 1;
     }
-    message RouterAttrs {
-        string bind_interface = 1;
+    message MTU {
+        uint32 value = 1;
     }
-    message BridgeAttrs {
-        string ifname = 1;
+    message Gateway {
+        string value = 1;
     }
-    string link_name = 1;
-    oneof attrs {
-        VlanAttrs vlan = 2;
-        VxlanAttrs vxlan = 3;
-        RouterAttrs router = 4;
-        BridgeAttrs bridge = 5;
-    }
+
+    string name = 1;
+    string ifname = 2;
+
+    // Router specific
+    Limit in_limit = 11;
+    Limit out_limit = 12;
+
+    // Common
+    repeated Addr addrs = 21;
+    MTU mtu = 22;
+    Gateway gateway4 = 23;
+    Gateway gateway6 = 24;
+
+    bool apply = 100;
+}
+
+message DeleteConfRequest {
+    string name = 1;
+    string ifname = 2;
+    bool deconfigure = 100;
 }

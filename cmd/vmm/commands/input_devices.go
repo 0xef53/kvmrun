@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -29,7 +31,7 @@ var CommandInputDeviceAttach = &cli.Command{
 		&cli.GenericFlag{Name: "type", Aliases: []string{"t"}, Value: flag_types.DefaultInputDeviceType(), Usage: "input device `type`"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineInputDeviceAttach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineInputDeviceAttach)
 	},
 }
 
@@ -42,6 +44,6 @@ var CommandInputDeviceDetach = &cli.Command{
 		&cli.GenericFlag{Name: "type", Aliases: []string{"t"}, Value: flag_types.DefaultInputDeviceType(), Usage: "input device `type`"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineInputDeviceDetach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineInputDeviceDetach)
 	},
 }

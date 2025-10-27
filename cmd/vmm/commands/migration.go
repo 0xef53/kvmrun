@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -36,7 +38,7 @@ var CommandMigrationProcessStart = &cli.Command{
 		&cli.BoolFlag{Name: "create-disks", Usage: "create logical volumes in the same group on the destination server"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MigrationProcessStart)
+		return grpc_client.CommandGRPC(ctx, c, client.MigrationProcessStart)
 	},
 }
 
@@ -46,7 +48,7 @@ var CommandMigrationProcessShowStatus = &cli.Command{
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MigrationProcessShowStatus)
+		return grpc_client.CommandGRPC(ctx, c, client.MigrationProcessShowStatus)
 	},
 }
 
@@ -56,6 +58,6 @@ var CommandMigrationProcessCancel = &cli.Command{
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MigrationProcessCancel)
+		return grpc_client.CommandGRPC(ctx, c, client.MigrationProcessCancel)
 	},
 }

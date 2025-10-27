@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/cmd/vmm/commands"
 	"github.com/0xef53/kvmrun/internal/appconf"
 	"github.com/0xef53/kvmrun/kvmrun"
+
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
 
 	cli "github.com/urfave/cli/v3"
 )
@@ -31,7 +32,7 @@ func main() {
 			return nil, err
 		}
 
-		ctx = client.AppendAppConfToContext(ctx, appConf)
+		ctx = grpc_client.AppendAppConfToContext(ctx, appConf)
 
 		return ctx, nil
 	}
