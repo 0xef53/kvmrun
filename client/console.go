@@ -12,10 +12,12 @@ import (
 	pb_mahines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineConsoleConnect(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineConsoleConnect(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	resp, err := grpcClient.Machines().Get(ctx, &pb_mahines.GetRequest{Name: vmname})
 	if err != nil {
 		return err

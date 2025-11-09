@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -35,7 +37,7 @@ var CommandNetIfaceAttach = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineNetIfaceAttach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineNetIfaceAttach)
 	},
 }
 
@@ -48,7 +50,7 @@ var CommandNetIfaceDetach = &cli.Command{
 		&cli.BoolFlag{Name: "live", Usage: "affect running machine"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineNetIfaceDetach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineNetIfaceDetach)
 	},
 }
 
@@ -64,6 +66,6 @@ var CommandNetIfaceSetParameters = &cli.Command{
 		&cli.GenericFlag{Name: "link-state", Value: new(flag_types.NetIfaceLinkState), DefaultText: "not set", Usage: "interface link `state` (up or down)"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineNetIfaceSetParameters)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineNetIfaceSetParameters)
 	},
 }

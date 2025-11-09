@@ -1,6 +1,8 @@
 module github.com/0xef53/kvmrun
 
-go 1.24
+go 1.24.0
+
+toolchain go1.24.2
 
 require (
 	github.com/0xef53/go-qmp/v2 v2.0.4
@@ -12,7 +14,7 @@ require (
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sync v0.15.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/sys v0.37.0
 	google.golang.org/grpc v1.74.2
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/yaml.v3 v3.0.1

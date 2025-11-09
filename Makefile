@@ -30,7 +30,11 @@ DOCKER_PB_ARGS := \
     -v $(CWD):/go/$(PROJECT_NAME)
 
 protofiles_grpc = \
-    types/v2/types.proto \
+    types/v2/common.proto \
+    types/v2/machines.proto \
+    types/v2/tasks.proto \
+    types/v2/network.proto \
+    types/v2/hardware.proto \
     services/machines/v2/machines.proto \
     services/tasks/v2/tasks.proto \
     services/system/v2/system.proto \
@@ -107,6 +111,7 @@ install: $(binaries)
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifup
 	ln -fs vnetctl $(DESTDIR)/usr/lib/$(PROJECT_NAME)/ifdown
 	mv -t $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME)/vmm
+	ln -fs /usr/lib/$(PROJECT_NAME)/vnetctl $(DESTDIR)/usr/bin/vnetctl
 	cp -t $(DESTDIR)/etc/$(PROJECT_NAME) contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
 	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service

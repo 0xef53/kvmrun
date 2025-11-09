@@ -7,10 +7,12 @@ import (
 
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineHostDeviceAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineHostDeviceAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	addr, err := pci.AddressFromHex(c.Args().Tail()[0])
 	if err != nil {
 		return err
@@ -39,7 +41,7 @@ func MachineHostDeviceAttach(ctx context.Context, vmname string, c *cli.Command,
 	return err
 }
 
-func MachineHostDeviceDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineHostDeviceDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	addr, err := pci.AddressFromHex(c.Args().Tail()[0])
 	if err != nil {
 		return err
@@ -55,7 +57,7 @@ func MachineHostDeviceDetach(ctx context.Context, vmname string, c *cli.Command,
 	return err
 }
 
-func MachineHostDeviceSetOptions(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineHostDeviceSetOptions(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	addr, err := pci.AddressFromHex(c.Args().Tail()[0])
 	if err != nil {
 		return err

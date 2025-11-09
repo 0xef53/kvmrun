@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package kvmrun.api.types.v2;
+
+option go_package = "github.com/0xef53/kvmrun/api/types/v2;types";
+
+message TaskInfo {
+    message MigrationInfo {
+        message Stat {
+            uint64 total = 1;
+            uint64 remaining = 2;
+            uint64 transferred = 3;
+            uint32 progress = 4;
+            uint32 speed = 5;
+        }
+        string dst_server = 1;
+        Stat qemu = 2;
+        map<string,Stat> disks = 3;
+    }
+    enum TaskState {
+        UNKNOWN = 0;
+        RUNNING = 1;
+        COMPLETED = 2;
+        FAILED = 3;
+    }
+    string task_id = 1;
+    TaskState state = 2;
+    string state_desc = 3;
+    uint32 progress = 4;
+    oneof stat {
+        MigrationInfo migration = 10;
+    };
+}

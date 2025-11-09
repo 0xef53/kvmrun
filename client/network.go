@@ -9,10 +9,12 @@ import (
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineNetIfaceAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineNetIfaceAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.NetIfaceAttachRequest{
 		Name:         vmname,
 		Ifname:       c.Args().Tail()[0],
@@ -39,7 +41,7 @@ func MachineNetIfaceAttach(ctx context.Context, vmname string, c *cli.Command, g
 	return err
 }
 
-func MachineNetIfaceDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineNetIfaceDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.NetIfaceDetachRequest{
 		Name:   vmname,
 		Ifname: c.Args().Tail()[0],
@@ -51,7 +53,7 @@ func MachineNetIfaceDetach(ctx context.Context, vmname string, c *cli.Command, g
 	return err
 }
 
-func MachineNetIfaceSetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineNetIfaceSetParameters(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("queues") {
 		req := pb_machines.NetIfaceSetQueuesRequest{
 			Name:   vmname,

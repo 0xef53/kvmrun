@@ -6,10 +6,12 @@ import (
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineDiskAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.DiskAttachRequest{
 		Name:      vmname,
 		DiskPath:  c.Args().Tail()[0],
@@ -31,7 +33,7 @@ func MachineDiskAttach(ctx context.Context, vmname string, c *cli.Command, grpcC
 	return err
 }
 
-func MachineDiskDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.DiskDetachRequest{
 		Name:     vmname,
 		DiskName: c.Args().Tail()[0],
@@ -43,7 +45,7 @@ func MachineDiskDetach(ctx context.Context, vmname string, c *cli.Command, grpcC
 	return err
 }
 
-func MachineDiskRemoveQemuBitmap(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskRemoveQemuBitmap(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("remove-bitmap") && c.Bool("remove-bitmap") {
 		req := pb_machines.DiskRemoveQemuBitmapRequest{
 			Name:     vmname,
@@ -58,7 +60,7 @@ func MachineDiskRemoveQemuBitmap(ctx context.Context, vmname string, c *cli.Comm
 	return nil
 }
 
-func MachineDiskSetReadLimit(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskSetReadLimit(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("iops-rd") {
 		req := pb_machines.DiskSetIOLimitRequest{
 			Name:     vmname,
@@ -75,7 +77,7 @@ func MachineDiskSetReadLimit(ctx context.Context, vmname string, c *cli.Command,
 	return nil
 }
 
-func MachineDiskSetWriteLimit(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskSetWriteLimit(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	if c.IsSet("iops-wr") {
 		req := pb_machines.DiskSetIOLimitRequest{
 			Name:     vmname,
@@ -92,7 +94,7 @@ func MachineDiskSetWriteLimit(ctx context.Context, vmname string, c *cli.Command
 	return nil
 }
 
-func MachineDiskResizeQemuBlockdev(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineDiskResizeQemuBlockdev(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.DiskResizeQemuBlockdevRequest{
 		Name:     vmname,
 		DiskName: c.Args().Tail()[0],

@@ -6,7 +6,7 @@ type VlanDeviceAttrs struct {
 	Parent string
 }
 
-func ConfigureVlanPort(linkname string, attrs *VlanDeviceAttrs, secondStage bool) error {
+func VlanPortConfigure(linkname string, attrs *VlanDeviceAttrs, secondStage bool) error {
 	if secondStage {
 		// no second stage for this scheme
 		return nil
@@ -15,6 +15,6 @@ func ConfigureVlanPort(linkname string, attrs *VlanDeviceAttrs, secondStage bool
 	return nil
 }
 
-func DeconfigureVlanPort(linkname string, vlan_id uint32) error {
+func VlanPortDeconfigure(linkname string, vlan_id uint32) error {
 	return nil
 }

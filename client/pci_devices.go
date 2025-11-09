@@ -7,10 +7,12 @@ import (
 
 	pb_hw "github.com/0xef53/kvmrun/api/services/hardware/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func PCI_PrintList(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func PCI_PrintList(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	resp, err := grpcClient.Hardware().ListPCI(ctx, new(pb_hw.ListPCIRequest))
 	if err != nil {
 		return err

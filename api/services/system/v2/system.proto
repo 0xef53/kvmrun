@@ -3,7 +3,8 @@ syntax = "proto3";
 package kvmrun.api.services.system.v2;
 
 import "google/protobuf/empty.proto";
-import "types/v2/types.proto";
+import "types/v2/common.proto";
+import "types/v2/machines.proto";
 import "github.com/0xef53/go-grpc/options/field_options.proto";
 
 option go_package = "github.com/0xef53/kvmrun/api/services/system/v2;system";

@@ -6,26 +6,26 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-type BridgeDeviceAttrs struct {
-	Ifname string
-	MTU    uint32
+type BridgePortAttrs struct {
+	BridgeName string
+	MTU        uint32
 }
 
-func ConfigureBridgePort(linkname string, attrs *BridgeDeviceAttrs, secondStage bool) error {
+func BridgePortConfigure(linkname string, attrs *BridgePortAttrs, secondStage bool) error {
 	if secondStage {
 		// no second stage for this scheme
 		return nil
 	}
 
-	brLink, err := netlink.LinkByName(attrs.Ifname)
+	brLink, err := netlink.LinkByName(attrs.BridgeName)
 
 	switch err.(type) {
 	case nil:
 		if _, ok := brLink.(*netlink.Bridge); !ok {
-			return fmt.Errorf("not a bridge device: %s", attrs.Ifname)
+			return fmt.Errorf("not a bridge device: %s", attrs.BridgeName)
 		}
 	case netlink.LinkNotFoundError:
-		return fmt.Errorf("bridge does not exist: %s", attrs.Ifname)
+		return fmt.Errorf("bridge does not exist: %s", attrs.BridgeName)
 	default:
 		return fmt.Errorf("netlink: %s", err)
 	}
@@ -52,7 +52,7 @@ func ConfigureBridgePort(linkname string, attrs *BridgeDeviceAttrs, secondStage 
 	return nil
 }
 
-func DeconfigureBridgePort(linkname string, brname string) error {
+func BridgePortDeconfigure(linkname string, brname string) error {
 	link, err := netlink.LinkByName(linkname)
 	if err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {

@@ -7,13 +7,13 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-type VxlanDeviceAttrs struct {
+type VxlanPortAttrs struct {
 	VNI   uint32
 	MTU   uint32
 	Local net.IP
 }
 
-func ConfigureVxlanPort(linkname string, attrs *VxlanDeviceAttrs, secondStage bool) error {
+func VxlanPortConfigure(linkname string, attrs *VxlanPortAttrs, secondStage bool) error {
 	if secondStage {
 		// no second stage for this scheme
 		return nil
@@ -60,7 +60,7 @@ func ConfigureVxlanPort(linkname string, attrs *VxlanDeviceAttrs, secondStage bo
 	return nil
 }
 
-func DeconfigureVxlanPort(linkname string, vni uint32) error {
+func VxlanPortDeconfigure(linkname string, vni uint32) error {
 	if err := RemoveLinkIfExist(linkname); err != nil {
 		return err
 	}

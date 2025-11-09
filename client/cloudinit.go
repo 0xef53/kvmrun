@@ -13,10 +13,12 @@ import (
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	cli "github.com/urfave/cli/v3"
 )
 
-func MachineCloudInitDriveAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCloudInitDriveAttach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CloudInitDriveAttachRequest{
 		Name: vmname,
 	}
@@ -38,7 +40,7 @@ func MachineCloudInitDriveAttach(ctx context.Context, vmname string, c *cli.Comm
 	return err
 }
 
-func MachineCloudInitDriveDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCloudInitDriveDetach(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CloudInitDriveDetachRequest{
 		Name: vmname,
 	}
@@ -48,7 +50,7 @@ func MachineCloudInitDriveDetach(ctx context.Context, vmname string, c *cli.Comm
 	return err
 }
 
-func MachineCloudInitDriveChangeMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCloudInitDriveChangeMedia(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.CloudInitDriveChangeMediaRequest{
 		Name: vmname,
 		Live: c.Bool("live"),
@@ -65,7 +67,7 @@ func MachineCloudInitDriveChangeMedia(ctx context.Context, vmname string, c *cli
 	return err
 }
 
-func MachineCloudInitDriveBuildImage(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MachineCloudInitDriveBuildImage(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	var outputFile string
 
 	if len(c.Args().Tail()) >= 1 {

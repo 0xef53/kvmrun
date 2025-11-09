@@ -12,13 +12,15 @@ import (
 
 	bar "github.com/0xef53/kvmrun/client/progress_bar"
 
+	grpc_interfaces "github.com/0xef53/kvmrun/internal/grpc/interfaces"
+
 	grpc_codes "google.golang.org/grpc/codes"
 	grpc_status "google.golang.org/grpc/status"
 
 	cli "github.com/urfave/cli/v3"
 )
 
-func MigrationProcessStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MigrationProcessStart(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_machines.StartMigrationRequest{
 		Name:        vmname,
 		DstServer:   c.Args().Tail()[0],
@@ -78,7 +80,7 @@ func MigrationProcessStart(ctx context.Context, vmname string, c *cli.Command, g
 	return nil
 }
 
-func MigrationProcessShowStatus(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MigrationProcessShowStatus(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_tasks.GetRequest{
 		Key: vmname + "/migration",
 	}
@@ -185,7 +187,7 @@ func MigrationProcessShowStatus(ctx context.Context, vmname string, c *cli.Comma
 	return nil
 }
 
-func MigrationProcessCancel(ctx context.Context, vmname string, c *cli.Command, grpcClient *kvmrun_Interfaces) error {
+func MigrationProcessCancel(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
 	req := pb_tasks.CancelRequest{
 		Key: vmname + "/migration",
 	}

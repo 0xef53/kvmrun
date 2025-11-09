@@ -6,6 +6,8 @@ import (
 	"github.com/0xef53/kvmrun/client"
 	"github.com/0xef53/kvmrun/client/flag_types"
 
+	grpc_client "github.com/0xef53/kvmrun/client/grpcclient"
+
 	cli "github.com/urfave/cli/v3"
 )
 
@@ -32,7 +34,7 @@ var CommandHostDeviceAttach = &cli.Command{
 		&cli.BoolFlag{Name: "no-check-device", Usage: "don't check device accessibility"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineHostDeviceAttach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineHostDeviceAttach)
 	},
 }
 
@@ -42,7 +44,7 @@ var CommandDeviceDetach = &cli.Command{
 	ArgsUsage: "VMNAME PCIADDR",
 	HideHelp:  true,
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineHostDeviceDetach)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineHostDeviceDetach)
 	},
 }
 
@@ -56,6 +58,6 @@ var CommandDeviceSetOptions = &cli.Command{
 		&cli.GenericFlag{Name: "primary-gpu", Value: flag_types.NewStringBool(), Usage: "use as primary GPU instead of standard Cirrus video card (on/off)"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
-		return client.WithGRPC(ctx, c, client.MachineHostDeviceSetOptions)
+		return grpc_client.CommandGRPC(ctx, c, client.MachineHostDeviceSetOptions)
 	},
 }

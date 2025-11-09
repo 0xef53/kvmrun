@@ -4,7 +4,7 @@ package kvmrun.api.services.tasks.v2;
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
-import "types/v2/types.proto";
+import "types/v2/tasks.proto";
 
 option go_package = "github.com/0xef53/kvmrun/api/services/tasks/v2;tasks";
 

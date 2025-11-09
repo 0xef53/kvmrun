@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package kvmrun.api.types.v2;
+
+option go_package = "github.com/0xef53/kvmrun/api/types/v2;types";
+
+message AppConf {
+    message KvmrunConf {
+        string qemu_rootdir = 1;
+        string cert_dir = 2;
+    }
+    KvmrunConf kvmrun = 1;
+}
+

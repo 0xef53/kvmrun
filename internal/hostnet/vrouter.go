@@ -24,25 +24,27 @@ var (
 	ErrCgroupBinding = errors.New("failed to configure cgroup")
 )
 
-type RouterDeviceAttrs struct {
-	Addrs          []string
-	MTU            uint32
-	BindInterface  string
-	DefaultGateway string
-	InLimit        uint32
-	OutLimit       uint32
-	ProcessID      uint32
+type VirtualRouterAttrs struct {
+	Addrs         []string
+	MTU           uint32
+	BindInterface string
+	Gateway4      string
+	Gateway6      string
+	InLimit       uint32
+	OutLimit      uint32
+
+	ProcessID uint32
 }
 
-func ConfigureRouter(linkname string, attrs *RouterDeviceAttrs, secondStage bool) error {
+func RouterConfigure(linkname string, attrs *VirtualRouterAttrs, secondStage bool) error {
 	if secondStage {
-		return ConfigureRouterAddrs(linkname, attrs)
+		return RouterConfigureAddrs(linkname, attrs.Addrs, attrs.Gateway4, attrs.Gateway6)
 	}
 
-	return ConfigureRouterInterface(linkname, attrs)
+	return RouterConfigureInterface(linkname, attrs)
 }
 
-func ConfigureRouterInterface(linkname string, attrs *RouterDeviceAttrs) error {
+func RouterConfigureInterface(linkname string, attrs *VirtualRouterAttrs) error {
 	if attrs.OutLimit > 0 && len(attrs.BindInterface) == 0 {
 		return fmt.Errorf("can not setup outbound limit: bind_interface is not set")
 	}
@@ -64,16 +66,16 @@ func ConfigureRouterInterface(linkname string, attrs *RouterDeviceAttrs) error {
 		}
 	}
 
-	if err := createBlackholeRules(linkname); err != nil {
+	if err := routerCreateBlackholeRules(linkname); err != nil {
 		return err
 	}
 
-	if err := setInboundLimits(linkname, attrs.InLimit); err != nil {
+	if err := routerSetInboundLimits(linkname, attrs.InLimit); err != nil {
 		return err
 	}
 
 	if len(attrs.BindInterface) > 0 {
-		if err := setOutboundLimits(linkname, linkID, attrs.ProcessID, attrs.OutLimit, attrs.BindInterface); err != nil {
+		if err := routerSetOutboundLimits(linkname, linkID, attrs.ProcessID, attrs.OutLimit, attrs.BindInterface); err != nil {
 			return err
 		}
 
@@ -89,7 +91,7 @@ func ConfigureRouterInterface(linkname string, attrs *RouterDeviceAttrs) error {
 	return nil
 }
 
-func createBlackholeRules(linkname string) error {
+func routerCreateBlackholeRules(linkname string) error {
 	/*
 		TODO: should be rewritten using the "netlink" library
 
@@ -107,7 +109,11 @@ func createBlackholeRules(linkname string) error {
 	return nil
 }
 
-func setInboundLimits(linkname string, rate uint32) error {
+func RouterSetInboundLimits(linkname string, rate uint32) error {
+	return routerSetInboundLimits(linkname, rate)
+}
+
+func routerSetInboundLimits(linkname string, rate uint32) error {
 	/*
 		TODO: should be rewritten using the "netlink" library
 	*/
@@ -137,7 +143,22 @@ func setInboundLimits(linkname string, rate uint32) error {
 	return nil
 }
 
-func setOutboundLimits(linkname string, linkID uint16, pid, rate uint32, bindInterface string) error {
+func RouterSetOutboundLimits(linkname string, rate uint32, bindInterface string, pid uint32) error {
+	link, err := netlink.LinkByName(linkname)
+	if err != nil {
+		return fmt.Errorf("netlink: %w", err)
+	}
+
+	linkID := GetLinkID(linkname, link.Attrs().Index)
+
+	if _, err := netlink.LinkByName(bindInterface); err != nil {
+		return fmt.Errorf("netlink: %w", err)
+	}
+
+	return routerSetOutboundLimits(linkname, linkID, pid, rate, bindInterface)
+}
+
+func routerSetOutboundLimits(linkname string, linkID uint16, pid, rate uint32, bindInterface string) error {
 	/*
 		TODO: should be rewritten using the "netlink" library
 	*/
@@ -195,30 +216,32 @@ func setOutboundLimits(linkname string, linkID uint16, pid, rate uint32, bindInt
 	return nil
 }
 
-func ConfigureRouterAddrs(linkname string, attrs *RouterDeviceAttrs) error {
+func RouterConfigureAddrs(linkname string, addrs []string, gateway4, gateway6 string) error {
 	link, err := netlink.LinkByName(linkname)
 	if err != nil {
 		return fmt.Errorf("netlink: %s", err)
 	}
 
-	for _, addr := range attrs.Addrs {
-		if err := addRoute(link, addr, "main"); err != nil {
+	for _, addr := range addrs {
+		if err := routerAddRoute(link, addr, "main"); err != nil {
+			fmt.Printf("DEBUG ConfigureRouterAddrs(): addRoute err (type = %T): %+v\n", err, err)
 			return err
 		}
-		if err := addRule(link, addr, "main"); err != nil {
+		if err := routerAddRule(link, addr, "main"); err != nil {
+			fmt.Printf("DEBUG ConfigureRouterAddrs(): addRule err (type = %T): %+v\n", err, err)
 			return err
 		}
 	}
 
 	// Send Gratuitous ARP for all router gateways
-	if err := announceRouterGateways(link, attrs); err != nil {
+	if err := routerAnnounceGateways(link, addrs, gateway4); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func addRoute(link netlink.Link, addr, table string) error {
+func routerAddRoute(link netlink.Link, addr, table string) error {
 	tableNum, err := utils.GetRouteTableIndex(table)
 	if err != nil {
 		return err
@@ -284,7 +307,7 @@ func addRoute(link netlink.Link, addr, table string) error {
 	return nil
 }
 
-func addRule(link netlink.Link, addr, table string) error {
+func routerAddRule(link netlink.Link, addr, table string) error {
 	tableNum, err := utils.GetRouteTableIndex(table)
 	if err != nil {
 		return err
@@ -314,10 +337,10 @@ func addRule(link netlink.Link, addr, table string) error {
 	return nil
 }
 
-func announceRouterGateways(link netlink.Link, attrs *RouterDeviceAttrs) error {
+func routerAnnounceGateways(link netlink.Link, addrs []string, gateway4 string) error {
 	gws := make(map[string]struct{})
 
-	for _, addr := range attrs.Addrs {
+	for _, addr := range addrs {
 		ip, err := utils.ParseIPNet(addr)
 		if err != nil {
 			return err
@@ -337,7 +360,7 @@ func announceRouterGateways(link netlink.Link, attrs *RouterDeviceAttrs) error {
 
 			gw = netip.MustParseAddr(lastIP.String()).Prev().String()
 		} else {
-			gw = attrs.DefaultGateway
+			gw = gateway4
 		}
 
 		if _, ok := gws[gw]; !ok && len(gw) > 0 {
@@ -350,7 +373,7 @@ func announceRouterGateways(link netlink.Link, attrs *RouterDeviceAttrs) error {
 	return nil
 }
 
-func DeconfigureRouter(linkname, bindInterface string) error {
+func RouterDeconfigure(linkname, bindInterface string) error {
 	// Remove all rules including blackhole
 	if rules, err := netlink.RuleList(netlink.FAMILY_ALL); err == nil {
 		for _, rule := range rules {
@@ -360,7 +383,7 @@ func DeconfigureRouter(linkname, bindInterface string) error {
 		}
 	}
 
-	removeBlackholeRulesV6(linkname)
+	routerRemoveBlackholeRulesV6(linkname)
 
 	// Remove all routes and addresses
 	if link, err := netlink.LinkByName(linkname); err == nil {
@@ -383,7 +406,7 @@ func DeconfigureRouter(linkname, bindInterface string) error {
 	}
 
 	// Remove all TC rules
-	setInboundLimits(linkname, 0)
+	routerSetInboundLimits(linkname, 0)
 
 	if len(bindInterface) > 0 {
 		attrs := struct {
@@ -403,7 +426,7 @@ func DeconfigureRouter(linkname, bindInterface string) error {
 
 		linkID := GetLinkID(linkname, attrs.Index)
 
-		setOutboundLimits(linkname, linkID, 0, 0, bindInterface)
+		routerSetOutboundLimits(linkname, linkID, 0, 0, bindInterface)
 
 		os.Remove(filepath.Join("/run/kvm-network", linkname))
 	}
@@ -411,7 +434,7 @@ func DeconfigureRouter(linkname, bindInterface string) error {
 	return nil
 }
 
-func removeBlackholeRulesV6(linkname string) error {
+func routerRemoveBlackholeRulesV6(linkname string) error {
 	/*
 		TODO: should be rewritten using the "netlink" library
 
