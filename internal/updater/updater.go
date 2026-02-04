@@ -9,10 +9,12 @@ import (
 	"os"
 	"time"
 
-	pb "github.com/0xef53/kvmrun/api/services/system/v1"
-	"github.com/0xef53/kvmrun/internal/grpcclient"
 	"github.com/0xef53/kvmrun/internal/osprober"
 	"github.com/0xef53/kvmrun/internal/systemd"
+
+	pb_system "github.com/0xef53/kvmrun/api/services/system/v2"
+
+	grpcclient "github.com/0xef53/go-grpc/client"
 
 	empty "github.com/golang/protobuf/ptypes/empty"
 )
@@ -86,7 +88,7 @@ func download(urlstr, filepath string) error {
 
 func GracefulRestart() error {
 	// Unix socket client
-	conn, err := grpcclient.NewConn("unix:@/run/kvmrund.sock", nil, false)
+	conn, err := grpcclient.NewInsecureConnection("unix:@/run/kvmrund.sock", nil)
 	if err != nil {
 		return err
 	}
@@ -98,7 +100,7 @@ func GracefulRestart() error {
 	}
 	defer systemctl.Close()
 
-	if _, err := pb.NewSystemServiceClient(conn).GracefulShutdown(context.Background(), new(empty.Empty)); err != nil {
+	if _, err := pb_system.NewSystemServiceClient(conn).ServerGracefulShutdown(context.Background(), new(empty.Empty)); err != nil {
 		return err
 	}
 

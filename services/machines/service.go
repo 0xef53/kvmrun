@@ -1,32 +1,41 @@
 package machines
 
 import (
+	"context"
 	"fmt"
 
-	pb "github.com/0xef53/kvmrun/api/services/machines/v1"
 	"github.com/0xef53/kvmrun/services"
 
+	pb "github.com/0xef53/kvmrun/api/services/machines/v2"
+
+	grpcserver "github.com/0xef53/go-grpc/server"
+
+	grpc_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	grpc "google.golang.org/grpc"
 )
 
-var _ pb.MachineServiceServer = &ServiceServer{}
+var _ = pb.MachineServiceServer(new(service))
 
 func init() {
-	services.Register(&ServiceServer{})
+	grpcserver.Register(new(service), grpcserver.WithServiceBucket("kvmrun"))
 }
 
-type ServiceServer struct {
+type service struct {
 	*services.ServiceServer
 }
 
-func (s *ServiceServer) Init(inner *services.ServiceServer) {
+func (s *service) Init(inner *services.ServiceServer) {
 	s.ServiceServer = inner
 }
 
-func (s *ServiceServer) Name() string {
+func (s *service) Name() string {
 	return fmt.Sprintf("%T", s)
 }
 
-func (s *ServiceServer) Register(server *grpc.Server) {
+func (s *service) RegisterGRPC(server *grpc.Server) {
 	pb.RegisterMachineServiceServer(server, s)
+}
+
+func (s *service) RegisterGW(mux *grpc_runtime.ServeMux, endpoint string, dialOpts []grpc.DialOption) {
+	pb.RegisterMachineServiceHandlerFromEndpoint(context.Background(), mux, endpoint, dialOpts)
 }

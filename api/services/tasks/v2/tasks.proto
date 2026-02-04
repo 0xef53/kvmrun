@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package kvmrun.api.services.tasks.v2;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "types/v2/tasks.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/tasks/v2;tasks";
+
+service TaskService {
+    rpc Get(GetRequest) returns (GetResponse) {
+        option (google.api.http).get = "/v2/tasks/{key}";
+    }
+
+    rpc List(ListRequest) returns (ListResponse) {
+        option (google.api.http).get = "/v2/tasks";
+    }
+
+    rpc Cancel(CancelRequest) returns (google.protobuf.Empty) {
+        option (google.api.http).delete = "/v2/tasks/{key}";
+    }
+}
+
+message GetRequest {
+    string key = 1;
+}
+
+message GetResponse {
+    types.v2.TaskInfo task = 1;
+}
+
+message ListRequest {
+    repeated string keys = 1;
+}
+
+message ListResponse {
+    repeated types.v2.TaskInfo tasks = 1;
+}
+
+message CancelRequest {
+    string key = 1;
+}

@@ -12,7 +12,7 @@ type UnknownBackendError struct {
 }
 
 func (e *UnknownBackendError) Error() string {
-	return fmt.Sprintf("could not determine backend type for disk: %s", e.Path)
+	return fmt.Sprintf("could not determine backend type for device: %s", e.Path)
 }
 
 func IsUnknownBackendError(err error) bool {

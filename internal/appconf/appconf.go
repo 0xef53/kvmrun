@@ -6,64 +6,88 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/0xef53/kvmrun/internal/grpcserver"
+	grpcserver "github.com/0xef53/go-grpc/server"
 
 	"gopkg.in/gcfg.v1"
 )
 
-type CommonParams struct {
-	CertDir   string      `gcfg:"cert-dir"`
-	CACrt     string      `gcfg:"-"`
-	CAKey     string      `gcfg:"-"`
-	ServerCrt string      `gcfg:"-"`
-	ServerKey string      `gcfg:"-"`
-	ClientCrt string      `gcfg:"-"`
-	ClientKey string      `gcfg:"-"`
-	TLSConfig *tls.Config `gcfg:"-"`
+type KvmrunConfig struct {
+	QemuRootDir string `gcfg:"qemu-rootdir"`
+	CertDir     string `gcfg:"cert-dir"`
 }
 
-// KvmrunConfig represents the Kvmrun configuration
-type KvmrunConfig struct {
-	Common CommonParams
-	Server grpcserver.ServerConf
+// Config represents the Kvmrun configuration
+type Config struct {
+	Kvmrun KvmrunConfig      `gcfg:"common"`
+	Server grpcserver.Config `gcfg:"server"`
+
+	TLSConfig *tls.Config `gcfg:"-"`
+
+	ServerCrt string `gcfg:"-"`
+	ServerKey string `gcfg:"-"`
+	ClientCrt string `gcfg:"-"`
+	ClientKey string `gcfg:"-"`
 }
 
 // NewConfig reads and parses the configuration file and returns
 // a new instance of KvmrunConfig on success.
-func NewConfig(p string) (*KvmrunConfig, error) {
-	cfg := KvmrunConfig{
-		Common: CommonParams{
-			CertDir: "/usr/share/kvmrun/tls",
+func newConfig(p string) (*Config, error) {
+	cfg := Config{
+		Kvmrun: KvmrunConfig{
+			QemuRootDir: "/",
+			CertDir:     "/usr/share/kvmrun/tls",
 		},
-		Server: grpcserver.ServerConf{
-			BindSocket: "/run/kvmrund.sock",
+		Server: grpcserver.Config{
+			Port:           9393,
+			GatewayPort:    9898,
+			GRPCSocketPath: "/run/kvmrund.sock",
 		},
 	}
 
 	err := gcfg.ReadFileInto(&cfg, p)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %s", err)
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	cfg.Common.CACrt = filepath.Join(cfg.Common.CertDir, "CA.crt")
-	cfg.Common.CAKey = filepath.Join(cfg.Common.CertDir, "CA.key")
-	cfg.Common.ServerCrt = filepath.Join(cfg.Common.CertDir, "server.crt")
-	cfg.Common.ServerKey = filepath.Join(cfg.Common.CertDir, "server.key")
-	cfg.Common.ClientCrt = filepath.Join(cfg.Common.CertDir, "client.crt")
-	cfg.Common.ClientKey = filepath.Join(cfg.Common.CertDir, "client.key")
+	cfg.ClientCrt = filepath.Join(cfg.Kvmrun.CertDir, "client.crt")
+	cfg.ClientKey = filepath.Join(cfg.Kvmrun.CertDir, "client.key")
 
 	// Client TLS
-	if v, err := tlsConfig(cfg.Common.ClientCrt, cfg.Common.ClientKey); err == nil {
-		cfg.Common.TLSConfig = v
+	if v, err := tlsConfig(cfg.ClientCrt, cfg.ClientKey); err == nil {
+		cfg.TLSConfig = v
 	} else {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
 	}
 
+	if v := strings.TrimSpace(cfg.Kvmrun.QemuRootDir); len(v) == 0 {
+		// Switch to default value
+		cfg.Kvmrun.QemuRootDir = "/"
+	} else {
+		if p, err := filepath.Abs(v); err == nil {
+			cfg.Kvmrun.QemuRootDir = p
+		} else {
+			return nil, err
+		}
+	}
+
+	return &cfg, nil
+}
+
+func NewServerConfig(p string) (*Config, error) {
+	cfg, err := newConfig(p)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.ServerCrt = filepath.Join(cfg.Kvmrun.CertDir, "server.crt")
+	cfg.ServerKey = filepath.Join(cfg.Kvmrun.CertDir, "server.key")
+
 	// Server TLS
-	if v, err := tlsConfig(cfg.Common.ServerCrt, cfg.Common.ServerKey); err == nil {
+	if v, err := tlsConfig(cfg.ServerCrt, cfg.ServerKey); err == nil {
 		cfg.Server.TLSConfig = v
 	} else {
 		if !os.IsNotExist(err) {
@@ -71,7 +95,11 @@ func NewConfig(p string) (*KvmrunConfig, error) {
 		}
 	}
 
-	return &cfg, nil
+	return cfg, nil
+}
+
+func NewClientConfig(p string) (*Config, error) {
+	return newConfig(p)
 }
 
 func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
@@ -81,7 +109,7 @@ func tlsConfig(certFile, keyFile string) (*tls.Config, error) {
 	}
 
 	if len(cert.Certificate) != 2 {
-		return nil, fmt.Errorf("certificate should have 2 concatenated certificates: server + CA")
+		return nil, fmt.Errorf("certificate should have 2 concatenated certificates: cert + CA")
 	}
 
 	ca, err := x509.ParseCertificate(cert.Certificate[1])

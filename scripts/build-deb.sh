@@ -16,8 +16,13 @@ trap "chown -R $(stat --printf '%u:%g' debian) $RESULT_DIR" 0
 declare -r GIT_COMMIT_REV="$(git show -s --format=%h)"
 declare -r GIT_REMOTE_URL="$(git ls-remote --get-url)"
 
-declare -r VER="$(bin/vmm version | awk -F',' '{gsub("v", "", $1); print $1}')"
-declare -r REVISION="git$(git rev-list HEAD --count).${GIT_COMMIT_REV}"
+declare -r VER="$(bin/vmm -config contrib/kvmrun.ini version | awk -F',' '{gsub("v", "", $1); print $1}')"
+
+declare REVISION="git.0"
+
+if [[ -n "$GIT_COMMIT_REV" ]]; then
+    REVISION="git$(git rev-list HEAD --count).${GIT_COMMIT_REV}"
+fi
 
 declare -r TMPDIR="$(mktemp -d)"
 
@@ -28,6 +33,9 @@ cp -t "$TMPDIR" -a "contrib"
 cp -t "$TMPDIR" "Makefile"
 
 cd "$TMPDIR"
+
+cp "contrib/qemu.wrapper.debian" "contrib/qemu.wrapper"
+chmod 0755 "contrib/qemu.wrapper"
 
 rm -vf "debian/changelog"
 

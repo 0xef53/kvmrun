@@ -43,7 +43,7 @@ func main() {
 	if iface.Ifup == "" {
 		return
 	}
-
+	//time.Sleep(600 * time.Second)
 	cmd := exec.Command(iface.Ifup, ifname)
 
 	cmd.Stdin = bytes.NewReader(c)

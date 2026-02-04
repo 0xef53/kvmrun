@@ -7,6 +7,8 @@ const (
 
 	CONFDIR = "/etc/kvmrun"
 
+	QEMU_BINARY = "/usr/lib/kvmrun/qemu.wrapper"
+
 	VMNETINIT = "/usr/lib/kvmrun/netinit"
 
 	QMPMONDIR  = "/var/run/kvm-monitor"
@@ -15,32 +17,7 @@ const (
 	MODULESDIR = "/var/lib/kvmrun/modules"
 	LOGDIR     = "/var/log/kvmrun"
 
-	CGROOTPATH = "kvmrun"
+	DEFAULT_QEMU_ROOTDIR = "/"
 )
 
-type DevDriver struct {
-	Name         string `json:"name"`
-	HotPluggable bool   `json:"hotplugguble"`
-}
-
-type DevDrivers []DevDriver
-
-func (d DevDrivers) Exists(name string) bool {
-	for _, v := range d {
-		if v.Name == name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (d DevDrivers) HotPluggable(name string) bool {
-	for _, v := range d {
-		if v.Name == name && v.HotPluggable {
-			return true
-		}
-	}
-
-	return false
-}
+const DriverType_UNKNOWN = 0

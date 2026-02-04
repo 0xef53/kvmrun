@@ -2,17 +2,17 @@ package kvmrun
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/user"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/0xef53/kvmrun/internal/pci"
+	"github.com/0xef53/kvmrun/kvmrun/backend"
 	"github.com/0xef53/kvmrun/kvmrun/backend/file"
+	"github.com/0xef53/kvmrun/kvmrun/internal/pool"
 )
 
 // InstanceConf represents a virtual machine configuration
@@ -23,13 +23,7 @@ type InstanceConf struct {
 	confname string `json:"-"`
 }
 
-func NewInstanceConf(vmname string) Instance {
-	allowed := regexp.MustCompile(`^[0-9A-Za-z_]{3,16}$`)
-
-	if !allowed.MatchString(vmname) {
-
-	}
-
+func newInstanceConf(vmname string) *InstanceConf {
 	vmc := InstanceConf{
 		InstanceProperties: &InstanceProperties{
 			name: vmname,
@@ -37,79 +31,68 @@ func NewInstanceConf(vmname string) Instance {
 		confname: "config",
 	}
 
-	vmc.Mem.Total = 128
-	vmc.Mem.Actual = 128
+	vmc.Memory.Total = 128
+	vmc.Memory.Actual = 128
 	vmc.CPU.Total = 1
 	vmc.CPU.Actual = 1
 
-	return Instance(&vmc)
+	return &vmc
+}
+
+func NewInstanceConf(vmname string) Instance {
+	return Instance(newInstanceConf(vmname))
 }
 
 func GetInstanceConf(vmname string) (Instance, error) {
-	vmc := InstanceConf{
-		InstanceProperties: &InstanceProperties{
-			name: vmname,
-		},
-		confname: "config",
+	vmname = strings.TrimSpace(vmname)
+
+	if len(vmname) == 0 {
+		return nil, fmt.Errorf("empty machine name")
 	}
 
-	vmc.Mem.Total = 128
-	vmc.Mem.Actual = 128
-	vmc.CPU.Total = 1
-	vmc.CPU.Actual = 1
+	vmc := newInstanceConf(vmname)
 
-	b, err := os.ReadFile(vmc.config())
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, &NotFoundError{vmname}
-		} else {
+	if b, err := os.ReadFile(vmc.config()); err == nil {
+		if err := json.Unmarshal(b, vmc); err != nil {
 			return nil, err
 		}
-	}
-	if err := json.Unmarshal(b, &vmc); err != nil {
+	} else {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%w: %s", ErrNotFound, vmname)
+		}
 		return nil, err
 	}
 
 	vmc.MachineType = strings.TrimSpace(strings.ToLower(vmc.MachineType))
 
-	if len(vmc.Firmware.Flash) > 0 {
-		b, err := NewFirmwareBackend(vmc.Firmware.Flash)
-		if err != nil {
-			return nil, err
-		}
-		vmc.Firmware.flashDisk = &Disk{
-			Path:    vmc.Firmware.Flash,
-			Driver:  "pflash",
-			Backend: b,
+	// If a path to persistent flash is set, flashDisk must not be nil.
+	if vmc.Firmware != nil && len(vmc.Firmware.Flash) > 0 && vmc.Firmware.flashDisk == nil {
+		return nil, &backend.UnknownBackendError{Path: vmc.Firmware.Flash}
+	}
+
+	// Each cdrom device must have a non-nil backend.
+	for _, cd := range vmc.Cdroms.Values() {
+		if len(cd.Media) > 0 && cd.MediaBackend == nil {
+			return nil, &backend.UnknownBackendError{Path: cd.Media}
 		}
 	}
 
-	for idx := range vmc.HostPCIDevices {
-		addr, err := pci.AddressFromHex(vmc.HostPCIDevices[idx].Addr)
-		if err != nil {
-			return nil, err
+	// Each disk device must have a non-nil backend.
+	for _, d := range vmc.Disks.Values() {
+		if d.Backend == nil {
+			return nil, &backend.UnknownBackendError{Path: d.Path}
 		}
-		vmc.HostPCIDevices[idx].BackendAddr = addr
-		vmc.HostPCIDevices[idx].Addr = addr.String() // normalizing
 	}
 
-	for idx := range vmc.Disks {
-		b, err := NewDiskBackend(vmc.Disks[idx].Path)
-		if err != nil {
-			return nil, err
-		}
-		vmc.Disks[idx].Backend = b
+	// CloudInit drive must have a non-nil backend.
+	if vmc.CloudInitDrive != nil && vmc.CloudInitDrive.Backend == nil {
+		return nil, &backend.UnknownBackendError{Path: vmc.CloudInitDrive.Media}
 	}
 
-	if vmc.CIDrive != nil {
-		if len(vmc.CIDrive.Media) > 0 {
-			b, err := NewCloudInitDriveBackend(vmc.CIDrive.Media)
-			if err != nil {
-				return nil, err
-			}
-			vmc.CIDrive.Backend = b
-		} else {
-			vmc.CIDrive = nil
+	// Each host-PCI device must have a non-nil backend address.
+	for _, dev := range vmc.HostDevices.Values() {
+		if dev.BackendAddr == nil {
+			return nil, fmt.Errorf("invalid host-pci addr: %s", dev.PCIAddr)
 		}
 	}
 
@@ -117,13 +100,18 @@ func GetInstanceConf(vmname string) (Instance, error) {
 	if err != nil {
 		return nil, err
 	}
-	uid, err := strconv.Atoi(vmuser.Uid)
-	if err != nil {
+
+	if uid, err := strconv.Atoi(vmuser.Uid); err == nil {
+		vmc.uid = uid
+	} else {
 		return nil, err
 	}
-	vmc.uid = uid
 
-	return Instance(&vmc), nil
+	return Instance(vmc), nil
+}
+
+func (c InstanceConf) config() string {
+	return filepath.Join(CONFDIR, c.name, c.confname)
 }
 
 func (c InstanceConf) IsIncoming() bool {
@@ -131,343 +119,308 @@ func (c InstanceConf) IsIncoming() bool {
 }
 
 func (c InstanceConf) Save() error {
+	if err := ValidateMachineName(c.Name()); err != nil {
+		return err
+	}
+
 	b, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(c.config(), b, 0644)
+	return os.WriteFile(c.config(), append(b, '\n'), 0644)
 }
 
 func (c InstanceConf) SaveStartupConfig() error {
+	if err := ValidateMachineName(c.Name()); err != nil {
+		return err
+	}
+
+	startupConfig := filepath.Join(CHROOTDIR, c.name, "run/startup_config")
+
 	b, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(CHROOTDIR, c.name, "run/startup_config"), b, 0644)
-}
-
-func (c InstanceConf) config() string {
-	return filepath.Join(CONFDIR, c.name, c.confname)
+	return os.WriteFile(startupConfig, append(b, '\n'), 0644)
 }
 
 func (c InstanceConf) Status() (InstanceState, error) {
 	return StateInactive, nil
 }
 
-func (c InstanceConf) Pid() int {
-	return 0
-}
-
-func (c *InstanceConf) SetActualCPUs(n int) error {
-	if n < 1 {
-		return fmt.Errorf("invalid cpu count: cannot be less than 1")
-	}
-	if n > c.CPU.Total {
-		return fmt.Errorf("invalid actual cpu: cannot be large than total cpu (%d)", c.CPU.Total)
-	}
-
-	c.CPU.Actual = n
-
-	return nil
-}
-
-func (c *InstanceConf) SetTotalCPUs(n int) error {
-	if n < 1 {
-		return fmt.Errorf("invalid cpu count: cannot be less than 1")
-	}
-	if n < c.CPU.Actual {
-		return fmt.Errorf("invalid total cpu: cannot be less than actual cpu")
-	}
-
-	c.CPU.Total = n
-
-	return nil
-}
-
-func (c *InstanceConf) SetCPUSockets(n int) error {
-	if n < 0 {
-		return fmt.Errorf("invalid number of processor sockets: cannot be less than 0")
-	}
-
-	if c.CPU.Total%n != 0 {
-		return fmt.Errorf("invalid number of processor sockets: total cpu count must be multiple of %d", n)
-	}
-
-	c.CPU.Sockets = n
-
-	return nil
-}
-
-func (c *InstanceConf) SetCPUModel(model string) error {
-	c.CPU.Model = model
-	return nil
-}
-
-func (c *InstanceConf) SetCPUQuota(quota int) error {
-	c.CPU.Quota = quota
-	return nil
-}
-
-func (c *InstanceConf) SetMachineType(t string) error {
-	c.MachineType = t
-	return nil
-}
-
-func (c *InstanceConf) SetFirmwareImage(p string) error {
-	if len(p) > 0 {
-		c.Firmware.Image = p
-	}
-
-	return nil
-}
-
-func (c *InstanceConf) SetFirmwareFlash(p string) error {
-	if len(p) != 0 && p != c.Firmware.Flash {
-		b, err := NewFirmwareBackend(p)
-		if err != nil {
-			return err
-		}
-		c.Firmware.flashDisk = &Disk{
-			Path:    p,
-			Driver:  "pflash",
-			Backend: b,
-		}
-		c.Firmware.Flash = p
-	}
-
-	return nil
-}
-
-func (c *InstanceConf) RemoveFirmwareConf() error {
-	c.Firmware.Image = ""
-	c.Firmware.Flash = ""
-	c.Firmware.flashDisk = nil
-
-	return nil
-}
-
-func (c *InstanceConf) SetActualMem(s int) error {
-	if s < 1 {
-		return fmt.Errorf("invalid memory size: cannot be less than 1")
-	}
-	if s > c.Mem.Total {
-		return fmt.Errorf("invalid actual memory: cannot be large than total memory (%d)", c.Mem.Total)
-	}
-
-	c.Mem.Actual = s
-
-	return nil
-}
-
-func (c *InstanceConf) SetTotalMem(s int) error {
-	if s < 1 {
-		return fmt.Errorf("invalid memory size: cannot be less than 1")
-	}
-	if s < c.Mem.Actual {
-		return fmt.Errorf("invalid total memory: cannot be less than actual memory")
-	}
-
-	c.Mem.Total = s
-
-	return nil
-}
-
-func (c *InstanceConf) AppendHostPCI(d HostPCI) error {
-	if c.HostPCIDevices.Exists(d.Addr) {
-		return &AlreadyConnectedError{"instance_conf", d.Addr}
-	}
-
-	c.HostPCIDevices.Append(&d)
-
-	return nil
-}
-
-func (c *InstanceConf) RemoveHostPCI(hexaddr string) error {
-	addr, err := pci.AddressFromHex(hexaddr)
+func (c *InstanceConf) MachineTypeSet(typename string) error {
+	t, err := ParseMachineType(typename)
 	if err != nil {
 		return err
 	}
 
-	if c.HostPCIDevices.Exists(addr.String()) {
-		return c.HostPCIDevices.Remove(addr.String())
-	}
-
-	return &NotConnectedError{"instance_conf", addr.String()}
-}
-
-func (c *InstanceConf) SetHostPCIMultifunctionOption(hexaddr string, enabled bool) error {
-	d := c.HostPCIDevices.Get(hexaddr)
-	if d == nil {
-		return &NotConnectedError{"instance_conf", hexaddr}
-	}
-
-	d.Multifunction = enabled
+	c.MachineType = t.name
 
 	return nil
 }
 
-func (c *InstanceConf) SetHostPCIPrimaryGPUOption(hexaddr string, enabled bool) error {
-	d := c.HostPCIDevices.Get(hexaddr)
-	if d == nil {
-		return &NotConnectedError{"instance_conf", hexaddr}
+func (c *InstanceConf) FirmwareSetImage(image string) error {
+	if c.Firmware == nil {
+		if fw, err := NewFirmware(image, ""); err == nil {
+			c.Firmware = fw
+		} else {
+			return err
+		}
 	}
 
-	d.PrimaryGPU = enabled
+	return c.Firmware.SetImage(image)
+}
+
+func (c *InstanceConf) FirmwareSetFlash(flash string) error {
+	if c.Firmware == nil {
+		return fmt.Errorf("firmware image must be set before this operation")
+	}
+
+	return c.Firmware.SetFlash(flash)
+}
+
+func (c *InstanceConf) FirmwareRemoveConf() error {
+	c.Firmware = nil
 
 	return nil
 }
 
-func (c *InstanceConf) AppendInputDevice(d InputDevice) error {
-	if c.Inputs.Exists(d.Type) {
-		return &AlreadyConnectedError{"instance_conf", d.Type}
-	}
-
-	c.Inputs.Append(&d)
-
-	return nil
+func (c *InstanceConf) MemorySetActual(value int) error {
+	return c.Memory.SetActual(value)
 }
 
-func (c *InstanceConf) RemoveInputDevice(t string) error {
-	if c.Inputs.Exists(t) {
-		return c.Inputs.Remove(t)
-	}
-
-	return &NotConnectedError{"instance_conf", t}
+func (c *InstanceConf) MemorySetTotal(value int) error {
+	return c.Memory.SetTotal(value)
 }
 
-func (c *InstanceConf) AppendCdrom(d Cdrom) error {
-	if c.Cdroms.Exists(d.Name) {
-		return &AlreadyConnectedError{"instance_conf", d.Name}
-	}
-
-	if !CdromDrivers.Exists(d.Driver) {
-		return fmt.Errorf("unknown disk driver: %s", d.Driver)
-	}
-
-	c.Cdroms.Append(&d)
-
-	return nil
+func (c *InstanceConf) CPUSetActual(value int) error {
+	return c.CPU.SetActual(value)
 }
 
-func (c *InstanceConf) InsertCdrom(d Cdrom, idx int) error {
-	if c.Cdroms.Exists(d.Name) {
-		return &AlreadyConnectedError{"instance_conf", d.Name}
+func (c *InstanceConf) CPUSetTotal(value int) error {
+	return c.CPU.SetTotal(value)
+}
+
+func (c *InstanceConf) CPUSetSockets(value int) error {
+	return c.CPU.SetSockets(value)
+}
+
+func (c *InstanceConf) CPUSetModel(value string) error {
+	return c.CPU.SetModel(value)
+}
+
+func (c *InstanceConf) CPUSetQuota(value int) error {
+	return c.CPU.SetQuota(value)
+}
+
+func (c *InstanceConf) InputDeviceAppend(opts InputDeviceProperties) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	if !CdromDrivers.Exists(d.Driver) {
-		return fmt.Errorf("unknown disk driver: %s", d.Driver)
-	}
+	dev := InputDevice{InputDeviceProperties: opts}
 
-	if idx > len(c.Cdroms) {
-		idx = len(c.Cdroms)
-	}
+	if err := c.InputDevices.Append(&dev); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", dev.Type}
+		}
 
-	if err := c.Cdroms.Insert(&d, idx); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveCdrom(name string) error {
-	if c.Cdroms.Exists(name) {
-		return c.Cdroms.Remove(name)
+func (c *InstanceConf) InputDeviceRemove(devtype string) error {
+	err := c.InputDevices.Remove(devtype)
+
+	if errors.Is(err, pool.ErrNotFound) {
+		return &NotConnectedError{"instance_conf", devtype}
 	}
 
-	return &NotConnectedError{"instance_conf", name}
+	return err
 }
 
-func (c *InstanceConf) ChangeCdromMedia(name, media string) error {
-	d := c.Cdroms.Get(name)
-	if d == nil {
-		return &NotConnectedError{"instance_conf", name}
+func (c *InstanceConf) CdromAppend(opts CdromProperties) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	if b, err := NewCdromBackend(media); err == nil {
-		d.Backend = b
+	cd := Cdrom{
+		CdromProperties: opts,
+		driver:          CdromDriverTypeValue(opts.Driver),
+	}
+
+	if len(cd.Media) > 0 {
+		if be, err := NewDiskBackend(cd.Media); err == nil {
+			cd.MediaBackend = be
+		} else {
+			return err
+		}
+	}
+
+	if err := c.Cdroms.Append(&cd); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", cd.Name}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (c *InstanceConf) CdromInsert(opts CdromProperties, position int) error {
+	if err := opts.Validate(true); err != nil {
+		return err
+	}
+
+	cd := Cdrom{
+		CdromProperties: opts,
+		driver:          CdromDriverTypeValue(opts.Driver),
+	}
+
+	if len(cd.Media) > 0 {
+		if be, err := NewDiskBackend(cd.Media); err == nil {
+			cd.MediaBackend = be
+		} else {
+			return err
+		}
+	}
+
+	if err := c.Cdroms.Insert(&cd, position); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", cd.Name}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (c *InstanceConf) CdromRemove(devname string) error {
+	err := c.Cdroms.Remove(devname)
+
+	if errors.Is(err, pool.ErrNotFound) {
+		return &NotConnectedError{"instance_conf", devname}
+	}
+
+	return err
+}
+
+func (c *InstanceConf) CdromChangeMedia(devname, media string) error {
+	media = strings.TrimSpace(media)
+
+	if len(media) == 0 {
+		return fmt.Errorf("empty cdrom media")
+	}
+
+	cd := c.Cdroms.Get(devname)
+
+	if cd == nil {
+		return &NotConnectedError{"instance_conf", devname}
+	}
+
+	if cd.Media == media {
+		return &AlreadyConnectedError{"instance_conf", media}
+	}
+
+	if be, err := NewCdromBackend(media); err == nil {
+		cd.MediaBackend = be
 	} else {
 		return err
 	}
 
-	d.Media = media
+	cd.Media = media
 
 	return nil
 }
 
-func (c InstanceConf) ResizeQemuBlockdev(_ string) error {
-	return ErrNotImplemented
-}
+func (c *InstanceConf) CdromRemoveMedia(devname string) error {
+	cd := c.Cdroms.Get(devname)
 
-func (c *InstanceConf) AppendDisk(d Disk) error {
-	if !DiskDrivers.Exists(d.Driver) {
-		return fmt.Errorf("unknown disk driver: %s", d.Driver)
+	if cd == nil {
+		return &NotConnectedError{"instance_conf", devname}
 	}
 
-	if c.Disks.Exists(d.Path) {
-		return &AlreadyConnectedError{"instance_conf", d.Path}
-	}
-
-	c.Disks.Append(&d)
+	cd.Media = ""
+	cd.MediaBackend = nil
 
 	return nil
 }
 
-func (c *InstanceConf) InsertDisk(d Disk, idx int) error {
-	if !DiskDrivers.Exists(d.Driver) {
-		return fmt.Errorf("unknown disk driver: %s", d.Driver)
+func (c *InstanceConf) DiskAppend(opts DiskProperties) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	if idx > len(c.Disks) {
-		idx = len(c.Disks)
+	d := Disk{
+		DiskProperties: opts,
+		driver:         DiskDriverTypeValue(opts.Driver),
 	}
 
-	if c.Disks.Exists(d.Path) {
-		return &AlreadyConnectedError{"instance_conf", d.Path}
+	if be, err := NewDiskBackend(d.Path); err == nil {
+		d.Backend = be
+	} else {
+		return err
 	}
 
-	if err := c.Disks.Insert(&d, idx); err != nil {
+	if err := c.Disks.Append(&d); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", d.Path}
+		}
 		return err
 	}
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveDisk(dpath string) error {
-	if !c.Disks.Exists(dpath) {
-		return &NotConnectedError{"instance_conf", dpath}
+func (c *InstanceConf) DiskInsert(opts DiskProperties, position int) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	return c.Disks.Remove(dpath)
-}
-
-func (c *InstanceConf) AppendProxy(proxy Proxy) error {
-	if c.Proxy.Exists(proxy.Path) {
-		return &AlreadyConnectedError{"instance_conf", proxy.Path}
+	d := Disk{
+		DiskProperties: opts,
+		driver:         DiskDriverTypeValue(opts.Driver),
 	}
 
-	c.Proxy.Append(&proxy)
+	if be, err := NewDiskBackend(d.Path); err == nil {
+		d.Backend = be
+	} else {
+		return err
+	}
+
+	if err := c.Disks.Insert(&d, position); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", d.Path}
+		}
+		return err
+	}
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveProxy(fullpath string) error {
-	if !c.Proxy.Exists(fullpath) {
-		return &NotConnectedError{"instance_conf", fullpath}
+func (c *InstanceConf) DiskRemove(diskname string) error {
+	err := c.Disks.Remove(diskname)
+
+	if errors.Is(err, pool.ErrNotFound) {
+		return &NotConnectedError{"instance_conf", diskname}
 	}
 
-	return c.Proxy.Remove(fullpath)
+	return err
 }
 
-func (c *InstanceConf) SetDiskReadIops(dpath string, iops int) error {
+func (c *InstanceConf) DiskSetReadIops(diskname string, iops int) error {
 	if iops < 0 {
 		return fmt.Errorf("invalid iops value: cannot be less than 0")
 	}
 
-	d := c.Disks.Get(dpath)
+	d := c.Disks.Get(diskname)
+
 	if d == nil {
-		return &NotConnectedError{"instance_conf", dpath}
+		return &NotConnectedError{"instance_conf", diskname}
 	}
 
 	d.IopsRd = iops
@@ -475,14 +428,15 @@ func (c *InstanceConf) SetDiskReadIops(dpath string, iops int) error {
 	return nil
 }
 
-func (c *InstanceConf) SetDiskWriteIops(dpath string, iops int) error {
+func (c *InstanceConf) DiskSetWriteIops(diskname string, iops int) error {
 	if iops < 0 {
 		return fmt.Errorf("invalid iops value: cannot be less than 0")
 	}
 
-	d := c.Disks.Get(dpath)
+	d := c.Disks.Get(diskname)
+
 	if d == nil {
-		return &NotConnectedError{"instance_conf", dpath}
+		return &NotConnectedError{"instance_conf", diskname}
 	}
 
 	d.IopsWr = iops
@@ -490,46 +444,51 @@ func (c *InstanceConf) SetDiskWriteIops(dpath string, iops int) error {
 	return nil
 }
 
-func (c InstanceConf) RemoveDiskBitmap(dpath string) error {
+func (c InstanceConf) DiskRemoveQemuBitmap(_ string) error {
 	return ErrNotImplemented
 }
 
-func (c *InstanceConf) AppendNetIface(iface NetIface) error {
-	if len(iface.Ifname) == 0 {
-		return fmt.Errorf("undefined network interface name")
-	}
+func (c InstanceConf) DiskResizeQemuBlockdev(_ string) error {
+	return ErrNotImplemented
+}
 
-	if !NetDrivers.Exists(iface.Driver) {
-		return fmt.Errorf("unknown network interface driver: %s", iface.Driver)
-	}
-
-	if c.NetIfaces.Exists(iface.Ifname) {
-		return &AlreadyConnectedError{"instance_conf", iface.Ifname}
-	}
-
-	if _, err := net.ParseMAC(iface.HwAddr); err != nil {
+func (c *InstanceConf) NetIfaceAppend(opts NetIfaceProperties) error {
+	if err := opts.Validate(true); err != nil {
 		return err
 	}
 
-	c.NetIfaces.Append(&iface)
+	n := NetIface{
+		NetIfaceProperties: opts,
+		driver:             NetDriverTypeValue(opts.Driver),
+	}
+
+	if err := c.NetIfaces.Append(&n); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", n.Ifname}
+		}
+		return err
+	}
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveNetIface(ifname string) error {
-	if !c.NetIfaces.Exists(ifname) {
+func (c *InstanceConf) NetIfaceRemove(ifname string) error {
+	err := c.NetIfaces.Remove(ifname)
+
+	if errors.Is(err, pool.ErrNotFound) {
 		return &NotConnectedError{"instance_conf", ifname}
 	}
 
-	return c.NetIfaces.Remove(ifname)
+	return err
 }
 
-func (c *InstanceConf) SetNetIfaceQueues(ifname string, queues int) error {
-	if queues == 1 {
-		return fmt.Errorf("invalid queues value: must be greater than 1")
+func (c *InstanceConf) NetIfaceSetQueues(ifname string, queues int) error {
+	if queues < 1 {
+		return fmt.Errorf("invalid queues value: cannot be less than 1")
 	}
 
 	n := c.NetIfaces.Get(ifname)
+
 	if n == nil {
 		return &NotConnectedError{"instance_conf", ifname}
 	}
@@ -539,12 +498,16 @@ func (c *InstanceConf) SetNetIfaceQueues(ifname string, queues int) error {
 	return nil
 }
 
-func (c *InstanceConf) SetNetIfaceUpScript(ifname, scriptPath string) error {
+func (c *InstanceConf) NetIfaceSetUpScript(ifname, scriptPath string) error {
 	if _, err := os.Stat(scriptPath); err != nil {
-		return fmt.Errorf("file not found: %s", scriptPath)
+		if os.IsNotExist(err) {
+			return err
+		}
+		return fmt.Errorf("failed to check %s: %w", scriptPath, err)
 	}
 
 	n := c.NetIfaces.Get(ifname)
+
 	if n == nil {
 		return &NotConnectedError{"instance_conf", ifname}
 	}
@@ -554,12 +517,16 @@ func (c *InstanceConf) SetNetIfaceUpScript(ifname, scriptPath string) error {
 	return nil
 }
 
-func (c *InstanceConf) SetNetIfaceDownScript(ifname, scriptPath string) error {
+func (c *InstanceConf) NetIfaceSetDownScript(ifname, scriptPath string) error {
 	if _, err := os.Stat(scriptPath); err != nil {
-		return fmt.Errorf("file not found: %s", scriptPath)
+		if os.IsNotExist(err) {
+			return err
+		}
+		return fmt.Errorf("failed to check %s: %w", scriptPath, err)
 	}
 
 	n := c.NetIfaces.Get(ifname)
+
 	if n == nil {
 		return &NotConnectedError{"instance_conf", ifname}
 	}
@@ -569,36 +536,33 @@ func (c *InstanceConf) SetNetIfaceDownScript(ifname, scriptPath string) error {
 	return nil
 }
 
-func (c *InstanceConf) SetNetIfaceLinkUp(ifname string) error {
+func (c *InstanceConf) NetIfaceSetLinkUp(_ string) error {
 	return ErrNotImplemented
 }
 
-func (c *InstanceConf) SetNetIfaceLinkDown(ifname string) error {
+func (c *InstanceConf) NetIfaceSetLinkDown(_ string) error {
 	return ErrNotImplemented
 }
 
-func (c *InstanceConf) AppendVSockDevice(cid uint32) error {
+func (c *InstanceConf) VSockDeviceAppend(opts ChannelVSockProperties) error {
 	if c.VSockDevice != nil {
 		return &AlreadyConnectedError{"instance_conf", "vsock device"}
 	}
 
-	vsock := new(VirtioVSock)
-
-	switch {
-	case cid == 0:
-		vsock.Auto = true
-	case cid >= 3:
-		vsock.ContextID = cid
-	default:
-		return ErrIncorrectContextID
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	c.VSockDevice = vsock
+	vsock := ChannelVSock{
+		ChannelVSockProperties: opts,
+	}
+
+	c.VSockDevice = &vsock
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveVSockDevice() error {
+func (c *InstanceConf) VSockDeviceRemove() error {
 	if c.VSockDevice == nil {
 		return &NotConnectedError{"instance_conf", "vsock device"}
 	}
@@ -608,8 +572,8 @@ func (c *InstanceConf) RemoveVSockDevice() error {
 	return nil
 }
 
-func (c *InstanceConf) SetCloudInitMedia(s string) error {
-	newdrive, err := NewCloudInitDrive(s)
+func (c *InstanceConf) CloudInitSetMedia(media string) error {
+	newdrive, err := NewCloudInitDrive(media)
 	if err != nil {
 		return err
 	}
@@ -620,65 +584,114 @@ func (c *InstanceConf) SetCloudInitMedia(s string) error {
 		}
 	}
 
-	if c.CIDrive != nil {
-		newdrive.Driver = c.CIDrive.Driver
+	if c.CloudInitDrive != nil {
+		newdrive.CloudInitDriveProperties.Driver = c.CloudInitDrive.Driver().String()
+		newdrive.driver = c.CloudInitDrive.Driver()
 	}
 
-	c.CIDrive = newdrive
+	c.CloudInitDrive = newdrive
 
 	return nil
 }
 
-func (c *InstanceConf) SetCloudInitDriver(s string) error {
-	if c.CIDrive == nil {
+func (c *InstanceConf) CloudInitSetDriver(driverName string) error {
+	if c.CloudInitDrive == nil {
 		return &NotConnectedError{"instance_conf", "cloud-init drive"}
 	}
 
-	if !CloudInitDrivers.Exists(s) {
-		return fmt.Errorf("unknown cloud-init device driver: %s", s)
+	driver := CloudInitDriverTypeValue(strings.TrimSpace(driverName))
+
+	if driver == DriverType_UNKNOWN {
+		return fmt.Errorf("unknown cloud-init driver: %s", driverName)
 	}
-	c.CIDrive.Driver = s
+
+	c.CloudInitDrive.CloudInitDriveProperties.Driver = driver.String()
+	c.CloudInitDrive.driver = driver
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveCloudInitConf() error {
-	c.CIDrive = nil
+func (c *InstanceConf) CloudInitRemoveConf() error {
+	c.CloudInitDrive = nil
 
 	return nil
 }
 
-func (c *InstanceConf) RemoveKernelConf() error {
-	c.Kernel.Image = ""
-	c.Kernel.Cmdline = ""
-	c.Kernel.Initrd = ""
-	c.Kernel.Modiso = ""
+func (c *InstanceConf) KernelSetImage(value string) error {
+	return c.Kernel.SetImage(value)
+}
+
+func (c *InstanceConf) KernelSetCmdline(value string) error {
+	return c.Kernel.SetCmdline(value)
+}
+
+func (c *InstanceConf) KernelSetInitrd(value string) error {
+	return c.Kernel.SetInitrd(value)
+}
+
+func (c *InstanceConf) KernelSetModiso(value string) error {
+	return c.Kernel.SetModiso(value)
+}
+
+func (c *InstanceConf) KernelRemoveConf() error {
+	return c.Kernel.Reset()
+}
+
+func (c *InstanceConf) HostDeviceAppend(opts HostDeviceProperties) error {
+	dev, err := NewHostDevice(opts.PCIAddr)
+	if err != nil {
+		return err
+	}
+
+	dev.PrimaryGPU = opts.PrimaryGPU
+	dev.Multifunction = opts.Multifunction
+
+	if err := c.HostDevices.Append(dev); err != nil {
+		if errors.Is(err, pool.ErrAlreadyExists) {
+			return &AlreadyConnectedError{"instance_conf", dev.PCIAddr}
+		}
+
+		return err
+	}
 
 	return nil
 }
 
-func (c *InstanceConf) SetKernelImage(s string) error {
-	c.Kernel.Image = s
+func (c *InstanceConf) HostDeviceRemove(hexaddr string) error {
+	err := c.HostDevices.Remove(hexaddr)
+
+	if errors.Is(err, pool.ErrNotFound) {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	return err
+}
+
+func (c *InstanceConf) HostDeviceSetMultifunctionOption(hexaddr string, enabled bool) error {
+	dev := c.HostDevices.Get(hexaddr)
+
+	if dev == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	dev.Multifunction = enabled
 
 	return nil
 }
 
-func (c *InstanceConf) SetKernelCmdline(s string) error {
-	c.Kernel.Cmdline = s
+func (c *InstanceConf) HostDeviceSetPrimaryGPUOption(hexaddr string, enabled bool) error {
+	dev := c.HostDevices.Get(hexaddr)
+
+	if dev == nil {
+		return &NotConnectedError{"instance_conf", hexaddr}
+	}
+
+	dev.PrimaryGPU = enabled
+
 	return nil
 }
 
-func (c *InstanceConf) SetKernelInitrd(s string) error {
-	c.Kernel.Initrd = s
-	return nil
-}
-
-func (c *InstanceConf) SetKernelModiso(s string) error {
-	c.Kernel.Modiso = s
-	return nil
-}
-
-func (c InstanceConf) SetVNCPassword(s string) error {
+func (c InstanceConf) VNCSetPassword(s string) error {
 	return ErrNotImplemented
 }
 
@@ -722,44 +735,36 @@ func GetIncomingConf(vmname string) (Instance, error) {
 		},
 	}
 
-	b, err := os.ReadFile(c.config())
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, err
-	}
-
-	if len(c.Firmware.Flash) > 0 {
-		b, err := NewFirmwareBackend(c.Firmware.Flash)
-		if err != nil {
+	if b, err := os.ReadFile(c.config()); err == nil {
+		if err := json.Unmarshal(b, &c); err != nil {
 			return nil, err
 		}
-		c.Firmware.flashDisk = &Disk{
-			Path:    c.Firmware.Flash,
-			Driver:  "pflash",
-			Backend: b,
+	} else {
+		return nil, err
+	}
+
+	// If a path to persistent flash is set, flashDisk must not be nil.
+	if c.Firmware != nil && len(c.Firmware.Flash) > 0 && c.Firmware.flashDisk == nil {
+		return nil, &backend.UnknownBackendError{Path: c.Firmware.Flash}
+	}
+
+	// Each cdrom device must have a non-nil backend.
+	for _, cd := range c.Cdroms.Values() {
+		if len(cd.Media) > 0 && cd.MediaBackend == nil {
+			return nil, &backend.UnknownBackendError{Path: cd.Media}
 		}
 	}
 
-	for idx := range c.Disks {
-		b, err := NewDiskBackend(c.Disks[idx].Path)
-		if err != nil {
-			return nil, err
+	// Each disk device must have a non-nil backend.
+	for _, d := range c.Disks.Values() {
+		if d.Backend == nil {
+			return nil, &backend.UnknownBackendError{Path: d.Path}
 		}
-		c.Disks[idx].Backend = b
 	}
 
-	if c.CIDrive != nil {
-		if len(c.CIDrive.Media) > 0 {
-			b, err := NewCloudInitDriveBackend(c.CIDrive.Media)
-			if err != nil {
-				return nil, err
-			}
-			c.CIDrive.Backend = b
-		} else {
-			c.CIDrive = nil
-		}
+	// CloudInit drive must have a non-nil backend.
+	if c.CloudInitDrive != nil && c.CloudInitDrive.Backend == nil {
+		return nil, &backend.UnknownBackendError{Path: c.CloudInitDrive.Media}
 	}
 
 	return &c, nil
@@ -781,52 +786,42 @@ func GetStartupConf(vmname string) (Instance, error) {
 		},
 	}
 
-	b, err := os.ReadFile(c.config())
-	if err != nil {
+	if b, err := os.ReadFile(c.config()); err == nil {
+		if err := json.Unmarshal(b, &c); err != nil {
+			return nil, err
+		}
+	} else {
 		return nil, err
 	}
-	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, err
+
+	// If a path to persistent flash is set, flashDisk must not be nil.
+	if c.Firmware != nil && len(c.Firmware.Flash) > 0 && c.Firmware.flashDisk == nil {
+		return nil, &backend.UnknownBackendError{Path: c.Firmware.Flash}
 	}
 
-	if len(c.Firmware.Flash) > 0 {
-		b, err := NewFirmwareBackend(c.Firmware.Flash)
-		if err != nil {
-			return nil, err
-		}
-		c.Firmware.flashDisk = &Disk{
-			Path:    c.Firmware.Flash,
-			Driver:  "pflash",
-			Backend: b,
+	// Each cdrom device must have a non-nil backend.
+	for _, cd := range c.Cdroms.Values() {
+		if len(cd.Media) > 0 && cd.MediaBackend == nil {
+			return nil, &backend.UnknownBackendError{Path: cd.Media}
 		}
 	}
 
-	for idx := range c.HostPCIDevices {
-		addr, err := pci.AddressFromHex(c.HostPCIDevices[idx].Addr)
-		if err != nil {
-			return nil, err
+	// Each disk device must have a non-nil backend.
+	for _, d := range c.Disks.Values() {
+		if d.Backend == nil {
+			return nil, &backend.UnknownBackendError{Path: d.Path}
 		}
-		c.HostPCIDevices[idx].BackendAddr = addr
-		c.HostPCIDevices[idx].Addr = addr.String() // normalizing
 	}
 
-	for idx := range c.Disks {
-		b, err := NewDiskBackend(c.Disks[idx].Path)
-		if err != nil {
-			return nil, err
-		}
-		c.Disks[idx].Backend = b
+	// CloudInit drive must have a non-nil backend.
+	if c.CloudInitDrive != nil && c.CloudInitDrive.Backend == nil {
+		return nil, &backend.UnknownBackendError{Path: c.CloudInitDrive.Media}
 	}
 
-	if c.CIDrive != nil {
-		if len(c.CIDrive.Media) > 0 {
-			b, err := NewCloudInitDriveBackend(c.CIDrive.Media)
-			if err != nil {
-				return nil, err
-			}
-			c.CIDrive.Backend = b
-		} else {
-			c.CIDrive = nil
+	// Each host-PCI device must have a non-nil backend address.
+	for _, dev := range c.HostDevices.Values() {
+		if dev.BackendAddr == nil {
+			return nil, fmt.Errorf("invalid host-pci addr: %s", dev.PCIAddr)
 		}
 	}
 

@@ -48,7 +48,10 @@ func (d *Device) IsAvailable() (bool, error) {
 }
 
 func (d *Device) Copy() backend.DiskBackend {
+	_uri := *d.URI
+
 	return &Device{
 		Path: d.Path,
+		URI:  &_uri,
 	}
 }

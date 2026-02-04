@@ -36,7 +36,7 @@ func CreateVolume(vgname, lvname string, size uint64) error {
 		if (st.Mode & unix.S_IFMT) != unix.S_IFBLK { // S_IFMT -- type of file
 			return fmt.Errorf("path exists but is not a block device: %s", devpath)
 		}
-		return &os.PathError{"lvcreate", devpath, os.ErrExist}
+		return &os.PathError{Op: "lvcreate", Path: devpath, Err: os.ErrExist}
 	case os.IsNotExist(err):
 	default:
 		return err
@@ -69,7 +69,7 @@ func RemoveVolume(devpath string) error {
 			return fmt.Errorf("path exists but is not a block device: %s", devpath)
 		}
 	case os.IsNotExist(err):
-		return &os.PathError{"lvremove", devpath, os.ErrNotExist}
+		return &os.PathError{Op: "lvremove", Path: devpath, Err: os.ErrNotExist}
 	default:
 		return err
 	}

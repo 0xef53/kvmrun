@@ -1,6 +1,8 @@
 package kvmrun
 
 import (
+	"errors"
+
 	qmp "github.com/0xef53/go-qmp/v2"
 )
 
@@ -17,10 +19,7 @@ func GetMachine(vmname string, mon *qmp.Monitor) (*Machine, error) {
 	}
 
 	vmr, err := GetInstanceQemu(vmname, mon)
-	switch err.(type) {
-	case nil:
-	case *NotRunningError:
-	default:
+	if err != nil && !errors.Is(err, ErrNotRunning) {
 		return nil, err
 	}
 

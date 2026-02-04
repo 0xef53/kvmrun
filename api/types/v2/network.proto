@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package kvmrun.api.types.v2;
+
+option go_package = "github.com/0xef53/kvmrun/api/types/v2;types";
+
+message NetworkEndPoint {
+    message Port {
+        string link_name = 1;
+        uint32 link_index = 2;
+    }
+    message Vlan {
+        uint32 vlan_id = 1;
+        repeated Port ports = 3;
+    }
+    message Vxlan {
+        uint32 vni = 1;
+        repeated Port ports = 3;
+    }
+    message IPFabric {
+        repeated string ipnets = 1;
+    }
+    string link_name = 1;
+    uint32 link_index = 2;
+    oneof attrs {
+        Vlan vlan_attrs = 3;
+        Vxlan vxlan_attrs = 4;
+        IPFabric ipfabric_attrs = 5;
+    }
+}
+
+message NetworkSchemeOpts {
+    message Attrs_VLAN {
+        uint32 vlan_id = 1;
+        string parent_interface = 2;
+    }
+    message Attrs_VxLAN {
+        uint32 vni = 1;
+        string bind_interface = 2;
+    }
+    message Attrs_Router {
+        string bind_interface = 1;
+        uint32 in_limit = 2;
+        uint32 out_limit = 3;
+        uint32 process_id = 100;
+    }
+    message Attrs_Bridge {
+        string bridge_name = 1;
+    }
+    string ifname = 1;
+    uint32 mtu = 2;
+    oneof attrs {
+        Attrs_VLAN vlan = 11;
+        Attrs_VxLAN vxlan = 12;
+        Attrs_Router router = 13;
+        Attrs_Bridge bridge = 14;
+    }
+    repeated string addrs = 21;
+    string gateway4 = 22;
+    string gateway6 = 23;
+}
+
+enum NetworkSchemeType {
+    UNDEFINED_SCHEME = 0;
+    ROUTED = 1;
+    BRIDGE = 2;
+    VXLAN = 3;
+    VLAN = 4;
+}
+

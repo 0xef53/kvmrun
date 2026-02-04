@@ -3,8 +3,8 @@ package kvmrun
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,27 +30,29 @@ func (r *InstanceQemu_i440fx) init() error {
 	var gr errgroup.Group
 
 	r.pciDevs = make([]qemu_types.PCIInfo, 0, 3)
+
 	if err := r.mon.Run(qmp.Command{Name: "query-pci", Arguments: nil}, &r.pciDevs); err != nil {
 		return err
 	}
+
 	r.blkDevs = make([]qemu_types.BlockInfo, 0, 8)
+
 	if err := r.mon.Run(qmp.Command{Name: "query-block", Arguments: nil}, &r.blkDevs); err != nil {
 		return err
 	}
 
-	gr.Go(func() error { return r.initCdroms() })
-	gr.Go(func() error { return r.initStorage() })
-	gr.Go(func() error { return r.initNetwork() })
+	gr.Go(func() error { return r.initCdromPool() })
+	gr.Go(func() error { return r.initDiskPool() })
+	gr.Go(func() error { return r.initNetIfacePool() })
 	gr.Go(func() error { return r.initCloudInitDrive() })
 
 	return gr.Wait()
 }
 
-func (r *InstanceQemu_i440fx) initCdroms() error {
-	pool := make(CDPool, 0, len(r.blkDevs))
+func (r *InstanceQemu_i440fx) initCdromPool() error {
 	for _, dev := range r.blkDevs {
-		// Skip non-cdrom devices
 		if !strings.HasPrefix(dev.QdevPath, "cdrom_") {
+			// skip non-cdrom devices
 			continue
 		}
 
@@ -58,9 +60,11 @@ func (r *InstanceQemu_i440fx) initCdroms() error {
 
 		if strings.HasPrefix(dev.Inserted.File, "json:") {
 			b := qemu_types.InsertedFileOptions{}
+
 			if err := json.Unmarshal([]byte(dev.Inserted.File[5:]), &b); err != nil {
 				return err
 			}
+
 			switch b.File.Driver {
 			case "iscsi":
 				devicePath = fmt.Sprintf(
@@ -91,29 +95,40 @@ func (r *InstanceQemu_i440fx) initCdroms() error {
 			return err
 		}
 
-		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{cdrom.QdevID(), "type"}}, &cdrom.Driver); err != nil {
+		qomQuery := qemu_types.QomQuery{Path: cdrom.QdevID(), Property: "type"}
+
+		if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &cdrom.CdromProperties.Driver); err != nil {
 			if _, ok := err.(*qmp.DeviceNotFound); ok {
-				// Not a cdrom device. Skip and continue.
+				// not a cdrom device, skip and continue.
 				continue
 			}
 			return err
 		}
-		if !CdromDrivers.Exists(cdrom.Driver) {
-			// Skip unknown driver
+
+		cdrom.driver = CdromDriverTypeValue(cdrom.CdromProperties.Driver)
+
+		if cdrom.Driver() == DriverType_UNKNOWN {
+			// skip device with unknown driver type
 			continue
 		}
 
-		switch cdrom.Driver {
-		case "ide-cd":
+		switch cdrom.Driver() {
+		case CdromDriverType_IDE_CD:
 			// An addr/slot on the PCI bus
 			var pciAddr string
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{cdrom.QdevID(), "legacy-addr"}}, &pciAddr); err == nil {
-				cdrom.Addr = fmt.Sprintf("0x%s", strings.Split(pciAddr, ".")[0])
+
+			qomQuery := qemu_types.QomQuery{Path: cdrom.QdevID(), Property: "legacy-addr"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &pciAddr); err == nil {
+				cdrom.QemuAddr = fmt.Sprintf("0x%s", strings.Split(pciAddr, ".")[0])
 			}
-		case "scsi-cd":
+		case CdromDriverType_SCSI_CD:
 			// SCSI bus name/addr and lun of disk
 			var parentBus string
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{cdrom.QdevID(), "parent_bus"}}, &parentBus); err != nil {
+
+			busQomQuery := qemu_types.QomQuery{Path: cdrom.QdevID(), Property: "parent_bus"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &busQomQuery}, &parentBus); err != nil {
 				return err
 			}
 			// in:  /machine/peripheral/scsi0/virtio-backend/scsi0.0
@@ -121,163 +136,164 @@ func (r *InstanceQemu_i440fx) initCdroms() error {
 			parentBusName := strings.Split(filepath.Base(parentBus), ".")[0]
 
 			var lun int
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{cdrom.QdevID(), "lun"}}, &lun); err != nil {
+
+			lunQomQuery := qemu_types.QomQuery{Path: cdrom.QdevID(), Property: "lun"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &lunQomQuery}, &lun); err != nil {
 				return err
 			}
 
-			cdrom.Addr = fmt.Sprintf("%s:%s/%d", parentBusName, r.scsiBuses[parentBusName].Addr, lun)
+			cdrom.QemuAddr = fmt.Sprintf("%s:%s/%d", parentBusName, r.scsiBuses[parentBusName].Addr, lun)
 		}
 
-		cdrom.ReadOnly = dev.Inserted.ReadOnly
+		cdrom.Readonly = dev.Inserted.ReadOnly
 
-		pool = append(pool, *cdrom)
+		r.Cdroms.Append(cdrom)
 	}
-
-	r.Cdroms = pool
 
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) AppendCdrom(d Cdrom) error {
-	if r.Cdroms.Exists(d.Name) {
-		return &AlreadyConnectedError{"instance_qemu", d.Name}
+func (r *InstanceQemu_i440fx) CdromAppend(opts CdromProperties) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	if !CdromDrivers.Exists(d.Driver) {
-		return fmt.Errorf("unknown device driver: %s", d.Driver)
+	driver := CdromDriverTypeValue(opts.Driver)
+
+	if !driver.HotPluggable() {
+		return fmt.Errorf("cdrom driver is not hot-pluggable: %s", opts.Driver)
 	}
 
-	if !CdromDrivers.HotPluggable(d.Driver) {
-		return fmt.Errorf("driver is not hotpuggable: %s", d.Driver)
+	if r.Cdroms.Exists(opts.Name) {
+		return &AlreadyConnectedError{"instance_qemu", opts.Name}
 	}
 
-	var success bool
+	// If set then CdromChangeMedia will be called at the end
+	requestedMedia := opts.Media
 
-	if _, ok := d.Backend.(*block.Device); ok {
-		devpath := filepath.Join(CHROOTDIR, r.name, d.Media)
+	opts.Media = ""
 
-		defer func() {
-			if !success {
-				os.Remove(devpath)
-			}
-		}()
+	// Changes in QEMU
 
-		stat := syscall.Stat_t{}
-		if err := syscall.Stat(d.Media, &stat); err != nil {
-			return err
-		}
-
-		os.MkdirAll(filepath.Dir(devpath), 0755)
-		if err := syscall.Mknod(devpath, syscall.S_IFBLK|uint32(os.FileMode(01640)), int(stat.Rdev)); err != nil {
-			if os.IsExist(err) {
-				return fmt.Errorf("device is already in use: %s", d.Media)
-			}
-			return err
-		}
-		if err := os.Chown(devpath, r.uid, 0); err != nil {
-			return err
-		}
+	cd := Cdrom{
+		CdromProperties: opts,
+		driver:          driver,
 	}
 
-	deviceOpts := qemu_types.DeviceOptions{
-		Driver: d.Driver,
-		Id:     d.QdevID(),
-		Drive:  d.Name,
+	deviceOpts := qemu_types.CdromDeviceOptions{
+		Driver: cd.Driver().String(),
+		ID:     cd.QdevID(),
+		Drive:  cd.Name,
 	}
 
-	switch d.Driver {
-	case "scsi-cd":
-		busName, _, _ := ParseSCSIAddr(d.Addr)
+	switch cd.Driver() {
+	case CdromDriverType_SCSI_CD:
+		busName, _, _ := ParseSCSIAddr(cd.QemuAddr)
+
 		if _, ok := r.scsiBuses[busName]; !ok {
-			busOpts := qemu_types.DeviceOptions{
+			busOpts := qemu_types.SCSIHostBusDeviceOptions{
 				Driver: "virtio-scsi-pci",
-				Id:     busName,
+				ID:     busName,
 			}
-			if err := r.mon.Run(qmp.Command{"device_add", &busOpts}, nil); err != nil {
+
+			if err := r.mon.Run(qmp.Command{Name: "device_add", Arguments: &busOpts}, nil); err != nil {
 				return fmt.Errorf("device_add failed: %s", err)
 			}
 		}
+
 		deviceOpts.Bus = fmt.Sprintf("%s.0", busName)
 		deviceOpts.SCSI_ID = 1
 	}
 
-	hcmd := fmt.Sprintf("file=%s,id=%s,format=raw,if=none,aio=native,cache=none,detect-zeroes=on", d.Media, d.Name)
+	hcmd := fmt.Sprintf("id=%s,if=none,aio=threads,detect-zeroes=on", cd.Name)
 
-	if d.ReadOnly {
-		hcmd += ",readonly"
+	if cd.Readonly {
+		hcmd += ",readonly=on"
 	}
 
 	if _, err := r.mon.RunHuman(fmt.Sprintf("drive_add auto \"%s\"", hcmd)); err != nil {
 		return fmt.Errorf("drive_add failed: %s", err)
 	}
 
-	if err := r.mon.Run(qmp.Command{"device_add", &deviceOpts}, nil); err != nil {
+	if err := r.mon.Run(qmp.Command{Name: "device_add", Arguments: &deviceOpts}, nil); err != nil {
 		return fmt.Errorf("device_add failed: %s", err)
 	}
 
-	r.Cdroms.Append(&d)
+	r.Cdroms.Append(&cd)
 
-	success = true
+	// Call CdromChangeMedia() if needed
+	if len(requestedMedia) > 0 {
+		return r.CdromChangeMedia(cd.Name, requestedMedia)
+	}
 
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) RemoveCdrom(name string) error {
-	d := r.Cdroms.Get(name)
-	if d == nil {
-		return &NotConnectedError{"instance_qemu", name}
+func (r *InstanceQemu_i440fx) CdromRemove(devname string) error {
+	cd := r.Cdroms.Get(devname)
+
+	if cd == nil {
+		return &NotConnectedError{"instance_qemu", devname}
 	}
 
-	if !CdromDrivers.HotPluggable(d.Driver) {
-		return fmt.Errorf("driver is not hotpuggable: %s", d.Driver)
+	if !cd.Driver().HotPluggable() {
+		return fmt.Errorf("cdrom driver is not hot-pluggable: %s", cd.Driver())
 	}
 
-	if _, ok := d.Backend.(*block.Device); ok {
-		devpath := filepath.Join(CHROOTDIR, r.name, d.Media)
-		if err := os.Remove(devpath); err != nil && !os.IsNotExist(err) {
+	// Remove the existing block device from a chroot
+	if _, ok := cd.MediaBackend.(*block.Device); ok {
+		chrootDevPath := filepath.Join(CHROOTDIR, r.name, cd.Media)
+
+		if err := os.Remove(chrootDevPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
 
+	// Changes in QEMU
+
+	// Remove QEMU device
 	ts := time.Now()
 
-	switch d.Driver {
-	case "scsi-cd":
-		if err := r.mon.Run(qmp.Command{"device_del", &qemu_types.StrID{d.QdevID()}}, nil); err != nil {
+	switch cd.Driver() {
+	case CdromDriverType_SCSI_CD:
+		if err := r.mon.Run(qmp.Command{Name: "device_del", Arguments: &qemu_types.StrID{ID: cd.QdevID()}}, nil); err != nil {
 			return fmt.Errorf("device_del error: %s", err)
 		}
 	}
 
-	// ... and wait until the operation is completed
+	// Wait until the operation is completed
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	switch _, err := r.mon.WaitDeviceDeletedEvent(ctx, d.QdevID(), uint64(ts.Unix())); {
-	case err == nil:
-	case err == context.DeadlineExceeded:
-		return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
-	default:
+	if _, err := r.mon.WaitDeviceDeletedEvent(ctx, cd.QdevID(), uint64(ts.Unix())); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
+		}
 		return err
 	}
 
+	// Find and remove block backend
 	blkDevs := make([]qemu_types.BlockInfo, 0, 8)
-	if err := r.mon.Run(qmp.Command{"query-block", nil}, &blkDevs); err != nil {
+
+	if err := r.mon.Run(qmp.Command{Name: "query-block", Arguments: nil}, &blkDevs); err != nil {
 		return err
 	}
 
 	for _, dev := range blkDevs {
-		if dev.Device == d.Name {
-			if _, err := r.mon.RunHuman("drive_del " + d.Name); err != nil {
+		if dev.Device == cd.Name {
+			if _, err := r.mon.RunHuman("drive_del " + cd.Name); err != nil {
 				return fmt.Errorf("drive_del error: %s", err)
 			}
 		}
 	}
 
-	return r.Cdroms.Remove(d.Name)
+	return r.Cdroms.Remove(cd.Name)
 }
 
-func (r *InstanceQemu_i440fx) initStorage() error {
+func (r *InstanceQemu_i440fx) initDiskPool() error {
 	r.scsiBuses = make(map[string]*SCSIBusInfo)
+
 	for _, dev := range r.pciDevs[0].Devices {
 		// desc:      SCSI controller
 		// class:     256
@@ -285,12 +301,12 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 		if !(dev.ClassInfo.Class == 256 && dev.ID.Device == 4100) {
 			continue
 		}
+
 		r.scsiBuses[dev.QdevID] = &SCSIBusInfo{"virtio-scsi-pci", fmt.Sprintf("0x%x", dev.Slot)}
 	}
 
-	pool := make(DiskPool, 0, len(r.blkDevs))
 	for _, dev := range r.blkDevs {
-		// Skip reserved names and empty devices
+		// skip reserved names and empty devices
 		if dev.Device == "modiso" || dev.Device == "cidata" || dev.Device == "fwloader" || dev.Device == "fwflash" {
 			continue
 		}
@@ -302,9 +318,11 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 
 		if strings.HasPrefix(dev.Inserted.File, "json:") {
 			b := qemu_types.InsertedFileOptions{}
+
 			if err := json.Unmarshal([]byte(dev.Inserted.File[5:]), &b); err != nil {
 				return err
 			}
+
 			switch b.File.Driver {
 			case "iscsi":
 				devicePath = fmt.Sprintf(
@@ -344,28 +362,40 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 			disk.QemuVirtualSize = dev.Inserted.Image.VirtualSize
 		}
 
-		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{disk.QdevID(), "type"}}, &disk.Driver); err != nil {
+		qomQuery := qemu_types.QomQuery{Path: disk.QdevID(), Property: "type"}
+
+		if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &disk.DiskProperties.Driver); err != nil {
 			if _, ok := err.(*qmp.DeviceNotFound); ok && strings.HasPrefix(dev.QdevPath, "cdrom_") {
 				// Possible it is a cdrom device. If so, skip and continue.
 				continue
 			}
 			return err
 		}
-		if !DiskDrivers.Exists(disk.Driver) {
+
+		disk.driver = DiskDriverTypeValue(disk.DiskProperties.Driver)
+
+		if disk.Driver() == DriverType_UNKNOWN {
+			// skip device with unknown driver type
 			continue
 		}
 
-		switch disk.Driver {
-		case "virtio-blk-pci", "ide-hd":
+		switch disk.Driver() {
+		case DiskDriverType_VIRTIO_BLK_PCI, DiskDriverType_IDE_HD:
 			// An addr/slot on the PCI bus
 			var pciAddr string
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{disk.QdevID(), "legacy-addr"}}, &pciAddr); err == nil {
-				disk.Addr = fmt.Sprintf("0x%s", strings.Split(pciAddr, ".")[0])
+
+			qomQuery := qemu_types.QomQuery{Path: disk.QdevID(), Property: "legacy-addr"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &pciAddr); err == nil {
+				disk.QemuAddr = fmt.Sprintf("0x%s", strings.Split(pciAddr, ".")[0])
 			}
-		case "scsi-hd":
+		case DiskDriverType_SCSI_HD:
 			// SCSI bus name/addr and lun of disk
 			var parentBus string
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{disk.QdevID(), "parent_bus"}}, &parentBus); err != nil {
+
+			busQomQuery := qemu_types.QomQuery{Path: disk.QdevID(), Property: "parent_bus"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &busQomQuery}, &parentBus); err != nil {
 				return err
 			}
 			// in:  /machine/peripheral/scsi0/virtio-backend/scsi0.0
@@ -373,87 +403,129 @@ func (r *InstanceQemu_i440fx) initStorage() error {
 			parentBusName := strings.Split(filepath.Base(parentBus), ".")[0]
 
 			var lun int
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{disk.QdevID(), "lun"}}, &lun); err != nil {
+
+			lunQomQuery := qemu_types.QomQuery{Path: disk.QdevID(), Property: "lun"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &lunQomQuery}, &lun); err != nil {
 				return err
 			}
 
-			disk.Addr = fmt.Sprintf("%s:%s/%d", parentBusName, r.scsiBuses[parentBusName].Addr, lun)
+			disk.QemuAddr = fmt.Sprintf("%s:%s/%d", parentBusName, r.scsiBuses[parentBusName].Addr, lun)
 		}
+
 		for _, m := range append(dev.DirtyBitmaps, dev.Inserted.DirtyBitmaps...) {
 			if m.Name == "backup" {
 				disk.HasBitmap = true
 			}
 		}
 
-		pool = append(pool, *disk)
-	}
+		if be, err := NewDiskBackend(disk.Path); err == nil {
+			disk.Backend = be
+		} else {
+			return err
+		}
 
-	r.Disks = pool
+		r.Disks.Append(disk)
+	}
 
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) AppendDisk(d Disk) error {
-	if r.Disks.Exists(d.Path) {
-		return &AlreadyConnectedError{"instance_qemu", d.Path}
+func (r *InstanceQemu_i440fx) DiskAppend(opts DiskProperties) error {
+	if err := opts.Validate(true); err != nil {
+		return err
 	}
 
-	if !DiskDrivers.HotPluggable(d.Driver) {
-		return fmt.Errorf("unknown hotpuggable disk driver: %s", d.Driver)
+	driver := DiskDriverTypeValue(opts.Driver)
+
+	if !driver.HotPluggable() {
+		return fmt.Errorf("disk driver is not hot-pluggable: %s", opts.Driver)
+	}
+
+	d := Disk{
+		DiskProperties: opts,
+		driver:         driver,
+	}
+
+	if be, err := NewDiskBackend(d.Path); err == nil {
+		if ok, err := be.IsAvailable(); err == nil {
+			if !ok {
+				return fmt.Errorf("disk is not available: %s", opts.Path)
+			}
+		} else {
+			return fmt.Errorf("failed to check disk: %w", err)
+		}
+
+		d.Backend = be
+	} else {
+		return err
+	}
+
+	if r.Disks.Exists(d.Backend.BaseName()) {
+		return &AlreadyConnectedError{"instance_qemu", d.Path}
 	}
 
 	var success bool
 
+	// Map the original block device to a chroot using mknod
 	if _, ok := d.Backend.(*block.Device); ok {
-		devpath := filepath.Join(CHROOTDIR, r.name, d.Path)
+		chrootDevPath := filepath.Join(CHROOTDIR, r.name, d.Path)
 
 		defer func() {
 			if !success {
-				os.Remove(devpath)
+				os.Remove(chrootDevPath)
 			}
 		}()
 
 		stat := syscall.Stat_t{}
+
 		if err := syscall.Stat(d.Path, &stat); err != nil {
 			return err
 		}
 
-		os.MkdirAll(filepath.Dir(devpath), 0755)
+		os.MkdirAll(filepath.Dir(chrootDevPath), 0755)
 
-		if err := syscall.Mknod(devpath, syscall.S_IFBLK|uint32(os.FileMode(01640)), int(stat.Rdev)); err != nil {
+		if err := syscall.Mknod(chrootDevPath, syscall.S_IFBLK|uint32(os.FileMode(01640)), int(stat.Rdev)); err != nil {
 			if os.IsExist(err) {
 				return fmt.Errorf("device is already in use: %s", d.Path)
 			}
 			return err
 		}
-		if err := os.Chown(devpath, r.uid, 0); err != nil {
+
+		if err := os.Chown(chrootDevPath, r.uid, 0); err != nil {
 			return err
 		}
 	}
 
-	devOpts := qemu_types.DeviceOptions{
-		Driver: d.Driver,
-		Id:     d.QdevID(),
+	// Changes in QEMU
+
+	// Add QEMU device
+	devOpts := qemu_types.BlockDeviceOptions{
+		Driver: d.Driver().String(),
+		ID:     d.QdevID(),
 		Drive:  d.BaseName(),
 	}
 
-	switch d.Driver {
-	case "scsi-hd":
-		busName, _, _ := ParseSCSIAddr(d.Addr)
+	switch d.Driver() {
+	case DiskDriverType_SCSI_HD:
+		busName, _, _ := ParseSCSIAddr(d.QemuAddr)
+
 		if _, ok := r.scsiBuses[busName]; !ok {
-			busOpts := qemu_types.DeviceOptions{
+			busOpts := qemu_types.SCSIHostBusDeviceOptions{
 				Driver: "virtio-scsi-pci",
-				Id:     busName,
+				ID:     busName,
 			}
-			if err := r.mon.Run(qmp.Command{"device_add", &busOpts}, nil); err != nil {
+
+			if err := r.mon.Run(qmp.Command{Name: "device_add", Arguments: &busOpts}, nil); err != nil {
 				return fmt.Errorf("device_add failed: %s", err)
 			}
 		}
+
 		devOpts.Bus = fmt.Sprintf("%s.0", busName)
 		devOpts.SCSI_ID = 1
 	}
 
-	// That's a fucking shame that we need to do it exactly that way
+	// Use HMP for add new block backend
 	cmd := fmt.Sprintf(
 		"drive_add auto \"file=%s,id=%s,format=raw,if=none,aio=native,cache=none,detect-zeroes=on,iops_rd=%d,iops_wr=%d\"",
 		d.Path,
@@ -461,11 +533,12 @@ func (r *InstanceQemu_i440fx) AppendDisk(d Disk) error {
 		d.IopsRd,
 		d.IopsWr,
 	)
+
 	if _, err := r.mon.RunHuman(cmd); err != nil {
 		return fmt.Errorf("drive_add failed: %s", err)
 	}
 
-	if err := r.mon.Run(qmp.Command{"device_add", &devOpts}, nil); err != nil {
+	if err := r.mon.Run(qmp.Command{Name: "device_add", Arguments: &devOpts}, nil); err != nil {
 		return fmt.Errorf("device_add failed: %s", err)
 	}
 
@@ -476,96 +549,114 @@ func (r *InstanceQemu_i440fx) AppendDisk(d Disk) error {
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) RemoveDisk(dpath string) error {
-	d := r.Disks.Get(dpath)
+func (r *InstanceQemu_i440fx) DiskRemove(diskname string) error {
+	d := r.Disks.Get(diskname)
+
 	if d == nil {
-		return &NotConnectedError{"instance_qemu", dpath}
+		return &NotConnectedError{"instance_qemu", diskname}
 	}
 
-	if !DiskDrivers.HotPluggable(d.Driver) {
-		return fmt.Errorf("unknown hotpuggable disk driver: %s", d.Driver)
+	if !d.Driver().HotPluggable() {
+		return fmt.Errorf("disk driver is not hot-pluggable: %s", d.Driver())
 	}
 
+	// Remove the existing block device from a chroot
 	if _, ok := d.Backend.(*block.Device); ok {
-		devpath := filepath.Join(CHROOTDIR, r.name, d.Path)
-		if err := os.Remove(devpath); err != nil && !os.IsNotExist(err) {
+		chrootDevPath := filepath.Join(CHROOTDIR, r.name, d.Path)
+
+		if err := os.Remove(chrootDevPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
 
-	// Remove from the guest
-	switch d.Driver {
-	case "virtio-blk-pci":
+	// Changes in QEMU
+
+	// Remove QEMU device
+	switch d.Driver() {
+	case DiskDriverType_VIRTIO_BLK_PCI:
 		ts := time.Now()
-		if err := r.mon.Run(qmp.Command{"device_del", &qemu_types.StrID{d.QdevID()}}, nil); err != nil {
+
+		if err := r.mon.Run(qmp.Command{Name: "device_del", Arguments: &qemu_types.StrID{ID: d.QdevID()}}, nil); err != nil {
 			return fmt.Errorf("device_del error: %s", err)
 		}
 
-		// ... and wait until the operation is completed
+		// Wait until the operation is completed
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
-		switch _, err := r.mon.WaitDeviceDeletedEvent(ctx, d.QdevID(), uint64(ts.Unix())); {
-		case err == nil:
-		case err == context.DeadlineExceeded:
-			return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
-		default:
+		if _, err := r.mon.WaitDeviceDeletedEvent(ctx, d.QdevID(), uint64(ts.Unix())); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
+			}
 			return err
 		}
-	case "scsi-hd":
-		if err := r.mon.Run(qmp.Command{"device_del", &qemu_types.StrID{d.QdevID()}}, nil); err != nil {
+	case DiskDriverType_SCSI_HD:
+		if err := r.mon.Run(qmp.Command{Name: "device_del", Arguments: &qemu_types.StrID{ID: d.QdevID()}}, nil); err != nil {
 			return fmt.Errorf("device_del error: %s", err)
 		}
 	}
 
+	// Find and remove block backend
 	blkDevs := make([]qemu_types.BlockInfo, 0, 8)
-	if err := r.mon.Run(qmp.Command{"query-block", nil}, &blkDevs); err != nil {
+
+	if err := r.mon.Run(qmp.Command{Name: "query-block", Arguments: nil}, &blkDevs); err != nil {
 		return err
 	}
 
 	for _, dev := range blkDevs {
 		if dev.Device == d.BaseName() {
-			// That's a fucking shame that we need to do it exactly that way
 			if _, err := r.mon.RunHuman("drive_del " + d.BaseName()); err != nil {
 				return fmt.Errorf("drive_del error: %s", err)
 			}
 		}
 	}
 
-	return r.Disks.Remove(d.Path)
+	return r.Disks.Remove(d.Backend.BaseName())
 }
 
-func (r *InstanceQemu_i440fx) initNetwork() error {
-	pool := make(NetifPool, 0, 8)
+func (r *InstanceQemu_i440fx) initNetIfacePool() error {
 	for _, dev := range r.pciDevs[0].Devices {
 		// {'class': 512, 'desc': 'Ethernet controller'}
 		if dev.ClassInfo.Class != 512 {
 			continue
 		}
 
-		netif := NetIface{Addr: fmt.Sprintf("0x%x", dev.Slot)}
+		netif := NetIface{QemuAddr: fmt.Sprintf("0x%x", dev.Slot)}
 
-		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "type"}}, &netif.Driver); err != nil {
+		typeQomQuery := qemu_types.QomQuery{Path: dev.QdevID, Property: "type"}
+
+		if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &typeQomQuery}, &netif.NetIfaceProperties.Driver); err != nil {
 			return err
 		}
-		if !NetDrivers.Exists(netif.Driver) {
+
+		netif.driver = NetDriverTypeValue(netif.NetIfaceProperties.Driver)
+
+		if netif.Driver() == DriverType_UNKNOWN {
+			// skip device with unknown driver type
 			continue
 		}
 
-		if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "mac"}}, &netif.HwAddr); err != nil {
+		macQomQuery := qemu_types.QomQuery{Path: dev.QdevID, Property: "mac"}
+
+		if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &macQomQuery}, &netif.HwAddr); err != nil {
 			return err
 		}
 
 		var mq bool
 		var vectors uint32
 
-		if netif.Driver == "virtio-net-pci" {
-			if err := r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "mq"}}, &mq); err == nil {
+		if netif.Driver() == NetDriverType_VIRTIO_NET_PCI {
+			qomQuery := qemu_types.QomQuery{Path: dev.QdevID, Property: "mq"}
+
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &mq); err == nil {
 				if mq {
-					err = r.mon.Run(qmp.Command{"qom-get", &qemu_types.QomQuery{dev.QdevID, "vectors"}}, &vectors)
+					qomQuery := qemu_types.QomQuery{Path: dev.QdevID, Property: "vectors"}
+
+					err = r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomQuery}, &vectors)
 					if err != nil {
 						return err
 					}
+
 					if vectors > 4 {
 						netif.Queues = int(vectors-2) / 2
 					}
@@ -584,136 +675,154 @@ func (r *InstanceQemu_i440fx) initNetwork() error {
 			Ifup   string `json:"ifup"`
 			Ifdown string `json:"ifdown"`
 		}{}
-		c, err := os.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/net", netif.Ifname))
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(c, &scripts); err != nil {
-			return err
-		}
-		netif.Ifup = scripts.Ifup
-		netif.Ifdown = scripts.Ifdown
 
-		pool = append(pool, netif)
+		if b, err := os.ReadFile(filepath.Join(CHROOTDIR, r.name, "run/net", netif.Ifname)); err == nil {
+			if err := json.Unmarshal(b, &scripts); err != nil {
+				return err
+			}
+
+			netif.Ifup = scripts.Ifup
+			netif.Ifdown = scripts.Ifdown
+		} else {
+			return err
+		}
+
+		r.NetIfaces.Append(&netif)
 	}
-
-	r.NetIfaces = pool
 
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) AppendNetIface(iface NetIface) error {
-	if len(iface.Ifname) == 0 {
-		return fmt.Errorf("undefined network interface name")
-	}
-
-	if r.NetIfaces.Exists(iface.Ifname) {
-		return &AlreadyConnectedError{"instance_qemu", iface.Ifname}
-	}
-
-	if !NetDrivers.HotPluggable(iface.Driver) {
-		return fmt.Errorf("unknown hotpuggable network interface driver: %s", iface.Driver)
-	}
-
-	if _, err := net.ParseMAC(iface.HwAddr); err != nil {
+func (r *InstanceQemu_i440fx) NetIfaceAppend(opts NetIfaceProperties) error {
+	if err := opts.Validate(true); err != nil {
 		return err
 	}
 
-	hostOpts := qemu_types.NetdevTapOptions{
+	driver := NetDriverTypeValue(opts.Driver)
+
+	if !driver.HotPluggable() {
+		return fmt.Errorf("net interface driver is not hot-pluggable: %s", opts.Driver)
+	}
+
+	n := NetIface{
+		NetIfaceProperties: opts,
+		driver:             driver,
+	}
+
+	if r.NetIfaces.Exists(n.Ifname) {
+		return &AlreadyConnectedError{"instance_qemu", n.Ifname}
+	}
+
+	// Changes in QEMU
+
+	backendOpts := qemu_types.NetdevTapOptions{
 		Type:       "tap",
-		ID:         iface.Ifname,
-		Ifname:     iface.Ifname,
+		ID:         n.Ifname,
+		Ifname:     n.Ifname,
 		Vhost:      true,
 		Script:     "no",
 		Downscript: "no",
 	}
-	opts := qemu_types.DeviceOptions{
-		Driver: iface.Driver,
-		Netdev: iface.Ifname,
-		Id:     iface.QdevID(),
-		Mac:    iface.HwAddr,
+
+	deviceOpts := qemu_types.NetDeviceOptions{
+		Driver: n.Driver().String(),
+		Netdev: n.Ifname,
+		ID:     n.QdevID(),
+		Mac:    n.HwAddr,
 	}
 
 	// Enable multi-queue on virtio-net-pci interface
-	if iface.Driver == "virtio-net-pci" && iface.Queues > 1 {
+	if n.Driver() == NetDriverType_VIRTIO_NET_PCI && n.Queues > 1 {
 		// "iface.Queues" -- is the number of queue pairs.
-		hostOpts.Queues = 2 * iface.Queues
+		backendOpts.Queues = 2 * n.Queues
 
-		// "iface.Queues" count vectors for TX (transmit) queues, the same for RX (receive) queues,
+		// "n.Queues" count vectors for TX (transmit) queues, the same for RX (receive) queues,
 		// one for configuration purposes, and one for possible VQ (vector quantization) control.
-		opts.MQ = true
-		opts.Vectors = 2*iface.Queues + 2
+		deviceOpts.MQ = true
+		deviceOpts.Vectors = 2*n.Queues + 2
 	}
 
-	if err := AddTapInterface(iface.Ifname, r.uid, opts.MQ); err != nil {
+	// Add new tap-interface on the host side
+	if err := AddTapInterface(n.Ifname, r.uid, deviceOpts.MQ); err != nil {
 		return err
 	}
-	if err := SetInterfaceUp(iface.Ifname); err != nil {
-		return err
-	}
-
-	if err := r.mon.Run(qmp.Command{"netdev_add", &hostOpts}, nil); err != nil {
-		return err
-	}
-	if err := r.mon.Run(qmp.Command{"device_add", &opts}, nil); err != nil {
+	if err := SetInterfaceUp(n.Ifname); err != nil {
 		return err
 	}
 
-	b, err := json.Marshal(iface)
-	if err != nil {
-		return err
-	}
-	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", iface.Ifname)
-	if err := os.WriteFile(ifaceConf, b, 0644); err != nil {
+	// Add netdev backend
+	if err := r.mon.Run(qmp.Command{Name: "netdev_add", Arguments: &backendOpts}, nil); err != nil {
 		return err
 	}
 
-	r.NetIfaces.Append(&iface)
+	// Add QEMU device
+	if err := r.mon.Run(qmp.Command{Name: "device_add", Arguments: &deviceOpts}, nil); err != nil {
+		return err
+	}
+
+	// Save current configuration in a chroot
+	if b, err := json.Marshal(n); err == nil {
+		ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", n.Ifname)
+
+		if err := os.WriteFile(ifaceConf, b, 0644); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+
+	r.NetIfaces.Append(&n)
 
 	return nil
 }
 
-func (r *InstanceQemu_i440fx) RemoveNetIface(ifname string) error {
-	iface := r.NetIfaces.Get(ifname)
-	if iface == nil {
+func (r *InstanceQemu_i440fx) NetIfaceRemove(ifname string) error {
+	n := r.NetIfaces.Get(ifname)
+
+	if n == nil {
 		return &NotConnectedError{"instance_qemu", ifname}
 	}
 
-	if !NetDrivers.HotPluggable(iface.Driver) {
-		return fmt.Errorf("unknown hotpuggable network interface driver: %s", iface.Driver)
+	if !n.Driver().HotPluggable() {
+		return fmt.Errorf("net interface driver is not hot-pluggable: %s", n.Driver())
 	}
 
-	// Remove from the guest and wait until the operation is completed
+	// Changes in QEMU
+
+	// Remove QEMU device
 	ts := time.Now()
-	if err := r.mon.Run(qmp.Command{"device_del", &qemu_types.StrID{iface.QdevID()}}, nil); err != nil {
+
+	if err := r.mon.Run(qmp.Command{Name: "device_del", Arguments: &qemu_types.StrID{ID: n.QdevID()}}, nil); err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	switch _, err := r.mon.WaitDeviceDeletedEvent(ctx, iface.QdevID(), uint64(ts.Unix())); {
-	case err == nil:
-	case err == context.DeadlineExceeded:
-		return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
-	default:
+	if _, err := r.mon.WaitDeviceDeletedEvent(ctx, n.QdevID(), uint64(ts.Unix())); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("device_del timeout error: failed to complete within 60 seconds")
+		}
 		return err
 	}
 
-	// Remove the backend
-	if err := r.mon.Run(qmp.Command{"netdev_del", &qemu_types.StrID{ifname}}, nil); err != nil {
+	// Remove netdev backend
+	if err := r.mon.Run(qmp.Command{Name: "netdev_del", Arguments: &qemu_types.StrID{ID: n.Ifname}}, nil); err != nil {
 		return err
 	}
 
-	if err := r.NetIfaces.Remove(ifname); err != nil {
+	if err := r.NetIfaces.Remove(n.Ifname); err != nil {
 		return err
 	}
 
-	if err := DelTapInterface(ifname); err != nil {
-		return fmt.Errorf("cannot remove the tap interface: %s", err)
+	// Remove tap-interface on the host side
+	if err := DelTapInterface(n.Ifname); err != nil {
+		return fmt.Errorf("cannot remove the tap interface: %w", err)
 	}
 
-	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", ifname)
+	ifaceConf := filepath.Join(CHROOTDIR, r.name, "run/net", n.Ifname)
+
+	// Save current configuration in a chroot
 	if err := os.Remove(ifaceConf); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -724,34 +833,27 @@ func (r *InstanceQemu_i440fx) RemoveNetIface(ifname string) error {
 func (r *InstanceQemu_i440fx) initCloudInitDrive() error {
 	for _, dev := range r.blkDevs {
 		if dev.Device == "cidata" && dev.Inserted.File != "" {
-			d := CloudInitDrive{
-				Media: dev.Inserted.File,
-			}
-
-			b, err := NewCloudInitDriveBackend(d.Media)
+			d, err := NewCloudInitDrive(dev.Inserted.File)
 			if err != nil {
 				return err
 			}
-			d.Backend = b
 
-			qomTypeArgs := qemu_types.QomQuery{
+			qomTypeQuery := qemu_types.QomQuery{
 				Path:     "cidata",
 				Property: "type",
 			}
 
-			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomTypeArgs}, &d.Driver); err != nil {
+			if err := r.mon.Run(qmp.Command{Name: "qom-get", Arguments: &qomTypeQuery}, &d.CloudInitDriveProperties.Driver); err != nil {
 				if _, ok := err.(*qmp.DeviceNotFound); ok {
-					// Unexpected, but not fatal.
+					// unexpected, but not fatal.
 					continue
 				}
 				return err
 			}
 
-			if !CloudInitDrivers.Exists(d.Driver) {
-				continue
-			}
+			d.driver = CloudInitDriverTypeValue(d.CloudInitDriveProperties.Driver)
 
-			r.CIDrive = &d
+			r.CloudInitDrive = d
 		}
 	}
 

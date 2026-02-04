@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package kvmrun.api.services.network.v2;
+
+import "google/protobuf/empty.proto";
+import "types/v2/network.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/network/v2;network";
+
+service NetworkService {
+    rpc ListEndpoints(ListEndpointsRequest) returns (ListEndpointsResponse) { }
+
+    rpc Configure(ConfigureRequest) returns (google.protobuf.Empty) { }
+    rpc Deconfigure(DeconfigureRequest) returns (google.protobuf.Empty) { }
+
+    rpc CreateConf(CreateConfRequest) returns (google.protobuf.Empty) { }
+    rpc UpdateConf(UpdateConfRequest) returns (google.protobuf.Empty) { }
+    rpc DeleteConf(DeleteConfRequest) returns (google.protobuf.Empty) { }
+}
+
+message ListEndpointsRequest {
+    message Filter {
+        // ...
+    }
+    Filter filter = 1;
+}
+
+message ListEndpointsResponse {
+    repeated types.v2.NetworkEndPoint end_points = 1;
+}
+
+message ConfigureRequest {
+    string name = 1;
+    string ifname = 2;
+    bool second_stage = 11;
+}
+
+message DeconfigureRequest {
+    string name = 1;
+    string ifname = 2;
+}
+
+message CreateConfRequest {
+    string name = 1;
+    types.v2.NetworkSchemeOpts options = 2;
+    bool configure = 100;
+}
+
+message UpdateConfRequest {
+    message Addr {
+        enum Action {
+            UNKNOWN = 0;
+            APPEND = 1;
+            REMOVE = 2;
+        }
+        string addr = 1;
+        Action action = 2;
+    }
+    message Limit {
+        uint32 value = 1;
+    }
+    message MTU {
+        uint32 value = 1;
+    }
+    message Gateway {
+        string value = 1;
+    }
+
+    string name = 1;
+    string ifname = 2;
+
+    // Router specific
+    Limit in_limit = 11;
+    Limit out_limit = 12;
+
+    // Common
+    repeated Addr addrs = 21;
+    MTU mtu = 22;
+    Gateway gateway4 = 23;
+    Gateway gateway6 = 24;
+
+    bool apply = 100;
+}
+
+message DeleteConfRequest {
+    string name = 1;
+    string ifname = 2;
+    bool deconfigure = 100;
+}

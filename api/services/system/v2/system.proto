@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package kvmrun.api.services.system.v2;
+
+import "google/protobuf/empty.proto";
+import "types/v2/common.proto";
+import "types/v2/machines.proto";
+import "github.com/0xef53/go-grpc/options/field_options.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/system/v2;system";
+
+service SystemService {
+    rpc QemuInstanceRegister(QemuInstanceRegisterRequest) returns (google.protobuf.Empty) { }
+    rpc QemuInstanceDeregister(QemuInstanceDeregisterRequest) returns (google.protobuf.Empty) { }
+    rpc QemuInstanceStop(QemuInstanceStopRequest) returns (google.protobuf.Empty) { }
+
+    rpc StartIncomingMigration(StartIncomingMigrationRequest) returns (StartIncomingMigrationResponse) { }
+
+    rpc ServerGracefulShutdown(google.protobuf.Empty) returns (google.protobuf.Empty) { }
+
+    rpc GetAppConf(google.protobuf.Empty) returns (GetAppConfResponse) { }
+}
+
+message QemuInstanceRegisterRequest {
+    string name = 1;
+    uint32 mem_actual = 2;
+    uint32 pid = 3;
+}
+
+message QemuInstanceDeregisterRequest {
+    string name = 1;
+}
+
+message QemuInstanceStopRequest {
+    string name = 1;
+    uint32 graceful_timeout = 2;
+}
+
+message StartIncomingMigrationRequest {
+    string name = 1;
+    bytes manifest = 2 [(grpc.options.v1.log_formatting).display = Hide];
+    map<string, uint64> disks = 3;
+    map<string, bytes> extra_files = 4 [(grpc.options.v1.log_formatting).display = Hide];
+    bool create_disks = 5;
+    string listen_addr = 6;
+    bool turn_off_after = 7;
+}
+
+message StartIncomingMigrationResponse {
+    types.v2.IncomingMigrationRequisites requisites = 1;
+}
+
+message GetAppConfResponse {
+    types.v2.AppConf app_conf = 1;
+}
