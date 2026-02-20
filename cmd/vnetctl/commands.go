@@ -37,7 +37,7 @@ var CommandCreateConf = &cli.Command{
 
 var CommandUpdateConf = &cli.Command{
 	Name:      "update-conf",
-	Usage:     "create a new network configuration",
+	Usage:     "update an existing network configuration",
 	ArgsUsage: "VMNAME IFNAME",
 	HideHelp:  true,
 	Category:  "Configuration",
