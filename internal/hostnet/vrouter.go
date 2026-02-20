@@ -224,11 +224,11 @@ func RouterConfigureAddrs(linkname string, addrs []string, gateway4, gateway6 st
 
 	for _, addr := range addrs {
 		if err := routerAddRoute(link, addr, "main"); err != nil {
-			fmt.Printf("DEBUG ConfigureRouterAddrs(): addRoute err (type = %T): %+v\n", err, err)
+			//fmt.Printf("DEBUG ConfigureRouterAddrs(): addRoute err (type = %T): %+v\n", err, err)
 			return err
 		}
 		if err := routerAddRule(link, addr, "main"); err != nil {
-			fmt.Printf("DEBUG ConfigureRouterAddrs(): addRule err (type = %T): %+v\n", err, err)
+			//fmt.Printf("DEBUG ConfigureRouterAddrs(): addRule err (type = %T): %+v\n", err, err)
 			return err
 		}
 	}
