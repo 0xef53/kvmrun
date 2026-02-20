@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -34,16 +33,6 @@ func (s *Server) CreateConf(ctx context.Context, vmname, ifname string, opts Net
 		}
 	}
 
-	/*
-			TODO:
-				убрать
-		if b, err := json.MarshalIndent(opts, "", "    "); err == nil {
-			fmt.Printf("DEBUG: CreateConf: vmname = %s, ifname = %s, opts = %s\n", vmname, ifname, string(b))
-		} else {
-			fmt.Printf("DEBUG: CreateConf: error = %s\n", err.Error())
-		}
-	*/
-
 	err := s.TaskRunFunc(ctx, server.BlockAnyOperations(vmname, ifname+"/hostnet"), true, nil, func(l *log.Entry) error {
 		schemes, err := GetNetworkSchemes(vmname)
 		if err != nil {
@@ -57,12 +46,6 @@ func (s *Server) CreateConf(ctx context.Context, vmname, ifname string, opts Net
 		}
 
 		schemes = append(schemes, opts.Properties())
-
-		if b, err := json.MarshalIndent(schemes, "", "    "); err == nil {
-			fmt.Printf("DEBUG: CreateConf: vmname = %s, ifname = %s, schemes = %s\n", vmname, ifname, string(b))
-		} else {
-			fmt.Printf("DEBUG: CreateConf: schemes error = %s\n", err.Error())
-		}
 
 		if err := WriteNetworkSchemes(vmname, schemes...); err != nil {
 			return err
@@ -119,12 +102,6 @@ func (s *Server) UpdateConf(ctx context.Context, vmname, ifname string, apply bo
 				scheme.Set(p.String(), update.Value)
 			case SchemeUpdate_GATEWAY4, SchemeUpdate_GATEWAY6:
 				scheme.Set(p.String(), update.Value)
-			}
-
-			if b, err := json.MarshalIndent(schemes, "", "    "); err == nil {
-				fmt.Printf("DEBUG: UpdateConf: vmname = %s, ifname = %s, schemes = %s\n", vmname, ifname, string(b))
-			} else {
-				fmt.Printf("DEBUG: UpdateConf: schemes error = %s\n", err.Error())
 			}
 		}
 
