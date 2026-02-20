@@ -55,7 +55,7 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
         fi
 
         # run chrooted QEMU binary
-        exec chroot "$QEMU_ROOTDIR" sh -c "cd $PWD && exec /usr/bin/qemu-system-x86_64 ${ARGS}"
+        exec chroot "$QEMU_ROOTDIR" /bin/sh -c "cd $PWD && exec /usr/bin/qemu-system-x86_64 ${ARGS}"
     fi
 
     UNSHARED=1 exec unshare -m "$0" ${ARGS}
