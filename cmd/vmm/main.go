@@ -55,6 +55,7 @@ func main() {
 		commands.CommandCreateConf,
 		commands.CommandRemoveConf,
 		commands.CommandPrintList,
+		commands.CommandInfo,
 		commands.CommandInspect,
 		commands.MemoryCommands,
 		commands.CPUCommands,

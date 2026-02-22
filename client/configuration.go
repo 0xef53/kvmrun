@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xef53/kvmrun/client/flag_types"
 	"github.com/0xef53/kvmrun/kvmrun"
+	"github.com/0xef53/kvmrun/kvmrun/backend/block"
 
 	pb_machines "github.com/0xef53/kvmrun/api/services/machines/v2"
 	pb_types "github.com/0xef53/kvmrun/api/types/v2"
@@ -141,6 +142,223 @@ func MachineInspect(ctx context.Context, vmname string, c *cli.Command, grpcClie
 	}
 
 	fmt.Printf("%s\n", b)
+
+	return nil
+}
+
+func MachineInfo(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
+	req := pb_machines.GetRequest{
+		Name: vmname,
+	}
+
+	resp, err := grpcClient.Machines().Get(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	appendLine := func(s string, a ...interface{}) string {
+		switch len(a) {
+		case 0:
+			s += "\n"
+		case 1:
+			s += fmt.Sprintf("%*s : \n", 20, a[0])
+		case 2:
+			var format string
+			switch a[1].(type) {
+			case int, int32, int64, uint, uint32, uint64:
+				format = "%*s : %d\n"
+			case string:
+				format = "%*s : %s\n"
+			default:
+				format = "%*s : %q\n"
+			}
+			s += fmt.Sprintf(format, 20, a[0], a[1])
+		}
+		return s
+	}
+
+	bootDevice := func(opts *pb_types.MachineOpts) string {
+		var bootdev string = "default"
+		var bootidx uint32 = ^uint32(0)
+
+		for _, d := range opts.Cdrom {
+			if d.Bootindex > 0 && d.Bootindex < bootidx {
+				bootdev = d.Name
+				bootidx = d.Bootindex
+			}
+		}
+
+		for _, d := range opts.Storage {
+			if d.Bootindex > 0 && d.Bootindex < bootidx {
+				bootdev = d.Path
+				bootidx = d.Bootindex
+			}
+		}
+
+		return bootdev
+	}
+
+	printBrief := func(m *pb_types.Machine) {
+		var opts *pb_types.MachineOpts
+
+		if m.Runtime != nil {
+			opts = m.Runtime
+		} else {
+			opts = m.Config
+		}
+
+		var s string
+
+		// Header
+		if m.Runtime != nil {
+			s += fmt.Sprintf("* %s (state: %s, pid: %d", m.Name, m.State, m.PID)
+		} else {
+			s += fmt.Sprintf("* %s (state: %s", m.Name, m.State)
+		}
+
+		if opts.VsockDevice != nil {
+			s += fmt.Sprintf(", cid: %d)", opts.VsockDevice.ContextID)
+		} else {
+			s += ")"
+		}
+
+		s = appendLine(s)
+
+		// Machine type
+		var machineType string
+
+		if m.Runtime != nil {
+			machineType = opts.MachineType
+		} else {
+			machineType = "default"
+		}
+
+		s = appendLine(s, "Machine type", machineType)
+		s = appendLine(s)
+
+		// Processor
+		if opts.CPU != nil {
+			s = appendLine(s, "Processor")
+			s = appendLine(s, "Model", opts.CPU.Model)
+			s = appendLine(s, "Actual", opts.CPU.Actual)
+			s = appendLine(s, "Total", opts.CPU.Total)
+
+			if c.Bool("verbose") {
+				s = appendLine(s, "Sockets", opts.CPU.Sockets)
+			}
+
+			s = appendLine(s)
+		}
+
+		// Memory
+		if opts.Memory != nil {
+			s = appendLine(s, "Memory")
+			s = appendLine(s, "Actual", fmt.Sprintf("%d MiB", opts.Memory.Actual))
+			s = appendLine(s, "Total", fmt.Sprintf("%d MiB", opts.Memory.Total))
+			s = appendLine(s)
+		}
+
+		// Firmware
+		if opts.Firmware != nil {
+			s = appendLine(s, "Firmware")
+			s = appendLine(s, "Image", opts.Firmware.Image)
+			s = appendLine(s, "Flash", opts.Firmware.Flash)
+			s = appendLine(s)
+		}
+
+		s = appendLine(s, "Boot device", bootDevice(opts))
+
+		if opts.CloudInitDrive != nil {
+			s = appendLine(s, "CloudInit", opts.CloudInitDrive.Path)
+		}
+
+		s = appendLine(s)
+
+		// Cdrom
+		if count := len(opts.Cdrom); count > 0 {
+			s = appendLine(s, "Cdroms", count)
+
+			for _, d := range opts.Cdrom {
+				s = appendLine(s, d.Name, fmt.Sprintf("%s, %s", d.Driver, d.Media))
+			}
+
+			s = appendLine(s)
+		}
+
+		// Storage
+		if count := len(opts.Storage); count > 0 {
+			s = appendLine(s, "Storage", count)
+
+			for _, d := range opts.Storage {
+				// ignore all errors -- it's OK in this case
+				size, _ := block.GetSize64(d.Path)
+
+				s = appendLine(s, filepath.Base(d.Path), fmt.Sprintf("%.2f GiB, %s", float64(size/(1<<30)), d.Driver))
+
+				if c.Bool("verbose") {
+					s = appendLine(s, "Path", d.Path)
+					s = appendLine(s, "IopsRd", d.IopsRd)
+					s = appendLine(s, "IopsWr", d.IopsWr)
+					s = appendLine(s)
+				}
+			}
+
+			s = appendLine(s)
+		}
+
+		// Network
+		if count := len(opts.Network); count > 0 {
+			s = appendLine(s, "Network", count)
+
+			for _, nc := range opts.Network {
+				s = appendLine(s, nc.Ifname, fmt.Sprintf("%s, %s (queue = %d)", nc.HwAddr, nc.Driver, nc.Queues))
+
+				if c.Bool("verbose") {
+					s = appendLine(s, "Ifup", nc.Ifup)
+					s = appendLine(s, "Ifdown", nc.Ifdown)
+					s = appendLine(s)
+				}
+			}
+
+			s = appendLine(s)
+		}
+
+		// Input devices
+		if count := len(opts.Inputs); count > 0 {
+			s = appendLine(s, "Input devices", count)
+
+			for _, d := range opts.Inputs {
+				s = appendLine(s, "", d.Type)
+			}
+
+			s = appendLine(s)
+		}
+
+		// Host PCI devices
+		if count := len(opts.HostPCI); count > 0 {
+			s = appendLine(s, "Host devices", count)
+
+			for _, d := range opts.HostPCI {
+				s = appendLine(s, "", d.PCIAddr)
+			}
+
+			s = appendLine(s)
+		}
+
+		// External kernel
+		if opts.Kernel != nil {
+			s = appendLine(s, "External kernel")
+			s = appendLine(s, "Image", opts.Kernel.Image)
+			s = appendLine(s, "Cmdline", opts.Kernel.Cmdline)
+			s = appendLine(s, "Initrd", opts.Kernel.Initrd)
+			s = appendLine(s, "Modules", opts.Kernel.Modiso)
+			s = appendLine(s)
+		}
+
+		fmt.Printf("%s", s)
+	}
+
+	printBrief(resp.Machine)
 
 	return nil
 }
