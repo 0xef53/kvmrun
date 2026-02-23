@@ -94,6 +94,8 @@ func main() {
 		CommandCreateConf,
 		CommandUpdateConf,
 		CommandRemoveConf,
+		//CommandInfo,
+		//CommandInspect,
 		{
 			Name:     "version",
 			Usage:    "print the version information",

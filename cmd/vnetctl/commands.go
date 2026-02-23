@@ -65,3 +65,30 @@ var CommandRemoveConf = &cli.Command{
 		return grpc_client.CommandGRPC(ctx, c, client.NetworkSchemeRemoveConf)
 	},
 }
+
+/*
+	TODO:
+		needs to be done soon
+
+var CommandInfo = &cli.Command{
+	Name:      "info",
+	Usage:     "print details in human-readable format",
+	ArgsUsage: "VMNAME IFNAME",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.MachineInfo)
+	},
+}
+
+var CommandInspect = &cli.Command{
+	Name:      "inspect",
+	Usage:     "print low-level information about an existing configuration in JSON",
+	ArgsUsage: "VMNAME IFNAME",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.NetworkSchemeInspect)
+	},
+}
+*/
