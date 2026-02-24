@@ -160,7 +160,7 @@ func buildEthernetsConfig(vmdir string) (map[string]cloudinit.EthernetConfig, er
 			ID       string   `json:"id"`
 			Name     string   `json:"ifname"`
 			Scheme   string   `json:"scheme"`
-			Addrs    []string `json:"ips"`
+			Addrs    []string `json:"addrs"`
 			Gateway4 string   `json:"gateway4"`
 			Gateway6 string   `json:"gateway6"`
 
