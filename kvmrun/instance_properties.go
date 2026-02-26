@@ -15,7 +15,7 @@ func ValidateMachineName(name string) error {
 		return nil
 	}
 
-	return fmt.Errorf("invalid machine name: only [0-9A-Za-z_] are allowed, min length is 3 and max length is 16")
+	return fmt.Errorf("invalid machine name '%s': only [0-9A-Za-z_] are allowed, min length is 3 and max length is 16", name)
 }
 
 type InstanceProperties struct {
