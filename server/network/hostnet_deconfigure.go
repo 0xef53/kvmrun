@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/hostnet"
@@ -58,6 +60,20 @@ func (s *Server) DeconfigureHostNetwork(ctx context.Context, vmname, ifname stri
 
 			if err := attrs.Validate(true); err != nil {
 				return err
+			}
+
+			// Remove net_cls controller for this virt.machine
+			if b, err := os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, vmname, "run/cgroups.net_cls.path")); err == nil {
+				dirname := string(b)
+
+				// Just a fast check
+				if strings.HasSuffix(dirname, fmt.Sprintf("kvmrun@%s.service", vmname)) {
+					if err := os.RemoveAll(dirname); err == nil {
+						log.WithField("ifname", ifname).Infof("Removed: %s", dirname)
+					} else {
+						log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
+					}
+				}
 			}
 
 			return hostnet.RouterDeconfigure(ifname, attrs.BindInterface)
