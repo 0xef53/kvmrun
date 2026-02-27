@@ -41,9 +41,23 @@ var CommandRemoveConf = &cli.Command{
 	},
 }
 
+var CommandInfo = &cli.Command{
+	Name:      "info",
+	Usage:     "print a virtual machine details in human-readable format",
+	ArgsUsage: "VMNAME",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "enable verbose output"},
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.MachineInfo)
+	},
+}
+
 var CommandInspect = &cli.Command{
 	Name:      "inspect",
-	Usage:     "print a virtual machine details",
+	Usage:     "print low-level information about a virtual machine in JSON",
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Category:  "Configuration",

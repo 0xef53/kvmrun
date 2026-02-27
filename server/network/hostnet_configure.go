@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	"github.com/0xef53/kvmrun/internal/hostnet"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/server"
@@ -103,6 +104,18 @@ func (s *Server) ConfigureHostNetwork(ctx context.Context, vmname, ifname string
 					log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
 
 					return nil
+				}
+
+				if cgroups, err := cg.GetProcessGroups(int(routerAttrs.ProcessID)); err == nil {
+					if g, ok := cgroups["net_cls"]; ok {
+						fname := filepath.Join(kvmrun.CHROOTDIR, vmname, "run/cgroups.net_cls.path")
+
+						if err := os.WriteFile(fname, []byte(g.Path()), 0644); err != nil {
+							log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
+						}
+					}
+				} else {
+					log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
 				}
 
 				return err
