@@ -69,7 +69,6 @@ func GetRouteTableIndex(table string) (int, error) {
 	// Also look in /etc/iproute2/rt_tables.d/*
 	if ff, err := os.ReadDir("/etc/iproute2/rt_tables.d"); err == nil {
 		for _, f := range ff {
-			fmt.Println(f.Name())
 			if f.Type().IsRegular() {
 				possiblePlaces = append(possiblePlaces, filepath.Join("/etc/iproute2/rt_tables.d", f.Name()))
 			}

@@ -30,10 +30,6 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
             mount --bind "/sys/fs/cgroup" "${QEMU_ROOTDIR}/sys/fs/cgroup"
         fi
 
-        if mountpoint -q --nofollow "/sys/fs/cgroup/net_cls" ; then
-            mount --bind "/sys/fs/cgroup/net_cls" "${QEMU_ROOTDIR}/sys/fs/cgroup/net_cls"
-        fi
-
         # kvmrun dirs
         install -d "${QEMU_ROOTDIR}/etc/kvmrun"
         install -d "${QEMU_ROOTDIR}/usr/lib/kvmrun"
@@ -52,6 +48,10 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
 
         if [[ -n "${SYSTEMD_UNITNAME:-}" ]] ; then
             /usr/lib/kvmrun/delegate-cgroup-v1-controller "$SYSTEMD_UNITNAME" "net_cls"
+        fi
+
+        if mountpoint -q --nofollow "/sys/fs/cgroup/net_cls" ; then
+            mount --bind --make-shared "/sys/fs/cgroup/net_cls" "${QEMU_ROOTDIR}/sys/fs/cgroup/net_cls"
         fi
 
         # run chrooted QEMU binary
