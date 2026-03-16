@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -172,6 +173,7 @@ func (p *SchemeProperties) valueAs(key string, target interface{}) (err error) {
 			err = fmt.Errorf("type mismatch: key = %s, %v", key, r)
 		}
 	}()
+
 	targetElem.Set(valueRV.Convert(targetElem.Type()))
 
 	return nil
@@ -443,4 +445,30 @@ const (
 type AddrUpdate struct {
 	Action AddrUpdateAction
 	Prefix string
+}
+
+// returns two lists: to appand and to remove
+func SplitAddrUpdate(updates ...*AddrUpdate) ([]*net.IPNet, []*net.IPNet, error) {
+	if len(updates) == 0 {
+		return nil, nil, nil
+	}
+
+	toAppend := make([]*net.IPNet, 0, 8)
+	toRemove := make([]*net.IPNet, 0, 8)
+
+	for _, update := range updates {
+		ipnet, err := utils.ParseIPNet(update.Prefix)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid IP address: %s", update.Prefix)
+		}
+
+		switch update.Action {
+		case AddrUpdate_APPEND:
+			toAppend = append(toAppend, ipnet)
+		case AddrUpdate_REMOVE:
+			toRemove = append(toRemove, ipnet)
+		}
+	}
+
+	return toAppend, toRemove, nil
 }

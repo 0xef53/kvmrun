@@ -2,17 +2,12 @@ package network
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 	"net"
-	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 
-	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	"github.com/0xef53/kvmrun/internal/hostnet"
+	"github.com/0xef53/kvmrun/internal/utils"
 	"github.com/0xef53/kvmrun/kvmrun"
 	"github.com/0xef53/kvmrun/server"
 
@@ -74,51 +69,31 @@ func (s *Server) ConfigureHostNetwork(ctx context.Context, vmname, ifname string
 			}
 
 			routerAttrs := hostnet.VirtualRouterAttrs{
-				BindInterface: attrs.BindInterface,
-				MTU:           attrs.MTU,
-				Addrs:         attrs.Addrs,
-				Gateway4:      attrs.Gateway4,
-				Gateway6:      attrs.Gateway6,
-				InLimit:       attrs.InLimit,
-				OutLimit:      attrs.OutLimit,
+				BindIface: attrs.BindInterface,
+				MTU:       attrs.MTU,
+				Gateway4:  attrs.Gateway4,
+				Gateway6:  attrs.Gateway6,
+				InLimit:   attrs.InLimit,
+				OutLimit:  attrs.OutLimit,
 			}
 
-			// PID is needed to configure net_cls.classid for use in traffic control rules
-			if b, err := os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, vmname, "pid")); err == nil {
-				if v, err := strconv.ParseUint(string(b), 10, 32); err == nil {
-					routerAttrs.ProcessID = uint32(v)
-				} else {
+			for _, addr := range attrs.Addrs {
+				ipnet, err := utils.ParseIPNet(addr)
+				if err != nil {
 					return err
 				}
-			} else {
-				if errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("%w: %s", kvmrun.ErrNotRunning, vmname)
+
+				if s.AppConf.VirtNet.UnmanagedNets.Contains(ipnet.IP) {
+					routerAttrs.UnmanagedAddrs = append(routerAttrs.UnmanagedAddrs, addr)
+
+					l.Infof("Skip QoS configuring for unmanaged %s", ipnet.String())
+				} else {
+					routerAttrs.Addrs = append(routerAttrs.Addrs, addr)
 				}
-				return err
 			}
 
 			configureFn = func(secondStage bool) error {
-				err = hostnet.RouterConfigure(ifname, &routerAttrs, secondStage)
-
-				if err != nil && errors.Is(err, hostnet.ErrCgroupBinding) {
-					log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
-
-					return nil
-				}
-
-				if cgroups, err := cg.GetProcessGroups(int(routerAttrs.ProcessID)); err == nil {
-					if g, ok := cgroups["net_cls"]; ok {
-						fname := filepath.Join(kvmrun.CHROOTDIR, vmname, "run/cgroups.net_cls.path")
-
-						if err := os.WriteFile(fname, []byte(g.Path()), 0644); err != nil {
-							log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
-						}
-					}
-				} else {
-					log.WithField("ifname", ifname).Warnf("Non-fatal error: %s", err)
-				}
-
-				return err
+				return hostnet.RouterConfigure(ifname, &routerAttrs, secondStage)
 			}
 		case Scheme_BRIDGE:
 			attrs, err := scheme.ExtractAttrs_Bridge()
