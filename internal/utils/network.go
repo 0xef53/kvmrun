@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -23,6 +24,18 @@ func ParseIPNet(s string) (*net.IPNet, error) {
 	}
 
 	return netlink.ParseIPNet(s)
+}
+
+func ParseCIDR(s string) (net.IP, *net.IPNet, error) {
+	if !strings.Contains(s, "/") {
+		if net.ParseIP(s).To4() != nil {
+			s += "/32"
+		} else {
+			s += "/128"
+		}
+	}
+
+	return net.ParseCIDR(s)
 }
 
 func GetRouteTableIndex(table string) (int, error) {
@@ -92,4 +105,20 @@ func GetRouteTableIndex(table string) (int, error) {
 	}
 
 	return -1, fmt.Errorf("%w: %s", errTableNotFound, table)
+}
+
+func IntToIPv4(n uint32) net.IP {
+	ip := make(net.IP, net.IPv4len)
+
+	binary.BigEndian.PutUint32(ip, n)
+
+	return ip
+}
+
+func IPv4ToInt(ip net.IP) (uint32, error) {
+	if ip.To4() == nil {
+		return 0, fmt.Errorf("not an IPv4 address: %s", ip.String())
+	}
+
+	return binary.BigEndian.Uint32(ip.To4()), nil
 }
