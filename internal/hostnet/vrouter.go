@@ -60,9 +60,7 @@ func RouterDeconfigure(linkname, tcBindIface string) error {
 	// Remove all rules including IPv4/IPv6 blackhole
 	routerRemoveRules(link)
 
-	// Remove all routes and addresses
-	//routerRemoveAddrs(link)
-
+	// Remove all routes and GW addresses
 	routerRemoveRoutes(link)
 
 	// Remove QoS configuration for incoming traffic
@@ -424,52 +422,6 @@ func routerRemoveRoutes(link netlink.Link, addrs ...string) error {
 	return nil
 }
 
-/*
-func routerRemoveAddrs(link netlink.Link, addrs ...string) error {
-	ensureLink(link)
-
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-	if err != nil {
-		return fmt.Errorf("netlink: %w", err)
-	}
-
-	var candidates []netlink.Addr
-
-	if len(prefixes) == 0 {
-		candidates = addrs
-	} else {
-		normalized := make(map[string]struct{})
-
-		// Normalize specified addr list
-		for _, addr := range prefixes {
-			ipnet, err := utils.ParseIPNet(addr)
-			if err != nil {
-				return err
-			}
-
-			normalized[ipnet.String()] = struct{}{}
-		}
-
-		candidates = make([]netlink.Addr, 0, len(prefixes))
-
-		for _, addr := range addrs {
-			if _, ok := normalized[addr.String()]; ok {
-				candidates = append(candidates, addr)
-			}
-		}
-	}
-
-	for _, addr := range candidates {
-		if addr.IP.IsLinkLocalUnicast() || addr.IP.IsLinkLocalMulticast() {
-			continue
-		}
-
-		netlink.AddrDel(link, &addr)
-	}
-
-	return nil
-}
-*/
 //
 // ip-rule functions
 //
