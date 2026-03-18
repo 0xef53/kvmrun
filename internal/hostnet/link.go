@@ -46,8 +46,8 @@ func GetLinkID(linkname string, linkindex int) LinkID {
 	bi := big.NewInt(0)
 	bi.SetBytes(h.Sum(nil))
 
-	// Should be a number between 200 and 65000
-	x := big.NewInt(0).Mod(bi, big.NewInt(64800)).Int64() + 200
+	// Should be a number between 200 (0xc8) and 52000 (0xcb20)
+	x := big.NewInt(0).Mod(bi, big.NewInt(51800)).Int64() + 200
 
 	return LinkID(x)
 }
