@@ -358,7 +358,7 @@ func (t *MachineMigrationTask) OnSuccess() error {
 		var resp *pb_machines.GetResponse
 
 		err := t.KvmrunGRPC(t.dstServer, func(client *grpc_interfaces.Kvmrun) (err error) {
-			resp, err = client.Machines().Get(t.Ctx(), &pb_machines.GetRequest{Name: t.vmname})
+			resp, err = client.Machines().Get(context.WithoutCancel(t.Ctx()), &pb_machines.GetRequest{Name: t.vmname})
 
 			return err
 		})
