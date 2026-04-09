@@ -97,7 +97,7 @@ func (s *Server) taskStart(fn func() (string, error)) (string, error) {
 				labels = append(labels, object+"/long-running")
 			}
 
-			if stats := s.Tasks.StatByLabel(labels...); len(stats) > 0 {
+			if stats := s.Tasks.Stat(labels...); len(stats) > 0 {
 				if md, ok := stats[0].Metadata.(*TaskMetadata); ok && md != nil {
 					if descErr, ok := longRunningTasks[md.Kind]; ok {
 						err = descErr
@@ -162,7 +162,7 @@ func (s *Server) TaskRunFunc(ctx context.Context, tgt map[string]task.OperationM
 }
 
 func (s *Server) TaskCancel(labels ...string) error {
-	s.Tasks.CancelByLabel(labels...)
+	s.Tasks.Cancel(labels...)
 
 	return nil
 }
@@ -170,22 +170,22 @@ func (s *Server) TaskCancel(labels ...string) error {
 func (s *Server) TaskGetStats(labels ...string) ([]*task.TaskStat, error) {
 	m := make(map[string]*task.TaskStat)
 
-	for _, st := range s.Tasks.StatByLabel(labels...) {
+	for _, st := range s.Tasks.Stat(labels...) {
 		m[st.ID] = st
 	}
 
 	if len(labels) == 0 {
 		for _, tid := range s.Tasks.List() {
-			if st := s.Tasks.Stat(tid); st != nil {
-				m[st.ID] = st
+			if st := s.Tasks.Stat(tid); len(st) > 0 {
+				m[st[0].ID] = st[0]
 			}
 		}
 	} else {
 		// Сheck if there are task IDs in the label list
 		for _, tid := range labels {
 			if err := uuid.Validate(tid); err == nil {
-				if st := s.Tasks.Stat(tid); st != nil {
-					m[st.ID] = st
+				if st := s.Tasks.Stat(tid); len(st) > 0 {
+					m[st[0].ID] = st[0]
 				}
 			}
 		}
