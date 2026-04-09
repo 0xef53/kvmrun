@@ -20,6 +20,8 @@ case "$1" in
         rm -f '/usr/sbin/kvmhelper'
 
         invoke-rc.d rsyslog restart
+        
+        systemctl --system daemon-reload >/dev/null || true
     ;;
 
     *)

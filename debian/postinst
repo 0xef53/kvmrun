@@ -16,8 +16,6 @@ set -e
 
 case "$1" in
     configure)
-        install -d '/var/lib/supervise'
-
         if [ -f '/usr/share/kvmrun/tls/CA.crt' ]; then
             echo 'Found an existing CA.crt. Skipping certificates generation.'
         else
@@ -27,6 +25,8 @@ case "$1" in
         ln -fs '/usr/bin/vmm' '/usr/bin/kvmhelper'
 
         invoke-rc.d rsyslog restart
+
+        systemctl --system daemon-reload >/dev/null || true
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
