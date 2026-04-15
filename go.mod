@@ -27,7 +27,7 @@ require (
 
 require (
 	github.com/0xef53/go-grpc v0.0.0-20250804122917-f0d76f635ad5
-	github.com/0xef53/go-task v1.0.0
+	github.com/0xef53/go-task v1.2.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/godbus/dbus/v5 v5.0.3 // indirect
 	github.com/google/uuid v1.6.0

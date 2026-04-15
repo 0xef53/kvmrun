@@ -358,7 +358,7 @@ func (t *MachineMigrationTask) OnSuccess() error {
 		var resp *pb_machines.GetResponse
 
 		err := t.KvmrunGRPC(t.dstServer, func(client *grpc_interfaces.Kvmrun) (err error) {
-			resp, err = client.Machines().Get(context.WithoutCancel(t.Ctx()), &pb_machines.GetRequest{Name: t.vmname})
+			resp, err = client.Machines().Get(t.Ctx(), &pb_machines.GetRequest{Name: t.vmname})
 
 			return err
 		})
@@ -390,6 +390,14 @@ func (t *MachineMigrationTask) OnSuccess() error {
 	if t.opts.RemoveAfter {
 		t.Logger.Info("Local machine will be removed as requested (RemoveAfter == true)")
 
+		// When a virtual machine process terminates, all associated background tasks
+		// are terminated by calling the Cancel() method.
+		// This code must not be interrupted, and the task must not have the INTERRUPTED status set.
+
+		t.Logger.Debug("Mark this task as uninterruptible to prevent cancellation")
+
+		t.SetUninterruptible()
+
 		err := func() error {
 			// Make 3 attempts to make sure that remote machine works fine
 			for attemp := 0; attemp < 3; attemp++ {
@@ -417,7 +425,7 @@ func (t *MachineMigrationTask) OnSuccess() error {
 			return nil
 		}()
 		if err != nil {
-			t.Logger.Errorf("Failed to remove configuretion of %s: %s", t.vmname, err)
+			t.Logger.Errorf("Failed to remove configurаtion of %s: %s", t.vmname, err)
 		}
 	}
 
