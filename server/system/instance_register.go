@@ -21,7 +21,7 @@ import (
 )
 
 type InstanceRegistrationOptions struct {
-	MemActual uint32 `json:"mem_actual"`
+	MemActual uint64 `json:"mem_actual"`
 	PID       uint32 `json:"pid"`
 }
 
@@ -185,7 +185,7 @@ func (t *InstanceRegistrationTask) initBalloon(ctx context.Context) error {
 			return false, err
 		}
 
-		if t.opts.MemActual != uint32(balloonInfo.Actual) {
+		if t.opts.MemActual != uint64(balloonInfo.Actual) {
 			return false, nil
 		}
 
