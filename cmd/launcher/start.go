@@ -205,7 +205,7 @@ func (l *launcher) Start() error {
 	req := pb_system.QemuInstanceRegisterRequest{
 		Name:      l.vmname,
 		PID:       uint32(os.Getpid()),
-		MemActual: uint32(vmconf.MemoryGetActual()) << 20,
+		MemActual: uint64(vmconf.MemoryGetActual()) << 20,
 	}
 	if _, err := l.client.QemuInstanceRegister(l.ctx, &req); err != nil {
 		return err
