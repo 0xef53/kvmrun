@@ -13,6 +13,7 @@ service NetworkService {
     rpc Configure(ConfigureRequest) returns (google.protobuf.Empty) { }
     rpc Deconfigure(DeconfigureRequest) returns (google.protobuf.Empty) { }
 
+    rpc GetConf(GetConfRequest) returns (GetConfResponse) {}
     rpc CreateConf(CreateConfRequest) returns (google.protobuf.Empty) { }
     rpc UpdateConf(UpdateConfRequest) returns (google.protobuf.Empty) { }
     rpc DeleteConf(DeleteConfRequest) returns (google.protobuf.Empty) { }
@@ -39,6 +40,13 @@ message DeconfigureRequest {
     string name = 1;
     string ifname = 2;
 }
+
+message GetConfRequest {
+    string name = 1;
+    repeated string ifnames = 2;
+}
+
+message GetConfResponse { }
 
 message CreateConfRequest {
     string name = 1;

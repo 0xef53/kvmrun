@@ -40,3 +40,13 @@ func (s *service) DeleteConf(ctx context.Context, req *pb.DeleteConfRequest) (*e
 
 	return new(empty.Empty), nil
 }
+
+func (s *service) GetConf(ctx context.Context, req *pb.GetConfRequest) (*pb.GetConfResponse, error) {
+	schemes, err := s.ServiceServer.Network.GetConf(ctx, req.Name, req.Ifnames...)
+	if err != nil {
+		return nil, err
+	}
+	_ = schemes
+
+	return new(pb.GetConfResponse), nil
+}

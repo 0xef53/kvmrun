@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
@@ -155,4 +156,39 @@ func NetworkSchemeRemoveConf(ctx context.Context, vmname string, c *cli.Command,
 	_, err := grpcClient.Network().DeleteConf(ctx, &req)
 
 	return err
+}
+
+func NetworkSchemeInspect(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
+	req := pb_network.GetConfRequest{
+		Name:    vmname,
+		Ifnames: c.Args().Tail(),
+	}
+
+	resp, err := grpcClient.Network().GetConf(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	b, err := json.MarshalIndent(resp, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", b)
+
+	return nil
+}
+
+func NetworkSchemeInfo(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
+	req := pb_network.GetConfRequest{
+		Name:    vmname,
+		Ifnames: c.Args().Tail(),
+	}
+
+	_, err := grpcClient.Network().GetConf(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
