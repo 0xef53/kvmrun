@@ -345,6 +345,10 @@ func (p *SchemeProperties) ExtractAttrs_VLAN() (*NetworkSchemeAttrs_VLAN, error)
 	return &attrs, nil
 }
 
+func (p *SchemeProperties) ExtractAttrs_COMMON() (*commonAttrs, error) {
+	return p.extractCommonAttrs()
+}
+
 func GetNetworkSchemes(vmname string, ifnames ...string) ([]*SchemeProperties, error) {
 	// Check if machine exists
 	if _, err := kvmrun.GetInstanceConf(vmname); err != nil {
