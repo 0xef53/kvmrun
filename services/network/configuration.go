@@ -46,7 +46,11 @@ func (s *service) GetConf(ctx context.Context, req *pb.GetConfRequest) (*pb.GetC
 	if err != nil {
 		return nil, err
 	}
-	_ = schemes
 
-	return new(pb.GetConfResponse), nil
+	protos, err := schemesToProto(schemes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetConfResponse{Schemes: protos}, nil
 }

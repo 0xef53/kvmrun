@@ -221,6 +221,6 @@ func (s *Server) RemoveConf(ctx context.Context, vmname, ifname string, deconfig
 	return nil
 }
 
-func (s *Server) GetConf(ctx context.Context, vmname string, ifnames ...string) ([]*SchemeProperties, error) {
-	return nil, nil
+func (s *Server) GetConf(_ context.Context, vmname string, ifnames ...string) ([]*SchemeProperties, error) {
+	return GetNetworkSchemes(vmname, ifnames...)
 }

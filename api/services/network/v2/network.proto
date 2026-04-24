@@ -46,7 +46,9 @@ message GetConfRequest {
     repeated string ifnames = 2;
 }
 
-message GetConfResponse { }
+message GetConfResponse {
+    repeated types.v2.NetworkSchemeOpts schemes = 1;
+}
 
 message CreateConfRequest {
     string name = 1;
