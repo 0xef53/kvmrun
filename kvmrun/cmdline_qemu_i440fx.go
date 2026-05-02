@@ -301,7 +301,7 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 			cidrive.driver = CloudInitDriverType_FLOPPY
 		}
 
-		if err := cidrive.Validate(true); err != nil {
+		if err := cidrive.Validate(false); err != nil {
 			return nil, fmt.Errorf("cloud-init validation error: %w", err)
 		}
 

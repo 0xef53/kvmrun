@@ -27,14 +27,18 @@ func InterfaceUp(ctx context.Context, ifname string, secondStage bool) error {
 
 	var vmname string
 
-	if cwd, err := os.Getwd(); err == nil {
-		if err := kvmrun.ValidateMachineName(filepath.Base(cwd)); err != nil {
-			return err
-		}
-
-		vmname = filepath.Base(cwd)
+	if v, ok := os.LookupEnv("VMNAME"); ok {
+		vmname = v
 	} else {
-		return fmt.Errorf("cannot determine machine name: %w", err)
+		if cwd, err := os.Getwd(); err == nil {
+			vmname = filepath.Base(cwd)
+		} else {
+			return fmt.Errorf("cannot determine machine name: %w", err)
+		}
+	}
+
+	if err := kvmrun.ValidateMachineName(vmname); err != nil {
+		return err
 	}
 
 	err := grpc_client.KvmrunGRPC(ctx, func(grpcClient *grpc_interfaces.Kvmrun) error {

@@ -22,11 +22,17 @@ func main() {
 	}
 	ifname := os.Args[1]
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		Error.Fatalln(err)
+	var vmname string
+
+	if v, ok := os.LookupEnv("VMNAME"); ok {
+		vmname = v
+	} else {
+		if cwd, err := os.Getwd(); err == nil {
+			vmname = filepath.Base(cwd)
+		} else {
+			Error.Fatalln(err)
+		}
 	}
-	vmname := filepath.Base(cwd)
 
 	config := filepath.Join(kvmrun.CHROOTDIR, vmname, "run/net", ifname)
 
@@ -43,7 +49,7 @@ func main() {
 	if iface.Ifup == "" {
 		return
 	}
-	//time.Sleep(600 * time.Second)
+
 	cmd := exec.Command(iface.Ifup, ifname)
 
 	cmd.Stdin = bytes.NewReader(c)
