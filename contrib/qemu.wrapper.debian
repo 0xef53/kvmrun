@@ -1,76 +1,46 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/bin/bash
+set -eu
 
-import os
-import sh
-import shutil
-import sys
-import time
+declare QEMU_ROOTDIR="$(realpath -m ${QEMU_ROOTDIR:-/})"
 
+if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
+    if ! mountpoint -q "$QEMU_ROOTDIR" ; then
+        echo "error: not a mountpoint: ${QEMU_ROOTDIR}" >&2
+        exit 2
+    fi
 
-def main():
-    qemu_rootdir = '/'
+    if [[ -n "${UNSHARED:-}" ]] ; then
+        # system dirs and files
+        install -d "${QEMU_ROOTDIR}/proc"
+        install -d "${QEMU_ROOTDIR}/sys"
+        install -d "${QEMU_ROOTDIR}/dev"
+        install -d "${QEMU_ROOTDIR}/run"
 
-    if 'QEMU_ROOTDIR' in os.environ:
-        qemu_rootdir = os.path.normpath(os.environ['QEMU_ROOTDIR'])
-    else:
-        os.environ['QEMU_ROOTDIR'] = qemu_rootdir
+        mount --bind "/proc" "${QEMU_ROOTDIR}/proc"
+        mount --bind "/sys" "${QEMU_ROOTDIR}/sys"
+        mount --bind "/dev" "${QEMU_ROOTDIR}/dev"
+        mount --bind "/dev/pts" "${QEMU_ROOTDIR}/dev/pts"
+        mount --bind "/run" "${QEMU_ROOTDIR}/run"
 
-    current_dir = os.getcwd()
+        mount --bind "/etc/passwd" "${QEMU_ROOTDIR}/etc/passwd"
+        mount --bind "/etc/group" "${QEMU_ROOTDIR}/etc/group"
 
-    if qemu_rootdir != '/':
-        if 'UNSHARED' in os.environ:
-            # system dirs and files
-            for d in ['proc', 'sys', 'dev', 'run']:
-                os.makedirs(os.path.join(qemu_rootdir, d), exist_ok=True)
-                sh.mount('--bind', os.path.join('/', d), os.path.join(qemu_rootdir, d))
+        # kvmrun dirs
+        install -d "${QEMU_ROOTDIR}/etc/kvmrun"
+        install -d "${QEMU_ROOTDIR}/usr/lib/kvmrun"
+        install -d "${QEMU_ROOTDIR}/var/lib/kvmrun"
+        install -d "${QEMU_ROOTDIR}/usr/share/kvmrun"
 
-            sh.mount('--bind', '/dev/pts', os.path.join(qemu_rootdir, 'dev/pts'))
+        mount --bind "/etc/kvmrun" "${QEMU_ROOTDIR}/etc/kvmrun"
+        mount --bind "/usr/lib/kvmrun" "${QEMU_ROOTDIR}/usr/lib/kvmrun"
+        mount --bind "/var/lib/kvmrun" "${QEMU_ROOTDIR}/var/lib/kvmrun"
+        mount --bind "/usr/share/kvmrun" "${QEMU_ROOTDIR}/usr/share/kvmrun"
 
-            sh.mount('--bind', '/etc/passwd', os.path.join(qemu_rootdir, 'etc/passwd'))
-            sh.mount('--bind', '/etc/group', os.path.join(qemu_rootdir, 'etc/group'))
+        # run chrooted QEMU binary
+        exec chroot "$QEMU_ROOTDIR" /usr/bin/qemu-system-x86_64 "${@}"
+    fi
 
-            if os.path.ismount('/sys/fs/cgroup'):
-                sh.mount('--bind', '/sys/fs/cgroup', os.path.join(qemu_rootdir, 'sys/fs/cgroup'))
+    UNSHARED=1 exec unshare -m "$0" "${@}"
+fi
 
-            # kvmrun dirs
-            for d in ['etc/kvmrun', 'usr/lib/kvmrun', 'var/lib/kvmrun', 'usr/share/kvmrun']:
-                os.makedirs(os.path.join(qemu_rootdir, d), exist_ok=True)
-                sh.mount('--bind', os.path.join('/', d), os.path.join(qemu_rootdir, d))
-
-            # run chrooted QEMU binary
-            os.chroot(qemu_rootdir)
-            os.chdir(current_dir)
-
-            qemuBinary = shutil.which('qemu-system-x86_64')
-            if qemuBinary is None:
-                raise FileNotFoundError(f'unable to find "qemu-system-x86_64" binary in "{qemu_rootdir}" directory')
-
-            sys.argv[0] = qemuBinary
-
-            os.execv(qemuBinary, sys.argv)
-
-        # Unshare and restart
-        os.environ['UNSHARED'] = '1'
-
-        unshareBinary = shutil.which('unshare')
-        if unshareBinary is None:
-            raise FileNotFoundError(f'unable to find "unshare" binary file')
-
-        os.execv(unshareBinary, ['-m'] + sys.argv)
-
-    # Run without chroot
-    qemuBinary = shutil.which('qemu-system-x86_64')
-    if qemuBinary is None:
-        raise FileNotFoundError(f'unable to find "qemu-system-x86_64" binary in "{qemu_rootdir}" directory')
-
-    sys.argv[0] = qemuBinary
-
-    os.execv(qemuBinary, sys.argv)
-
-
-if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        raise
+exec /usr/bin/qemu-system-x86_64 "$@"
