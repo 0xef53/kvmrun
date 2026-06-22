@@ -317,7 +317,12 @@ func (t *MachineMigrationTask) Main() error {
 		}()
 
 		group.Go(func() error {
-			return t.mirrorDisks(ctx, []*kvmrun.Disk{fwflash}, firmwareFlashReady, vmstateMigrated)
+			err := t.mirrorFirmwareFlashDevice(ctx, fwflash, firmwareFlashReady, vmstateMigrated)
+			if err != nil {
+				t.Logger.Error(err.Error())
+			}
+
+			return err
 		})
 
 		select {
@@ -755,6 +760,24 @@ func (t *MachineMigrationTask) mirrorDisks(ctx context.Context, disks []*kvmrun.
 	return processor.run()
 }
 
+func (t *MachineMigrationTask) mirrorFirmwareFlashDevice(ctx context.Context, fwflash *kvmrun.Disk, ready, stateMigrated chan struct{}) error {
+	processor := machineMigrationTask_StorageMirroringProcessor{
+		t:      t,
+		ctx:    ctx,
+		logger: t.Logger,
+	}
+
+	processor.disks = []*kvmrun.Disk{fwflash}
+
+	processor.readyToComplete = ready
+	processor.machineStateMigrated = stateMigrated
+
+	processor.fwFlashPresent = true
+	processor.fwFlashName = fwflash.BaseName()
+
+	return processor.run()
+}
+
 //
 // StorageMirroringProcessor
 //
@@ -768,13 +791,20 @@ type machineMigrationTask_StorageMirroringProcessor struct {
 	disks                []*kvmrun.Disk
 	readyToComplete      chan struct{}
 	machineStateMigrated chan struct{}
+
+	fwFlashPresent bool
+	fwFlashName    string
 }
 
 func (p *machineMigrationTask_StorageMirroringProcessor) run() (err error) {
 	diskNames := make([]string, 0, len(p.disks))
 
 	for _, d := range p.disks {
-		diskNames = append(diskNames, d.BaseName())
+		if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+			diskNames = append(diskNames, "fwflash")
+		} else {
+			diskNames = append(diskNames, d.BaseName())
+		}
 	}
 
 	p.logger.Infof("Start disks mirroring process (%s)", strings.Join(diskNames, ", "))
@@ -793,9 +823,17 @@ func (p *machineMigrationTask_StorageMirroringProcessor) run() (err error) {
 	for _, _d := range p.disks {
 		d := _d
 
-		p.logger.Infof("Run QMP command: drive-mirror; name=%s, remote_addr=%s:%d", d.BaseName(), p.t.dstServerAddr.String(), p.t.requisites.NBDPort)
+		var srcName, dstName string
 
-		dstName := d.BaseName()
+		if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+			srcName = "fwflash"
+			dstName = "fwflash"
+		} else {
+			srcName = d.BaseName()
+			dstName = d.BaseName()
+		}
+
+		p.logger.Infof("Run QMP command: drive-mirror; name=%s, remote_addr=%s:%d", srcName, p.t.dstServerAddr.String(), p.t.requisites.NBDPort)
 
 		if ovrd, ok := p.t.opts.Overrides.Disks[d.Path]; ok {
 			if _d, err := kvmrun.NewDisk(ovrd); err == nil {
@@ -807,10 +845,10 @@ func (p *machineMigrationTask_StorageMirroringProcessor) run() (err error) {
 
 		ts := time.Now()
 
-		args := p.newMirrorOpts(d.BaseName(), dstName)
+		args := p.newMirrorOpts(srcName, dstName)
 
 		if err := p.t.Server.Mon.Run(p.t.vmname, qmp.Command{Name: "drive-mirror", Arguments: args}, nil); err != nil {
-			return fmt.Errorf("failed to start mirroring (%s): %w", d.BaseName(), err)
+			return fmt.Errorf("failed to start mirroring (%s): %w", srcName, err)
 		}
 
 		group1.Go(func() error { return p.waitForReady(ctx1, ts, d) })
@@ -840,19 +878,27 @@ func (p *machineMigrationTask_StorageMirroringProcessor) run() (err error) {
 	for _, _d := range p.disks {
 		d := _d
 
-		p.logger.Infof("Run QMP command: block-job-complete; name=%s", d.BaseName())
+		var nbdDiskName string
+
+		if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+			nbdDiskName = "fwflash"
+		} else {
+			nbdDiskName = d.BaseName()
+		}
+
+		p.logger.Infof("Run QMP command: block-job-complete; name=%s", nbdDiskName)
 
 		jobID := struct {
 			Device string `json:"device"`
 		}{
-			Device: "migr_" + d.BaseName(),
+			Device: "migr_" + nbdDiskName,
 		}
 
 		ts := time.Now()
 
 		if err := p.t.Server.Mon.Run(p.t.vmname, qmp.Command{Name: "block-job-complete", Arguments: &jobID}, nil); err != nil {
 			// Non-fatal error, just printing
-			p.t.Logger.Errorf("Failed to stop mirroring (%s): %s", d.BaseName(), err.Error())
+			p.t.Logger.Errorf("Failed to stop mirroring (%s): %s", nbdDiskName, err.Error())
 
 			continue
 		}
@@ -885,11 +931,20 @@ func (p *machineMigrationTask_StorageMirroringProcessor) getJob(jobID string) (*
 			return j, nil
 		}
 	}
+
 	return nil, nil
 }
 
 func (p *machineMigrationTask_StorageMirroringProcessor) waitForReady(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
-	jobID := "migr_" + d.BaseName()
+	var diskName string
+
+	if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+		diskName = "fwflash"
+	} else {
+		diskName = d.BaseName()
+	}
+
+	jobID := "migr_" + diskName
 
 	// Disk stat will be available after the job status changes to running
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -912,13 +967,13 @@ func (p *machineMigrationTask_StorageMirroringProcessor) waitForReady(ctx contex
 		job, err := p.getJob(jobID)
 		if err != nil {
 			// No errors should be here
-			return fmt.Errorf("failed to get mirroring status (jobID=%s): %w", jobID, err)
+			return fmt.Errorf("failed to get mirroring status (job ID = %s): %w", jobID, err)
 		}
 		if job == nil {
 			return fmt.Errorf("unable to get mirroring status: job ID = %s", jobID)
 		}
 
-		if d.BaseName() != "fwflash" {
+		if diskName != "fwflash" {
 			p.t.updateStat("disk", d.Path, d.QemuVirtualSize, job.Len-job.Offset, d.QemuVirtualSize-(job.Len-job.Offset), 0)
 		}
 
@@ -946,7 +1001,15 @@ LOOP:
 		}
 
 		for _, d := range p.disks {
-			jobID := "migr_" + d.BaseName()
+			var diskName string
+
+			if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+				diskName = "fwflash"
+			} else {
+				diskName = d.BaseName()
+			}
+
+			jobID := "migr_" + diskName
 
 			job, err := p.getJob(jobID)
 			if err != nil {
@@ -957,7 +1020,7 @@ LOOP:
 				return fmt.Errorf("unable to get mirroring status: jobID = %s", jobID)
 			}
 
-			if d.BaseName() != "fwflash" {
+			if diskName != "fwflash" {
 				p.t.updateStat("disk", d.Path, d.QemuVirtualSize, job.Len-job.Offset, d.QemuVirtualSize-(job.Len-job.Offset), 0)
 			}
 		}
@@ -967,7 +1030,15 @@ LOOP:
 }
 
 func (p *machineMigrationTask_StorageMirroringProcessor) waitForCompleted(ctx context.Context, ts time.Time, d *kvmrun.Disk) error {
-	jobID := "migr_" + d.BaseName()
+	var diskName string
+
+	if p.fwFlashPresent && d.BaseName() == p.fwFlashName {
+		diskName = "fwflash"
+	} else {
+		diskName = d.BaseName()
+	}
+
+	jobID := "migr_" + diskName
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -981,25 +1052,25 @@ func (p *machineMigrationTask_StorageMirroringProcessor) waitForCompleted(ctx co
 
 		job, err := p.getJob(jobID)
 		if err != nil {
-			return fmt.Errorf("failed to complete disk mirroring for %s: %s", d.BaseName(), err)
+			return fmt.Errorf("failed to complete disk mirroring for %s: %s", diskName, err)
 		}
 
 		// Ok, job completed
 		if job == nil {
 			if _, found, err := p.t.Server.Mon.FindBlockJobErrorEvent(p.t.vmname, jobID, uint64(ts.Unix())); err == nil {
 				if found {
-					return fmt.Errorf("errors detected during disk mirroring: %s", d.BaseName())
+					return fmt.Errorf("errors detected during disk mirroring: %s", diskName)
 				}
 			} else {
-				return fmt.Errorf("FindBlockJobErrorEvent failed: %s: %w", d.BaseName(), err)
+				return fmt.Errorf("FindBlockJobErrorEvent failed: %s: %w", diskName, err)
 			}
 
 			if _, found, err := p.t.Server.Mon.FindBlockJobCompletedEvent(p.t.vmname, jobID, uint64(ts.Unix())); err == nil {
 				if !found {
-					return fmt.Errorf("no completed event found: %s", d.BaseName())
+					return fmt.Errorf("no completed event found: %s", diskName)
 				}
 			} else {
-				return fmt.Errorf("FindBlockJobCompletedEvent failed: %s: %w", d.BaseName(), err)
+				return fmt.Errorf("FindBlockJobCompletedEvent failed: %s: %w", diskName, err)
 			}
 
 			break
