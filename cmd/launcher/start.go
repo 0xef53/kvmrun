@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	"github.com/0xef53/kvmrun/internal/fsutil"
@@ -207,7 +208,23 @@ func (l *launcher) Start() error {
 		PID:       uint32(os.Getpid()),
 		MemActual: uint64(vmconf.MemoryGetActual()) << 20,
 	}
-	if _, err := l.client.QemuInstanceRegister(l.ctx, &req); err != nil {
+	if err := func() (err error) {
+		// We make several attempts, since kvmrund may have an unfinished task
+		// from a previous attempt to start a virt.machine.
+		for range 60 {
+			_, err = l.client.QemuInstanceRegister(l.ctx, &req)
+			if err != nil {
+				Info.Printf("failed to create a task to register an instance (next try in 5 seconds)")
+
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			break
+		}
+
+		return err
+	}(); err != nil {
 		return err
 	}
 
