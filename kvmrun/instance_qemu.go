@@ -94,6 +94,7 @@ func GetInstanceQemu(vmname string, mon *qmp.Monitor) (Instance, error) {
 
 	gr.Go(func() error { return inner.initFirmware() })
 	gr.Go(func() error { return inner.initCPU() })
+	gr.Go(func() error { return inner.initVGA() })
 	gr.Go(func() error { return inner.initMemory() })
 	gr.Go(func() error { return inner.initHostDevicePool() })
 	gr.Go(func() error { return inner.initInputDevicePool() })
@@ -467,6 +468,16 @@ func (r *InstanceQemu) CPUSetQuota(value int) (err error) {
 	}
 
 	return mgr.SetCpuQuota(int64(value))
+}
+
+func (r *InstanceQemu) initVGA() error {
+	r.VgaDevice.SetType(r.startupConf.VgaDeviceGetType())
+
+	return nil
+}
+
+func (r InstanceQemu) VgaDeviceSetType(_ string) error {
+	return ErrNotImplemented
 }
 
 func (r *InstanceQemu) initInputDevicePool() error {

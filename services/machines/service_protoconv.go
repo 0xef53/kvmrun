@@ -35,6 +35,9 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Model:   vmi.CPUGetModel(),
 				Quota:   uint32(vmi.CPUGetQuota()),
 			},
+			VGA: &pb_types.MachineOpts_VGA{
+				Type: vmi.VgaDeviceGetType(),
+			},
 		}
 
 		for _, d := range vmi.InputDeviceGetList() {
@@ -159,6 +162,10 @@ func propertiesFromMachineOpts(proto *pb_types.MachineOpts) *kvmrun.InstanceProp
 		opts.CPU.Sockets = int(proto.CPU.Sockets)
 		opts.CPU.Model = proto.CPU.Model
 		opts.CPU.Quota = int(proto.CPU.Quota)
+	}
+
+	if proto.VGA != nil {
+		opts.VgaDevice.Type = proto.VGA.Type
 	}
 
 	for _, v := range proto.Inputs {
