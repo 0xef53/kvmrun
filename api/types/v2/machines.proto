@@ -152,6 +152,11 @@ enum CloudInitDriver {
     CI_FLOPPY = 2;
 }
 
+enum VgaDeviceType {
+    VGA_TYPE_CIRRUS = 0;
+    VGA_TYPE_STD = 1;
+}
+
 enum InputDeviceType {
     UNDEFINED_INPUT_TYPE = 0;
     USB_TABLET = 1;

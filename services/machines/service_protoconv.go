@@ -1,6 +1,7 @@
 package machines
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -360,6 +361,14 @@ func optsFromStartMigrationRequest(req *pb.StartMigrationRequest) *machine.Migra
 	}
 
 	return &opts
+}
+
+func optsFromVGADeviceSetTypeRequest(req *pb.VGADeviceSetTypeRequest) *kvmrun.VgaDeviceProperties {
+	fmt.Printf("optsFromVGADeviceSetTypeRequest: req = %q\n", req)
+	fmt.Printf("optsFromVGADeviceSetTypeRequest: req.Type string = %q\n", kvmrun.QemuVgaType(req.Type).String())
+	return &kvmrun.VgaDeviceProperties{
+		Type: kvmrun.QemuVgaType(req.Type).String(),
+	}
 }
 
 func vncRequisitesToProto(requisites *machine.VNCRequisites) *pb_types.VNCRequisites {

@@ -60,6 +60,7 @@ func main() {
 		commands.MemoryCommands,
 		commands.CPUCommands,
 		commands.BootCommands,
+		commands.VgaDeviceCommands,
 		commands.HostDeviceCommands,
 		commands.InputDeviceCommands,
 		commands.CdromCommands,

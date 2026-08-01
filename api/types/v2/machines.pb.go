@@ -341,6 +341,52 @@ func (CloudInitDriver) EnumDescriptor() ([]byte, []int) {
 	return file_types_v2_machines_proto_rawDescGZIP(), []int{5}
 }
 
+type VGADeviceType int32
+
+const (
+	VGADeviceType_VGA_TYPE_CIRRUS VGADeviceType = 0
+	VGADeviceType_VGA_TYPE_STD    VGADeviceType = 1
+)
+
+// Enum value maps for VGADeviceType.
+var (
+	VGADeviceType_name = map[int32]string{
+		0: "VGA_TYPE_CIRRUS",
+		1: "VGA_TYPE_STD",
+	}
+	VGADeviceType_value = map[string]int32{
+		"VGA_TYPE_CIRRUS": 0,
+		"VGA_TYPE_STD":    1,
+	}
+)
+
+func (x VGADeviceType) Enum() *VGADeviceType {
+	p := new(VGADeviceType)
+	*p = x
+	return p
+}
+
+func (x VGADeviceType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (VGADeviceType) Descriptor() protoreflect.EnumDescriptor {
+	return file_types_v2_machines_proto_enumTypes[6].Descriptor()
+}
+
+func (VGADeviceType) Type() protoreflect.EnumType {
+	return &file_types_v2_machines_proto_enumTypes[6]
+}
+
+func (x VGADeviceType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use VGADeviceType.Descriptor instead.
+func (VGADeviceType) EnumDescriptor() ([]byte, []int) {
+	return file_types_v2_machines_proto_rawDescGZIP(), []int{6}
+}
+
 type InputDeviceType int32
 
 const (
@@ -371,11 +417,11 @@ func (x InputDeviceType) String() string {
 }
 
 func (InputDeviceType) Descriptor() protoreflect.EnumDescriptor {
-	return file_types_v2_machines_proto_enumTypes[6].Descriptor()
+	return file_types_v2_machines_proto_enumTypes[7].Descriptor()
 }
 
 func (InputDeviceType) Type() protoreflect.EnumType {
-	return &file_types_v2_machines_proto_enumTypes[6]
+	return &file_types_v2_machines_proto_enumTypes[7]
 }
 
 func (x InputDeviceType) Number() protoreflect.EnumNumber {
@@ -384,7 +430,7 @@ func (x InputDeviceType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InputDeviceType.Descriptor instead.
 func (InputDeviceType) EnumDescriptor() ([]byte, []int) {
-	return file_types_v2_machines_proto_rawDescGZIP(), []int{6}
+	return file_types_v2_machines_proto_rawDescGZIP(), []int{7}
 }
 
 type MachineOpts struct {
@@ -1965,14 +2011,18 @@ var file_types_v2_machines_proto_rawDesc = []byte{
 	0x49, 0x4e, 0x45, 0x44, 0x5f, 0x43, 0x4c, 0x4f, 0x55, 0x44, 0x49, 0x4e, 0x49, 0x54, 0x5f, 0x44,
 	0x52, 0x49, 0x56, 0x45, 0x52, 0x10, 0x00, 0x12, 0x0d, 0x0a, 0x09, 0x43, 0x49, 0x5f, 0x49, 0x44,
 	0x45, 0x5f, 0x43, 0x44, 0x10, 0x01, 0x12, 0x0d, 0x0a, 0x09, 0x43, 0x49, 0x5f, 0x46, 0x4c, 0x4f,
-	0x50, 0x50, 0x59, 0x10, 0x02, 0x2a, 0x3b, 0x0a, 0x0f, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x44, 0x65,
-	0x76, 0x69, 0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x18, 0x0a, 0x14, 0x55, 0x4e, 0x44, 0x45,
-	0x46, 0x49, 0x4e, 0x45, 0x44, 0x5f, 0x49, 0x4e, 0x50, 0x55, 0x54, 0x5f, 0x54, 0x59, 0x50, 0x45,
-	0x10, 0x00, 0x12, 0x0e, 0x0a, 0x0a, 0x55, 0x53, 0x42, 0x5f, 0x54, 0x41, 0x42, 0x4c, 0x45, 0x54,
-	0x10, 0x01, 0x42, 0x2d, 0x5a, 0x2b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x30, 0x78, 0x65, 0x66, 0x35, 0x33, 0x2f, 0x6b, 0x76, 0x6d, 0x72, 0x75, 0x6e, 0x2f, 0x61,
-	0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2f, 0x76, 0x32, 0x3b, 0x74, 0x79, 0x70, 0x65,
-	0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x50, 0x50, 0x59, 0x10, 0x02, 0x2a, 0x36, 0x0a, 0x0d, 0x56, 0x67, 0x61, 0x44, 0x65, 0x76, 0x69,
+	0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x13, 0x0a, 0x0f, 0x56, 0x47, 0x41, 0x5f, 0x54, 0x59,
+	0x50, 0x45, 0x5f, 0x43, 0x49, 0x52, 0x52, 0x55, 0x53, 0x10, 0x00, 0x12, 0x10, 0x0a, 0x0c, 0x56,
+	0x47, 0x41, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x5f, 0x53, 0x54, 0x44, 0x10, 0x01, 0x2a, 0x3b, 0x0a,
+	0x0f, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x44, 0x65, 0x76, 0x69, 0x63, 0x65, 0x54, 0x79, 0x70, 0x65,
+	0x12, 0x18, 0x0a, 0x14, 0x55, 0x4e, 0x44, 0x45, 0x46, 0x49, 0x4e, 0x45, 0x44, 0x5f, 0x49, 0x4e,
+	0x50, 0x55, 0x54, 0x5f, 0x54, 0x59, 0x50, 0x45, 0x10, 0x00, 0x12, 0x0e, 0x0a, 0x0a, 0x55, 0x53,
+	0x42, 0x5f, 0x54, 0x41, 0x42, 0x4c, 0x45, 0x54, 0x10, 0x01, 0x42, 0x2d, 0x5a, 0x2b, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x30, 0x78, 0x65, 0x66, 0x35, 0x33, 0x2f,
+	0x6b, 0x76, 0x6d, 0x72, 0x75, 0x6e, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73,
+	0x2f, 0x76, 0x32, 0x3b, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x33,
 }
 
 var (
@@ -1987,7 +2037,7 @@ func file_types_v2_machines_proto_rawDescGZIP() []byte {
 	return file_types_v2_machines_proto_rawDescData
 }
 
-var file_types_v2_machines_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_types_v2_machines_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
 var file_types_v2_machines_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_types_v2_machines_proto_goTypes = []interface{}{
 	(MachineState)(0),                   // 0: kvmrun.api.types.v2.MachineState
@@ -1996,48 +2046,49 @@ var file_types_v2_machines_proto_goTypes = []interface{}{
 	(DiskDriver)(0),                     // 3: kvmrun.api.types.v2.DiskDriver
 	(CdromDriver)(0),                    // 4: kvmrun.api.types.v2.CdromDriver
 	(CloudInitDriver)(0),                // 5: kvmrun.api.types.v2.CloudInitDriver
-	(InputDeviceType)(0),                // 6: kvmrun.api.types.v2.InputDeviceType
-	(*MachineOpts)(nil),                 // 7: kvmrun.api.types.v2.MachineOpts
-	(*Machine)(nil),                     // 8: kvmrun.api.types.v2.Machine
-	(*MigrationOverrides)(nil),          // 9: kvmrun.api.types.v2.MigrationOverrides
-	(*IncomingMigrationRequisites)(nil), // 10: kvmrun.api.types.v2.IncomingMigrationRequisites
-	(*VNCRequisites)(nil),               // 11: kvmrun.api.types.v2.VNCRequisites
-	(*MachineEvent)(nil),                // 12: kvmrun.api.types.v2.MachineEvent
-	(*MachineOpts_Firmware)(nil),        // 13: kvmrun.api.types.v2.MachineOpts.Firmware
-	(*MachineOpts_Memory)(nil),          // 14: kvmrun.api.types.v2.MachineOpts.Memory
-	(*MachineOpts_CPU)(nil),             // 15: kvmrun.api.types.v2.MachineOpts.CPU
-	(*MachineOpts_VGA)(nil),             // 16: kvmrun.api.types.v2.MachineOpts.VGA
-	(*MachineOpts_InputDevice)(nil),     // 17: kvmrun.api.types.v2.MachineOpts.InputDevice
-	(*MachineOpts_Cdrom)(nil),           // 18: kvmrun.api.types.v2.MachineOpts.Cdrom
-	(*MachineOpts_Disk)(nil),            // 19: kvmrun.api.types.v2.MachineOpts.Disk
-	(*MachineOpts_NetIface)(nil),        // 20: kvmrun.api.types.v2.MachineOpts.NetIface
-	(*MachineOpts_ChannelVSock)(nil),    // 21: kvmrun.api.types.v2.MachineOpts.ChannelVSock
-	(*MachineOpts_CloudInit)(nil),       // 22: kvmrun.api.types.v2.MachineOpts.CloudInit
-	(*MachineOpts_Kernel)(nil),          // 23: kvmrun.api.types.v2.MachineOpts.Kernel
-	(*MachineOpts_HostDevice)(nil),      // 24: kvmrun.api.types.v2.MachineOpts.HostDevice
-	nil,                                 // 25: kvmrun.api.types.v2.MigrationOverrides.DisksEntry
-	nil,                                 // 26: kvmrun.api.types.v2.MigrationOverrides.NetIfacesEntry
-	(*MachineEvent_Timestamp)(nil),      // 27: kvmrun.api.types.v2.MachineEvent.Timestamp
+	(VGADeviceType)(0),                  // 6: kvmrun.api.types.v2.VGADeviceType
+	(InputDeviceType)(0),                // 7: kvmrun.api.types.v2.InputDeviceType
+	(*MachineOpts)(nil),                 // 8: kvmrun.api.types.v2.MachineOpts
+	(*Machine)(nil),                     // 9: kvmrun.api.types.v2.Machine
+	(*MigrationOverrides)(nil),          // 10: kvmrun.api.types.v2.MigrationOverrides
+	(*IncomingMigrationRequisites)(nil), // 11: kvmrun.api.types.v2.IncomingMigrationRequisites
+	(*VNCRequisites)(nil),               // 12: kvmrun.api.types.v2.VNCRequisites
+	(*MachineEvent)(nil),                // 13: kvmrun.api.types.v2.MachineEvent
+	(*MachineOpts_Firmware)(nil),        // 14: kvmrun.api.types.v2.MachineOpts.Firmware
+	(*MachineOpts_Memory)(nil),          // 15: kvmrun.api.types.v2.MachineOpts.Memory
+	(*MachineOpts_CPU)(nil),             // 16: kvmrun.api.types.v2.MachineOpts.CPU
+	(*MachineOpts_VGA)(nil),             // 17: kvmrun.api.types.v2.MachineOpts.VGA
+	(*MachineOpts_InputDevice)(nil),     // 18: kvmrun.api.types.v2.MachineOpts.InputDevice
+	(*MachineOpts_Cdrom)(nil),           // 19: kvmrun.api.types.v2.MachineOpts.Cdrom
+	(*MachineOpts_Disk)(nil),            // 20: kvmrun.api.types.v2.MachineOpts.Disk
+	(*MachineOpts_NetIface)(nil),        // 21: kvmrun.api.types.v2.MachineOpts.NetIface
+	(*MachineOpts_ChannelVSock)(nil),    // 22: kvmrun.api.types.v2.MachineOpts.ChannelVSock
+	(*MachineOpts_CloudInit)(nil),       // 23: kvmrun.api.types.v2.MachineOpts.CloudInit
+	(*MachineOpts_Kernel)(nil),          // 24: kvmrun.api.types.v2.MachineOpts.Kernel
+	(*MachineOpts_HostDevice)(nil),      // 25: kvmrun.api.types.v2.MachineOpts.HostDevice
+	nil,                                 // 26: kvmrun.api.types.v2.MigrationOverrides.DisksEntry
+	nil,                                 // 27: kvmrun.api.types.v2.MigrationOverrides.NetIfacesEntry
+	(*MachineEvent_Timestamp)(nil),      // 28: kvmrun.api.types.v2.MachineEvent.Timestamp
 }
 var file_types_v2_machines_proto_depIdxs = []int32{
-	13, // 0: kvmrun.api.types.v2.MachineOpts.firmware:type_name -> kvmrun.api.types.v2.MachineOpts.Firmware
-	14, // 1: kvmrun.api.types.v2.MachineOpts.memory:type_name -> kvmrun.api.types.v2.MachineOpts.Memory
-	15, // 2: kvmrun.api.types.v2.MachineOpts.cpu:type_name -> kvmrun.api.types.v2.MachineOpts.CPU
-	16, // 3: kvmrun.api.types.v2.MachineOpts.vga:type_name -> kvmrun.api.types.v2.MachineOpts.VGA
-	17, // 4: kvmrun.api.types.v2.MachineOpts.inputs:type_name -> kvmrun.api.types.v2.MachineOpts.InputDevice
-	18, // 5: kvmrun.api.types.v2.MachineOpts.cdrom:type_name -> kvmrun.api.types.v2.MachineOpts.Cdrom
-	19, // 6: kvmrun.api.types.v2.MachineOpts.storage:type_name -> kvmrun.api.types.v2.MachineOpts.Disk
-	20, // 7: kvmrun.api.types.v2.MachineOpts.network:type_name -> kvmrun.api.types.v2.MachineOpts.NetIface
-	21, // 8: kvmrun.api.types.v2.MachineOpts.vsock_device:type_name -> kvmrun.api.types.v2.MachineOpts.ChannelVSock
-	22, // 9: kvmrun.api.types.v2.MachineOpts.cloudinit_drive:type_name -> kvmrun.api.types.v2.MachineOpts.CloudInit
-	23, // 10: kvmrun.api.types.v2.MachineOpts.kernel:type_name -> kvmrun.api.types.v2.MachineOpts.Kernel
-	24, // 11: kvmrun.api.types.v2.MachineOpts.hostpci:type_name -> kvmrun.api.types.v2.MachineOpts.HostDevice
-	7,  // 12: kvmrun.api.types.v2.Machine.config:type_name -> kvmrun.api.types.v2.MachineOpts
-	7,  // 13: kvmrun.api.types.v2.Machine.runtime:type_name -> kvmrun.api.types.v2.MachineOpts
+	14, // 0: kvmrun.api.types.v2.MachineOpts.firmware:type_name -> kvmrun.api.types.v2.MachineOpts.Firmware
+	15, // 1: kvmrun.api.types.v2.MachineOpts.memory:type_name -> kvmrun.api.types.v2.MachineOpts.Memory
+	16, // 2: kvmrun.api.types.v2.MachineOpts.cpu:type_name -> kvmrun.api.types.v2.MachineOpts.CPU
+	17, // 3: kvmrun.api.types.v2.MachineOpts.vga:type_name -> kvmrun.api.types.v2.MachineOpts.VGA
+	18, // 4: kvmrun.api.types.v2.MachineOpts.inputs:type_name -> kvmrun.api.types.v2.MachineOpts.InputDevice
+	19, // 5: kvmrun.api.types.v2.MachineOpts.cdrom:type_name -> kvmrun.api.types.v2.MachineOpts.Cdrom
+	20, // 6: kvmrun.api.types.v2.MachineOpts.storage:type_name -> kvmrun.api.types.v2.MachineOpts.Disk
+	21, // 7: kvmrun.api.types.v2.MachineOpts.network:type_name -> kvmrun.api.types.v2.MachineOpts.NetIface
+	22, // 8: kvmrun.api.types.v2.MachineOpts.vsock_device:type_name -> kvmrun.api.types.v2.MachineOpts.ChannelVSock
+	23, // 9: kvmrun.api.types.v2.MachineOpts.cloudinit_drive:type_name -> kvmrun.api.types.v2.MachineOpts.CloudInit
+	24, // 10: kvmrun.api.types.v2.MachineOpts.kernel:type_name -> kvmrun.api.types.v2.MachineOpts.Kernel
+	25, // 11: kvmrun.api.types.v2.MachineOpts.hostpci:type_name -> kvmrun.api.types.v2.MachineOpts.HostDevice
+	8,  // 12: kvmrun.api.types.v2.Machine.config:type_name -> kvmrun.api.types.v2.MachineOpts
+	8,  // 13: kvmrun.api.types.v2.Machine.runtime:type_name -> kvmrun.api.types.v2.MachineOpts
 	0,  // 14: kvmrun.api.types.v2.Machine.state:type_name -> kvmrun.api.types.v2.MachineState
-	25, // 15: kvmrun.api.types.v2.MigrationOverrides.disks:type_name -> kvmrun.api.types.v2.MigrationOverrides.DisksEntry
-	26, // 16: kvmrun.api.types.v2.MigrationOverrides.net_ifaces:type_name -> kvmrun.api.types.v2.MigrationOverrides.NetIfacesEntry
-	27, // 17: kvmrun.api.types.v2.MachineEvent.timestamp:type_name -> kvmrun.api.types.v2.MachineEvent.Timestamp
+	26, // 15: kvmrun.api.types.v2.MigrationOverrides.disks:type_name -> kvmrun.api.types.v2.MigrationOverrides.DisksEntry
+	27, // 16: kvmrun.api.types.v2.MigrationOverrides.net_ifaces:type_name -> kvmrun.api.types.v2.MigrationOverrides.NetIfacesEntry
+	28, // 17: kvmrun.api.types.v2.MachineEvent.timestamp:type_name -> kvmrun.api.types.v2.MachineEvent.Timestamp
 	18, // [18:18] is the sub-list for method output_type
 	18, // [18:18] is the sub-list for method input_type
 	18, // [18:18] is the sub-list for extension type_name
@@ -2285,7 +2336,7 @@ func file_types_v2_machines_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_types_v2_machines_proto_rawDesc,
-			NumEnums:      7,
+			NumEnums:      8,
 			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,

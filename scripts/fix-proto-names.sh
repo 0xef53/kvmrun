@@ -2,7 +2,7 @@
 set -eu
 
 for FNAME in $@ ; do
-    if [[ ! "$FNAME" =~ \.pb\.go$ ]] ; then
+    if [[ ! "$FNAME" =~ (\.pb\.go|\.pb\.gw\.go)$ ]] ; then
         continue
     fi
 

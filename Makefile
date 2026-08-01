@@ -101,7 +101,7 @@ protobufs:
 		--grpc-gateway_opt "logtostderr=true,paths=source_relative" \
 		--grpc-gateway_out ./api \
 		$(protofiles_grpc_gw)
-	scripts/fix-proto-names.sh $(shell find api/ -type f -name '*.pb.go')
+	scripts/fix-proto-names.sh $(shell find api/ -type f \( -name '*.pb.go' -o -name '*.pb.gw.go' \))
 
 install: $(binaries)
 	install -d $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(DESTDIR)/etc/$(PROJECT_NAME)
