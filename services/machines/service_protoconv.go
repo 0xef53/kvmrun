@@ -37,7 +37,7 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Quota:   uint32(vmi.CPUGetQuota()),
 			},
 			VGA: &pb_types.MachineOpts_VGA{
-				Type: vmi.VgaDeviceGetType(),
+				Type: vmi.VgaDeviceGetType().String(),
 			},
 		}
 

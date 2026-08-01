@@ -471,7 +471,7 @@ func (r *InstanceQemu) CPUSetQuota(value int) (err error) {
 }
 
 func (r *InstanceQemu) initVGA() error {
-	r.VgaDevice.SetType(r.startupConf.VgaDeviceGetType())
+	r.VgaDevice.SetType(r.startupConf.VgaDeviceGetType().String())
 
 	return nil
 }

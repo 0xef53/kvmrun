@@ -145,8 +145,8 @@ func (p *InstanceProperties) CPUGetQuota() int {
 	return p.CPU.Quota
 }
 
-func (p *InstanceProperties) VgaDeviceGetType() string {
-	return p.VgaDevice.vgaType.String()
+func (p *InstanceProperties) VgaDeviceGetType() QemuVgaType {
+	return p.VgaDevice.vgaType
 }
 
 func (p *InstanceProperties) InputDeviceGet(devtype string) *InputDevice {

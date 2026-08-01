@@ -43,7 +43,7 @@ type Instance interface {
 	CPUSetModel(string) error
 	CPUSetQuota(int) error
 
-	VgaDeviceGetType() string
+	VgaDeviceGetType() QemuVgaType
 	VgaDeviceSetType(string) error
 
 	InputDeviceGet(string) *InputDevice

@@ -289,7 +289,11 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	if hasPrimaryGPU {
 		args = append(args, "-vga", "none", "-nographic")
 	} else {
-		args = append(args, "-vga", "cirrus")
+		if t := b.vmconf.VgaDeviceGetType(); len(t.String()) > 0 {
+			args = append(args, "-vga", t.String())
+		} else {
+			args = append(args, "-vga", "cirrus")
+		}
 	}
 
 	// Input devices

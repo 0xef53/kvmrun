@@ -25,7 +25,6 @@ func (s *Server) VgaDeviceSetType(ctx context.Context, vmname string, opts *kvmr
 			return err
 		}
 
-		fmt.Printf("server/machine/VgaDeviceSetType: opts = %q\n", opts)
 		if err := vm.C.VgaDeviceSetType(opts.Type); err != nil {
 			return err
 		}
