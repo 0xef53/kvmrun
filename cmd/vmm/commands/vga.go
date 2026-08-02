@@ -27,7 +27,7 @@ var CommandVgaSetParameters = &cli.Command{
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Flags: []cli.Flag{
-		&cli.GenericFlag{Name: "type", Value: flag_types.DefaultVgaDeviceType(), Usage: "`type` of VGA card to emulate (valid values: cirrus, std)"},
+		&cli.GenericFlag{Name: "type", Value: flag_types.DefaultVgaDeviceType(), Usage: "`type` of VGA card to emulate (valid values: cirrus, std, virtio-vga)"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
 		return grpc_client.CommandGRPC(ctx, c, client.MachineVgaParametersSet)

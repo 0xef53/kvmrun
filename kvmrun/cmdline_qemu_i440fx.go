@@ -292,7 +292,7 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 		if t := b.vmconf.VgaDeviceGetType(); len(t.String()) > 0 {
 			args = append(args, "-vga", t.String())
 		} else {
-			args = append(args, "-vga", "cirrus")
+			args = append(args, "-vga", DefaultQemuVgaType().String())
 		}
 	}
 
