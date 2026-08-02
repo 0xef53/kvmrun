@@ -10,15 +10,15 @@ type QemuVgaType uint16
 const (
 	QEMU_VGA_CIRRUS QemuVgaType = iota
 	QEMU_VGA_STD
-	QEMU_VGA_VIRTIO_VGA
+	QEMU_VGA_VIRTIO
 )
 
 func (t QemuVgaType) String() string {
 	switch t {
 	case QEMU_VGA_STD:
 		return "std"
-	case QEMU_VGA_VIRTIO_VGA:
-		return "virtio-vga"
+	case QEMU_VGA_VIRTIO:
+		return "virtio"
 	}
 
 	return "cirrus"
@@ -28,8 +28,8 @@ func QemuVgaTypeValue(s string) QemuVgaType {
 	switch strings.ToLower(s) {
 	case "std":
 		return QEMU_VGA_STD
-	case "virtio-vga":
-		return QEMU_VGA_VIRTIO_VGA
+	case "virtio":
+		return QEMU_VGA_VIRTIO
 	}
 
 	return QEMU_VGA_CIRRUS

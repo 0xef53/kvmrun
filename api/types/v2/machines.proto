@@ -155,7 +155,7 @@ enum CloudInitDriver {
 enum VgaDeviceType {
     VGA_TYPE_CIRRUS = 0;
     VGA_TYPE_STD = 1;
-    VGA_TYPE_VIRTIO_VGA = 2;
+    VGA_TYPE_VIRTIO = 2;
 }
 
 enum InputDeviceType {
