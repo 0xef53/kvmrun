@@ -101,6 +101,13 @@ service MachineService {
         };
     }
 
+    rpc VgaDeviceSetType(VgaDeviceSetTypeRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            put: "/v2/machine/{name}/vga/type"
+            body: "*"
+        };
+    }
+
     rpc HostDeviceAttach(HostDeviceAttachRequest) returns (google.protobuf.Empty) {
         option (google.api.http) = {
             post: "/v2/machine/{name}/hostpci"
@@ -387,6 +394,11 @@ message CPUSetQuotaRequest {
 message CPUSetModelRequest {
     string name = 1;
     string model = 2;
+}
+
+message VgaDeviceSetTypeRequest {
+    string name = 1;
+    types.v2.VgaDeviceType type = 2;
 }
 
 message HostDeviceAttachRequest {

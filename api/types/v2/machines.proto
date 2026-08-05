@@ -20,6 +20,9 @@ message MachineOpts {
         string model = 4;
         uint32 quota = 5;
     }
+    message VGA {
+        string type = 1;
+    }
     message InputDevice {
         string type = 1;
     }
@@ -71,13 +74,14 @@ message MachineOpts {
     Firmware firmware = 2;
     Memory memory = 3;
     CPU cpu = 4;
-    repeated InputDevice inputs = 5;
-    repeated Cdrom cdrom = 6;
-    repeated Disk storage = 7;
-    repeated NetIface network = 8;
-    ChannelVSock vsock_device = 9;
-    CloudInit cloudinit_drive = 10;
-    Kernel kernel = 11;
+    VGA vga = 5;
+    repeated InputDevice inputs = 6;
+    repeated Cdrom cdrom = 7;
+    repeated Disk storage = 8;
+    repeated NetIface network = 9;
+    ChannelVSock vsock_device = 10;
+    CloudInit cloudinit_drive = 11;
+    Kernel kernel = 12;
     repeated HostDevice hostpci = 20;
 }
 
@@ -146,6 +150,12 @@ enum CloudInitDriver {
     UNDEFINED_CLOUDINIT_DRIVER = 0;
     CI_IDE_CD = 1;
     CI_FLOPPY = 2;
+}
+
+enum VgaDeviceType {
+    VGA_TYPE_CIRRUS = 0;
+    VGA_TYPE_STD = 1;
+    VGA_TYPE_VIRTIO = 2;
 }
 
 enum InputDeviceType {

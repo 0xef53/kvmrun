@@ -27,6 +27,7 @@ type InstanceProperties struct {
 
 	Memory         Memory          `json:"memory"`
 	CPU            VirtCPU         `json:"cpu"`
+	VgaDevice      VgaDevice       `json:"vga"`
 	InputDevices   InputDevicePool `json:"inputs"`
 	Cdroms         CdromPool       `json:"cdrom"`
 	Disks          DiskPool        `json:"storage"`
@@ -56,6 +57,10 @@ func (p *InstanceProperties) Validate(strict bool) error {
 	}
 
 	if err := p.CPU.Validate(strict); err != nil {
+		return err
+	}
+
+	if err := p.VgaDevice.Validate(strict); err != nil {
 		return err
 	}
 
@@ -138,6 +143,10 @@ func (p *InstanceProperties) CPUGetModel() string {
 
 func (p *InstanceProperties) CPUGetQuota() int {
 	return p.CPU.Quota
+}
+
+func (p *InstanceProperties) VgaDeviceGetType() QemuVgaType {
+	return p.VgaDevice.vgaType
 }
 
 func (p *InstanceProperties) InputDeviceGet(devtype string) *InputDevice {

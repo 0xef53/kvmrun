@@ -140,6 +140,7 @@ func (s *Server) Create(ctx context.Context, vmname string, opts *kvmrun.Instanc
 		vmc.CPUSetActual(opts.CPU.Actual)
 		vmc.CPUSetQuota(opts.CPU.Quota)
 		vmc.CPUSetModel(opts.CPU.Model)
+		vmc.VgaDeviceSetType(opts.VgaDevice.Type)
 
 		if opts.Firmware != nil {
 			vmc.FirmwareSetImage(opts.Firmware.Image)

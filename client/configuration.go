@@ -30,6 +30,7 @@ func MachineCreateConf(ctx context.Context, vmname string, c *cli.Command, grpcC
 				Model: c.String("cpu-model"),
 				Quota: uint32(c.Int("cpu-quota")),
 			},
+			VGA: &pb_types.MachineOpts_VGA{},
 		},
 	}
 
@@ -45,6 +46,13 @@ func MachineCreateConf(ctx context.Context, vmname string, c *cli.Command, grpcC
 			req.Options.CPU.Actual = uint32(v.Min)
 			req.Options.CPU.Total = uint32(v.Max)
 		}
+	}
+
+	if c.IsSet("vga") {
+		if v, ok := c.Value("vga").(kvmrun.QemuVgaType); ok {
+			req.Options.VGA.Type = v.String()
+		}
+
 	}
 
 	if c.IsSet("firmware") {

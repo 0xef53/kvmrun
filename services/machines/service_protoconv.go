@@ -1,6 +1,7 @@
 package machines
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -34,6 +35,9 @@ func machineToProto(vm *kvmrun.Machine, vmstate kvmrun.InstanceState, t time.Dur
 				Sockets: uint32(vmi.CPUGetSockets()),
 				Model:   vmi.CPUGetModel(),
 				Quota:   uint32(vmi.CPUGetQuota()),
+			},
+			VGA: &pb_types.MachineOpts_VGA{
+				Type: vmi.VgaDeviceGetType().String(),
 			},
 		}
 
@@ -159,6 +163,10 @@ func propertiesFromMachineOpts(proto *pb_types.MachineOpts) *kvmrun.InstanceProp
 		opts.CPU.Sockets = int(proto.CPU.Sockets)
 		opts.CPU.Model = proto.CPU.Model
 		opts.CPU.Quota = int(proto.CPU.Quota)
+	}
+
+	if proto.VGA != nil {
+		opts.VgaDevice.Type = proto.VGA.Type
 	}
 
 	for _, v := range proto.Inputs {
@@ -353,6 +361,14 @@ func optsFromStartMigrationRequest(req *pb.StartMigrationRequest) *machine.Migra
 	}
 
 	return &opts
+}
+
+func optsFromVGADeviceSetTypeRequest(req *pb.VGADeviceSetTypeRequest) *kvmrun.VgaDeviceProperties {
+	fmt.Printf("optsFromVGADeviceSetTypeRequest: req = %q\n", req)
+	fmt.Printf("optsFromVGADeviceSetTypeRequest: req.Type string = %q\n", kvmrun.QemuVgaType(req.Type).String())
+	return &kvmrun.VgaDeviceProperties{
+		Type: kvmrun.QemuVgaType(req.Type).String(),
+	}
 }
 
 func vncRequisitesToProto(requisites *machine.VNCRequisites) *pb_types.VNCRequisites {
