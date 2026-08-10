@@ -1,8 +1,8 @@
 PROJECT_NAME := kvmrun
 PROJECT_REPO := github.com/0xef53/$(PROJECT_NAME)
 
-GOLANG_IMAGE := golang:1.24-bullseye
-DEVTOOLS_IMAGE := 0xef53/devtools:debian-bullseye
+GOLANG_IMAGE := golang:1.25-bookworm
+DEVTOOLS_IMAGE := 0xef53/debian-dev:bookworm
 
 CWD := $(shell pwd)
 
