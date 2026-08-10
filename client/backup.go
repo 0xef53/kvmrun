@@ -99,8 +99,10 @@ func BackupProcessShowStatus(ctx context.Context, vmname string, c *cli.Command,
 		}
 	} else {
 		/*
-			TODO: нужно проверить, что будет, если таски нет. Возможно тут стоит добавить
-				вывод "{}" в таком случае, по аналогии с соседней ф-ией миграции.
+			TODO:
+				Need to check what happens if there's no task.
+				Perhaps we should add the "{}" output here in that case,
+				similar to the migration function.
 		*/
 		return fmt.Errorf("cannot request data: %w", err)
 	}

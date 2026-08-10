@@ -120,7 +120,6 @@ type TaskMetadata struct {
 	Kind string
 }
 
-// Всегда делается context.WithoutCancel для переданного контекста
 func (s *Server) TaskStart(ctx context.Context, t task.Task, resp interface{}, opts ...task.TaskOption) (string, error) {
 	if _, ok := metadata.FromContext(ctx); ok {
 		// do nothing, some metadata already set
@@ -135,7 +134,6 @@ func (s *Server) TaskStart(ctx context.Context, t task.Task, resp interface{}, o
 	})
 }
 
-// Всегда делается context.WithoutCancel для переданного контекста
 func (s *Server) TaskRunFunc(ctx context.Context, tgt map[string]task.OperationMode, wait bool, opts []task.TaskOption, fn func(*log.Entry) error) error {
 	if _, ok := metadata.FromContext(ctx); ok {
 		// do nothing, some metadata already set
@@ -181,7 +179,7 @@ func (s *Server) TaskGetStats(labels ...string) ([]*task.TaskStat, error) {
 			}
 		}
 	} else {
-		// Сheck if there are task IDs in the label list
+		// Check if there are task IDs in the label list
 		for _, tid := range labels {
 			if err := uuid.Validate(tid); err == nil {
 				if st := s.Tasks.Stat(tid); len(st) > 0 {
@@ -246,8 +244,7 @@ func (s *Server) readTaskStatFile(label string) (*task.TaskStat, error) {
 	hashname := fmt.Sprintf("%x", md5.Sum([]byte(label)))
 
 	/*
-		COMMENT:
-			Метка всегда записана в формате: vmname/part1/part2/.../partN
+		The label is always written in the format: vmname/part1/part2/.../partN
 	*/
 
 	vmname := strings.TrimSpace(strings.SplitN(label, "/", 2)[0])

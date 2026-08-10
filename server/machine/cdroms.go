@@ -27,7 +27,7 @@ func (s *Server) CdromAttach(ctx context.Context, vmname string, opts *kvmrun.Cd
 		}
 
 		if live && vm.R != nil {
-			// -1 -- означает, что параметр не нужно брать в расчет
+			// -1 -- means that the parameter should not be taken into account
 			if position >= 0 {
 				return fmt.Errorf("unable to insert at the '%d' position while the machine is running", position)
 			}

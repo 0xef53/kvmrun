@@ -430,7 +430,7 @@ func (t *MachineMigrationTask) OnSuccess() error {
 			return nil
 		}()
 		if err != nil {
-			t.Logger.Errorf("Failed to remove configurаtion of %s: %s", t.vmname, err)
+			t.Logger.Errorf("Failed to remove configuration of %s: %s", t.vmname, err)
 		}
 	}
 
