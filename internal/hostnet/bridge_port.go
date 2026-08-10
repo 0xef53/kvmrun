@@ -27,25 +27,25 @@ func BridgePortConfigure(linkname string, attrs *BridgePortAttrs, secondStage bo
 	case netlink.LinkNotFoundError:
 		return fmt.Errorf("bridge does not exist: %s", attrs.BridgeName)
 	default:
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	link, err := netlink.LinkByName(linkname)
 	if err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetMaster(link, brLink); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if attrs.MTU >= 68 {
 		if err := netlink.LinkSetMTU(link, int(attrs.MTU)); err != nil {
-			return fmt.Errorf("netlink: %s: %s", link.Attrs().Name, err)
+			return fmt.Errorf("netlink: %s: %w", link.Attrs().Name, err)
 		}
 	}
 
@@ -59,11 +59,11 @@ func BridgePortDeconfigure(linkname string, brname string) error {
 			// link already removed, so do nothing
 			return nil
 		}
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetNoMaster(link); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	return nil
@@ -87,14 +87,14 @@ func CreateBridgeIfNotExist(linkname string) (netlink.Link, error) {
 		link = &netlink.Bridge{LinkAttrs: attrs}
 
 		if err := netlink.LinkAdd(link); err != nil {
-			return nil, fmt.Errorf("netlink: %s", err)
+			return nil, fmt.Errorf("netlink: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("netlink: %s", err)
+		return nil, fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		return nil, fmt.Errorf("netlink: %s", err)
+		return nil, fmt.Errorf("netlink: %w", err)
 	}
 
 	return link, nil

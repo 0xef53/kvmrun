@@ -4,9 +4,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/0xef53/kvmrun/internal/utils"
 
 	grpcserver "github.com/0xef53/go-grpc/server"
 
@@ -18,10 +21,46 @@ type KvmrunConfig struct {
 	CertDir     string `gcfg:"cert-dir"`
 }
 
+type VnetConfig struct {
+	UnmanagedNets UnmanagedNets `gcfg:"unmanaged"`
+}
+
+type UnmanagedNets struct {
+	subnets []*net.IPNet
+}
+
+func (v *UnmanagedNets) UnmarshalText(b []byte) error {
+	s := strings.TrimSpace(string(b))
+
+	ipnet, err := utils.ParseIPNet(s)
+	if err != nil {
+		return err
+	}
+
+	if v.subnets == nil {
+		v.subnets = make([]*net.IPNet, 0, 4)
+	}
+
+	v.subnets = append(v.subnets, ipnet)
+
+	return nil
+}
+
+func (v *UnmanagedNets) Contains(ip net.IP) bool {
+	for _, subnet := range v.subnets {
+		if subnet.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Config represents the Kvmrun configuration
 type Config struct {
-	Kvmrun KvmrunConfig      `gcfg:"common"`
-	Server grpcserver.Config `gcfg:"server"`
+	Kvmrun  KvmrunConfig      `gcfg:"common"`
+	Server  grpcserver.Config `gcfg:"server"`
+	VirtNet VnetConfig        `gcfg:"virtual-net"`
 
 	TLSConfig *tls.Config `gcfg:"-"`
 

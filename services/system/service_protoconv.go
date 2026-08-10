@@ -40,7 +40,7 @@ func incomingRequisitesToProto(requisites *system.IncomingRequisites) *pb_types.
 
 func optsFromQemuInstanceRegisterRequest(req *pb.QemuInstanceRegisterRequest) *system.InstanceRegistrationOptions {
 	return &system.InstanceRegistrationOptions{
-		MemActual: uint32(req.MemActual),
+		MemActual: req.MemActual,
 		PID:       uint32(req.PID),
 	}
 }

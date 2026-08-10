@@ -2,7 +2,7 @@
 set -eu
 
 for FNAME in $@ ; do
-    if [[ ! "$FNAME" =~ \.pb\.go$ ]] ; then
+    if [[ ! "$FNAME" =~ (\.pb\.go|\.pb\.gw\.go)$ ]] ; then
         continue
     fi
 
@@ -10,6 +10,7 @@ for FNAME in $@ ; do
         -e 's/PrimaryGpu/PrimaryGPU/g' \
         -e 's/ContextId/ContextID/g' \
         -e 's/Cpu/CPU/g' \
+        -e 's/Vga/VGA/g' \
         -e 's/Pid/PID/g' \
         -e 's/CloudinitDrive/CloudInitDrive/g' \
         -e 's/Hostpci/HostPCI/g' \

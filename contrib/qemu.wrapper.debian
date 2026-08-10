@@ -1,7 +1,6 @@
 #!/bin/bash
 set -eu
 
-declare ARGS="$@"
 declare QEMU_ROOTDIR="$(realpath -m ${QEMU_ROOTDIR:-/})"
 
 if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
@@ -11,7 +10,7 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
     fi
 
     if [[ -n "${UNSHARED:-}" ]] ; then
-        # system dirs
+        # system dirs and files
         install -d "${QEMU_ROOTDIR}/proc"
         install -d "${QEMU_ROOTDIR}/sys"
         install -d "${QEMU_ROOTDIR}/dev"
@@ -26,14 +25,6 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
         mount --bind "/etc/passwd" "${QEMU_ROOTDIR}/etc/passwd"
         mount --bind "/etc/group" "${QEMU_ROOTDIR}/etc/group"
 
-        if mountpoint -q --nofollow "/sys/fs/cgroup" ; then
-            mount --bind "/sys/fs/cgroup" "${QEMU_ROOTDIR}/sys/fs/cgroup"
-        fi
-
-        if mountpoint -q --nofollow "/sys/fs/cgroup/net_cls" ; then
-            mount --bind "/sys/fs/cgroup/net_cls" "${QEMU_ROOTDIR}/sys/fs/cgroup/net_cls"
-        fi
-
         # kvmrun dirs
         install -d "${QEMU_ROOTDIR}/etc/kvmrun"
         install -d "${QEMU_ROOTDIR}/usr/lib/kvmrun"
@@ -45,24 +36,11 @@ if [[ "$QEMU_ROOTDIR" != "/" ]] ; then
         mount --bind "/var/lib/kvmrun" "${QEMU_ROOTDIR}/var/lib/kvmrun"
         mount --bind "/usr/share/kvmrun" "${QEMU_ROOTDIR}/usr/share/kvmrun"
 
-        # The net_cls controller is used by the "routed scheme" network configuration
-        # to limit an outgoing traffic of virtual machines.
-        # This script is used here because systemd does not manage controllers
-        # that will not be part of cgroup v2 in the future.
-
-        if [[ -n "${SYSTEMD_UNITNAME:-}" ]] ; then
-            /usr/lib/kvmrun/delegate-cgroup-v1-controller "$SYSTEMD_UNITNAME" "net_cls"
-        fi
-
         # run chrooted QEMU binary
-        exec chroot "$QEMU_ROOTDIR" sh -c "cd $PWD && exec /usr/bin/qemu-system-x86_64 ${ARGS}"
+        exec chroot "$QEMU_ROOTDIR" /usr/bin/qemu-system-x86_64 "${@}"
     fi
 
-    UNSHARED=1 exec unshare -m "$0" ${ARGS}
-fi
-
-if [[ -n "${SYSTEMD_UNITNAME:-}" ]] ; then
-    /usr/lib/kvmrun/delegate-cgroup-v1-controller "$SYSTEMD_UNITNAME" "net_cls"
+    UNSHARED=1 exec unshare -m "$0" "${@}"
 fi
 
 exec /usr/bin/qemu-system-x86_64 "$@"

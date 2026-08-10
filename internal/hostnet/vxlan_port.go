@@ -33,26 +33,26 @@ func VxlanPortConfigure(linkname string, attrs *VxlanPortAttrs, secondStage bool
 	}
 
 	if err := netlink.LinkSetMaster(vxLink, brLink); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	link, err := netlink.LinkByName(linkname)
 	if err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetMaster(link, brLink); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	if attrs.MTU >= 68 {
 		for _, l := range []netlink.Link{brLink, vxLink, link} {
 			if err := netlink.LinkSetMTU(l, int(attrs.MTU)); err != nil {
-				return fmt.Errorf("netlink: %s: %s", l.Attrs().Name, err)
+				return fmt.Errorf("netlink: %s: %w", l.Attrs().Name, err)
 			}
 		}
 	}
@@ -79,7 +79,7 @@ func VxlanPortDeconfigure(linkname string, vni uint32) error {
 
 	links, err := netlink.LinkList()
 	if err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	for _, link := range links {
@@ -96,7 +96,7 @@ func VxlanPortDeconfigure(linkname string, vni uint32) error {
 	}
 
 	if err := netlink.LinkDel(brLink); err != nil {
-		return fmt.Errorf("netlink: %s", err)
+		return fmt.Errorf("netlink: %w", err)
 	}
 
 	return nil
@@ -128,14 +128,14 @@ func CreateVxlanIfNotExist(linkname string, vni uint32, srcIP net.IP) (netlink.L
 		}
 
 		if err := netlink.LinkAdd(link); err != nil {
-			return nil, fmt.Errorf("netlink: %s", err)
+			return nil, fmt.Errorf("netlink: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("netlink: %s", err)
+		return nil, fmt.Errorf("netlink: %w", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		return nil, fmt.Errorf("netlink: %s", err)
+		return nil, fmt.Errorf("netlink: %w", err)
 	}
 
 	return link, nil

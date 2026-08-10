@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	pb_network "github.com/0xef53/kvmrun/api/services/network/v2"
@@ -155,4 +156,142 @@ func NetworkSchemeRemoveConf(ctx context.Context, vmname string, c *cli.Command,
 	_, err := grpcClient.Network().DeleteConf(ctx, &req)
 
 	return err
+}
+
+func NetworkSchemeInspect(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
+	req := pb_network.GetConfRequest{
+		Name:    vmname,
+		Ifnames: c.Args().Tail(),
+	}
+
+	resp, err := grpcClient.Network().GetConf(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	b, err := json.MarshalIndent(resp, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", b)
+
+	return nil
+}
+
+func NetworkSchemeInfo(ctx context.Context, vmname string, c *cli.Command, grpcClient *grpc_interfaces.Kvmrun) error {
+	req := pb_network.GetConfRequest{
+		Name:    vmname,
+		Ifnames: c.Args().Tail(),
+	}
+
+	resp, err := grpcClient.Network().GetConf(ctx, &req)
+	if err != nil {
+		return err
+	}
+
+	appendLine := func(s string, a ...interface{}) string {
+		switch len(a) {
+		case 0:
+			s += "\n"
+		case 1:
+			s += fmt.Sprintf("%*s : \n", 20, a[0])
+		case 2:
+			var format string
+			switch a[1].(type) {
+			case int, int32, int64, uint, uint32, uint64:
+				format = "%*s : %d\n"
+			case string:
+				format = "%*s : %s\n"
+			default:
+				format = "%*s : %q\n"
+			}
+			s += fmt.Sprintf(format, 20, a[0], a[1])
+		}
+		return s
+	}
+
+	printBrief := func(opts *pb_types.NetworkSchemeOpts) {
+		var schemeType network.SchemeType
+
+		switch opts.Attrs.(type) {
+		case *pb_types.NetworkSchemeOpts_Vlan:
+			schemeType = network.Scheme_VLAN
+		case *pb_types.NetworkSchemeOpts_Vxlan:
+			schemeType = network.Scheme_VXLAN
+		case *pb_types.NetworkSchemeOpts_Router:
+			schemeType = network.Scheme_ROUTED
+		case *pb_types.NetworkSchemeOpts_Bridge:
+			schemeType = network.Scheme_BRIDGE
+		default:
+			schemeType = network.Scheme_MANUAL
+		}
+
+		var s string
+
+		// Header
+		s += fmt.Sprintf("* Interface: %s (scheme type = %s)", opts.Ifname, schemeType.String())
+		s = appendLine(s)
+
+		var mtu = 1500
+
+		if opts.MTU > 0 {
+			mtu = int(opts.MTU)
+		}
+
+		// MTU
+		s = appendLine(s, "MTU", mtu)
+		s = appendLine(s)
+
+		// Addresses
+		if count := len(opts.Addrs); count > 0 {
+			s = appendLine(s, "Addresses", count)
+
+			for _, addr := range opts.Addrs {
+				s = appendLine(s, "", addr)
+			}
+
+			s = appendLine(s)
+		}
+
+		// Gateways
+		if len(opts.Gateway4) > 0 {
+			s = appendLine(s, "IPv4 gateway", opts.Gateway4)
+		}
+		if len(opts.Gateway6) > 0 {
+			s = appendLine(s, "IPv6 gateway", opts.Gateway6)
+		}
+		if len(opts.Gateway4) > 0 || len(opts.Gateway6) > 0 {
+			s = appendLine(s)
+		}
+
+		switch v := opts.Attrs.(type) {
+		case *pb_types.NetworkSchemeOpts_Vlan:
+			s = appendLine(s, "", "# VLAN parameters")
+			s = appendLine(s, "Parent device", v.Vlan.ParentInterface)
+			s = appendLine(s, "Vlan ID", v.Vlan.VlanID)
+		case *pb_types.NetworkSchemeOpts_Vxlan:
+			s = appendLine(s, "", "# VxLAN parameters")
+			s = appendLine(s, "Tunnel device", v.Vxlan.BindInterface)
+			s = appendLine(s, "VNI", v.Vxlan.VNI)
+		case *pb_types.NetworkSchemeOpts_Router:
+			s = appendLine(s, "", "# Router parameters")
+			s = appendLine(s, "In/Out device", v.Router.BindInterface)
+			s = appendLine(s, "Incoming limit", fmt.Sprintf("%d mbit/s", v.Router.InLimit))
+			s = appendLine(s, "Outgoing limit", fmt.Sprintf("%d mbit/s", v.Router.OutLimit))
+		case *pb_types.NetworkSchemeOpts_Bridge:
+			s = appendLine(s, "", "# Bridge parameters")
+			s = appendLine(s, "Bridge device", v.Bridge.BridgeName)
+		}
+
+		s = appendLine(s)
+
+		fmt.Printf("%s", s)
+	}
+
+	for _, sc := range resp.Schemes {
+		printBrief(sc)
+	}
+
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	cg "github.com/0xef53/kvmrun/internal/cgroups"
 	"github.com/0xef53/kvmrun/internal/fsutil"
@@ -205,9 +206,25 @@ func (l *launcher) Start() error {
 	req := pb_system.QemuInstanceRegisterRequest{
 		Name:      l.vmname,
 		PID:       uint32(os.Getpid()),
-		MemActual: uint32(vmconf.MemoryGetActual()) << 20,
+		MemActual: uint64(vmconf.MemoryGetActual()) << 20,
 	}
-	if _, err := l.client.QemuInstanceRegister(l.ctx, &req); err != nil {
+	if err := func() (err error) {
+		// We make several attempts, since kvmrund may have an unfinished task
+		// from a previous attempt to start a virt.machine.
+		for range 60 {
+			_, err = l.client.QemuInstanceRegister(l.ctx, &req)
+			if err != nil {
+				Info.Printf("failed to create a task to register an instance (next try in 5 seconds)")
+
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			break
+		}
+
+		return err
+	}(); err != nil {
 		return err
 	}
 
@@ -358,34 +375,32 @@ func prepareChroot(vmconf kvmrun.Instance, qemuRootDir string) error {
 			return err
 		}
 
-		if inner, ok := fwflash.Backend.(*kvmrun.FirmwareFlashBackend); ok {
-			switch inner.DiskBackend.(type) {
-			case *block.Device:
-				stat := syscall.Stat_t{}
-				if err := syscall.Stat(fwflash.Path, &stat); err != nil {
-					return fmt.Errorf("stat %s: %w", fwflash.Path, err)
+		switch fwflash.Backend.(type) {
+		case *block.Device:
+			stat := syscall.Stat_t{}
+			if err := syscall.Stat(fwflash.Path, &stat); err != nil {
+				return fmt.Errorf("stat %s: %w", fwflash.Path, err)
+			}
+			if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
+				return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
+			}
+		case *file.Device:
+			if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
+				// In case of incoming migration
+				if err := fsutil.Copy(fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
+					return err
 				}
-				if err := syscall.Mknod(filepath.Join(vmChrootDir, fwflash.Path), syscall.S_IFBLK|uint32(os.FileMode(01600)), int(stat.Rdev)); err != nil {
-					return fmt.Errorf("mknod %s: %w", fwflash.Path, err)
-				}
-			case *file.Device:
-				if _, ok := vmconf.(*kvmrun.IncomingConf); ok {
-					// In case of incoming migration
-					if err := fsutil.Copy(fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
-						return err
-					}
-					Info.Printf("(efivars: %s) Copy to %s\n", fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path))
-				} else {
-					// It's a trick in case of outgoing migration, as QEMU checks for the presence of a "file" at this path
-					if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
-						return err
-					}
+				Info.Printf("(efivars: %s) Copy to %s\n", fwflash.Path, filepath.Join(vmChrootDir, fwflash.Path))
+			} else {
+				// It's a trick in case of outgoing migration, as QEMU checks for the presence of a "file" at this path
+				if err := os.Symlink("/dev/null", filepath.Join(vmChrootDir, fwflash.Path)); err != nil {
+					return err
 				}
 			}
+		}
 
-			if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.UID(), 0); err != nil {
-				return err
-			}
+		if err := os.Chown(filepath.Join(vmChrootDir, fwflash.Path), vmconf.UID(), 0); err != nil {
+			return err
 		}
 	}
 

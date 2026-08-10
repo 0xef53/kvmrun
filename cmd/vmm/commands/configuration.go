@@ -24,6 +24,7 @@ var CommandCreateConf = &cli.Command{
 		&cli.StringFlag{Name: "cpu-model", Usage: "the CPU `model` (e.g., 'Westmere,+pcid' )"},
 		&cli.StringFlag{Name: "firmware", Value: "", DefaultText: "not set", Usage: "firmware image file `file`"},
 		&cli.StringFlag{Name: "flash-device", Value: "", DefaultText: "not set", Usage: "firmware flash device `file`"},
+		&cli.GenericFlag{Name: "vga", Value: flag_types.DefaultVgaDeviceType(), Usage: "`type` of VGA card to emulate (valid values: cirrus, std, virtio)"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
 		return grpc_client.CommandGRPC(ctx, c, client.MachineCreateConf)
@@ -41,9 +42,23 @@ var CommandRemoveConf = &cli.Command{
 	},
 }
 
+var CommandInfo = &cli.Command{
+	Name:      "info",
+	Usage:     "print a virtual machine details in human-readable format",
+	ArgsUsage: "VMNAME",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{Name: "verbose", Aliases: []string{"v"}, Usage: "enable verbose output"},
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.MachineInfo)
+	},
+}
+
 var CommandInspect = &cli.Command{
 	Name:      "inspect",
-	Usage:     "print a virtual machine details",
+	Usage:     "print low-level information about a virtual machine in JSON",
 	ArgsUsage: "VMNAME",
 	HideHelp:  true,
 	Category:  "Configuration",

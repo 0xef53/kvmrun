@@ -12,6 +12,7 @@ const (
 	VMNETINIT = "/usr/lib/kvmrun/netinit"
 
 	QMPMONDIR  = "/var/run/kvm-monitor"
+	NETWORKDIR = "/var/run/kvm-network"
 	CHROOTDIR  = "/var/lib/kvmrun/chroot"
 	KERNELSDIR = "/var/lib/kvmrun/kernels"
 	MODULESDIR = "/var/lib/kvmrun/modules"

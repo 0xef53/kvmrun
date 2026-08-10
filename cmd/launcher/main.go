@@ -50,14 +50,22 @@ func run() error {
 
 	var vmname string
 
-	if cwd, err := os.Getwd(); err == nil {
-		vmname = filepath.Base(cwd)
+	if v, ok := os.LookupEnv("VMNAME"); ok {
+		vmname = v
 	} else {
-		if v, ok := os.LookupEnv("VMNAME"); ok {
-			vmname = v
+		if cwd, err := os.Getwd(); err == nil {
+			vmname = filepath.Base(cwd)
 		} else {
 			return err
 		}
+	}
+
+	if err := os.Chdir(filepath.Join(kvmrun.CONFDIR, vmname)); err != nil {
+		return err
+	}
+
+	if err := os.Setenv("VMNAME", vmname); err != nil {
+		return err
 	}
 
 	launcher, err := newLauncher(vmname)

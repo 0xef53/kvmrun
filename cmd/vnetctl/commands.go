@@ -37,7 +37,7 @@ var CommandCreateConf = &cli.Command{
 
 var CommandUpdateConf = &cli.Command{
 	Name:      "update-conf",
-	Usage:     "create a new network configuration",
+	Usage:     "update an existing network configuration",
 	ArgsUsage: "VMNAME IFNAME",
 	HideHelp:  true,
 	Category:  "Configuration",
@@ -63,5 +63,27 @@ var CommandRemoveConf = &cli.Command{
 	Category:  "Configuration",
 	Action: func(ctx context.Context, c *cli.Command) error {
 		return grpc_client.CommandGRPC(ctx, c, client.NetworkSchemeRemoveConf)
+	},
+}
+
+var CommandInfo = &cli.Command{
+	Name:      "info",
+	Usage:     "print details in human-readable format",
+	ArgsUsage: "VMNAME [IFNAME]",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.NetworkSchemeInfo)
+	},
+}
+
+var CommandInspect = &cli.Command{
+	Name:      "inspect",
+	Usage:     "print low-level information in JSON",
+	ArgsUsage: "VMNAME [IFNAME]",
+	HideHelp:  true,
+	Category:  "Configuration",
+	Action: func(ctx context.Context, c *cli.Command) error {
+		return grpc_client.CommandGRPC(ctx, c, client.NetworkSchemeInspect)
 	},
 }

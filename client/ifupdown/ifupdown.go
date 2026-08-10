@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/0xef53/kvmrun/kvmrun"
 
@@ -26,14 +27,18 @@ func InterfaceUp(ctx context.Context, ifname string, secondStage bool) error {
 
 	var vmname string
 
-	if cwd, err := os.Getwd(); err == nil {
-		if err := kvmrun.ValidateMachineName(cwd); err != nil {
-			return err
-		}
-
-		vmname = cwd
+	if v, ok := os.LookupEnv("VMNAME"); ok {
+		vmname = v
 	} else {
-		return fmt.Errorf("cannot determine machine name: %w", err)
+		if cwd, err := os.Getwd(); err == nil {
+			vmname = filepath.Base(cwd)
+		} else {
+			return fmt.Errorf("cannot determine machine name: %w", err)
+		}
+	}
+
+	if err := kvmrun.ValidateMachineName(vmname); err != nil {
+		return err
 	}
 
 	err := grpc_client.KvmrunGRPC(ctx, func(grpcClient *grpc_interfaces.Kvmrun) error {
@@ -67,11 +72,11 @@ func InterfaceDown(ctx context.Context, ifname string) error {
 	var vmname string
 
 	if cwd, err := os.Getwd(); err == nil {
-		if err := kvmrun.ValidateMachineName(cwd); err != nil {
+		if err := kvmrun.ValidateMachineName(filepath.Base(cwd)); err != nil {
 			return err
 		}
 
-		vmname = cwd
+		vmname = filepath.Base(cwd)
 	} else {
 		return fmt.Errorf("cannot determine machine name: %w", err)
 	}

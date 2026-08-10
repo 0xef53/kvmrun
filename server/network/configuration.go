@@ -2,14 +2,8 @@ package network
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/hostnet"
@@ -34,16 +28,6 @@ func (s *Server) CreateConf(ctx context.Context, vmname, ifname string, opts Net
 		}
 	}
 
-	/*
-			TODO:
-				убрать
-		if b, err := json.MarshalIndent(opts, "", "    "); err == nil {
-			fmt.Printf("DEBUG: CreateConf: vmname = %s, ifname = %s, opts = %s\n", vmname, ifname, string(b))
-		} else {
-			fmt.Printf("DEBUG: CreateConf: error = %s\n", err.Error())
-		}
-	*/
-
 	err := s.TaskRunFunc(ctx, server.BlockAnyOperations(vmname, ifname+"/hostnet"), true, nil, func(l *log.Entry) error {
 		schemes, err := GetNetworkSchemes(vmname)
 		if err != nil {
@@ -57,12 +41,6 @@ func (s *Server) CreateConf(ctx context.Context, vmname, ifname string, opts Net
 		}
 
 		schemes = append(schemes, opts.Properties())
-
-		if b, err := json.MarshalIndent(schemes, "", "    "); err == nil {
-			fmt.Printf("DEBUG: CreateConf: vmname = %s, ifname = %s, schemes = %s\n", vmname, ifname, string(b))
-		} else {
-			fmt.Printf("DEBUG: CreateConf: schemes error = %s\n", err.Error())
-		}
 
 		if err := WriteNetworkSchemes(vmname, schemes...); err != nil {
 			return err
@@ -120,12 +98,6 @@ func (s *Server) UpdateConf(ctx context.Context, vmname, ifname string, apply bo
 			case SchemeUpdate_GATEWAY4, SchemeUpdate_GATEWAY6:
 				scheme.Set(p.String(), update.Value)
 			}
-
-			if b, err := json.MarshalIndent(schemes, "", "    "); err == nil {
-				fmt.Printf("DEBUG: UpdateConf: vmname = %s, ifname = %s, schemes = %s\n", vmname, ifname, string(b))
-			} else {
-				fmt.Printf("DEBUG: UpdateConf: schemes error = %s\n", err.Error())
-			}
 		}
 
 		if err := WriteNetworkSchemes(vmname, schemes...); err != nil {
@@ -144,28 +116,51 @@ func (s *Server) UpdateConf(ctx context.Context, vmname, ifname string, apply bo
 					case SchemeUpdate_IN_LIMIT:
 						err = hostnet.RouterSetInboundLimits(ifname, attrs.InLimit)
 					case SchemeUpdate_OUT_LIMIT:
-						// PID is needed to configure net_cls.classid for use in traffic control rules
-						pid, _err := func() (uint32, error) {
-							b, err := os.ReadFile(filepath.Join(kvmrun.CHROOTDIR, vmname, "pid"))
-							if err != nil {
-								return 0, err
-							}
-
-							v, err := strconv.ParseUint(string(b), 10, 32)
-							if err != nil {
-								return 0, err
-							}
-
-							return uint32(v), nil
-						}()
-
-						if _err != nil {
-							err = hostnet.RouterSetOutboundLimits(ifname, attrs.OutLimit, attrs.BindInterface, pid)
-						} else if !errors.Is(_err, fs.ErrNotExist) {
-							return _err
-						}
+						err = hostnet.RouterSetOutboundLimits(ifname, attrs.OutLimit, attrs.BindInterface)
 					case SchemeUpdate_ADDRS:
-						err = hostnet.RouterConfigureAddrs(ifname, attrs.Addrs, attrs.Gateway4, attrs.Gateway6)
+						err = func() error {
+							if addrUpdates, ok := update.Value.([]*AddrUpdate); ok {
+								toAppend, toRemove, err := SplitAddrUpdate(addrUpdates...)
+								if err != nil {
+									return fmt.Errorf("cannot parse list of IPs updates: %w", err)
+								}
+
+								for _, ipnet := range toAppend {
+									var unmanaged bool
+
+									// Skip QoS configuring for prefixes from unmanaged networks
+									if s.AppConf.VirtNet.UnmanagedNets.Contains(ipnet.IP) {
+										unmanaged = true
+
+										l.Infof("Skip QoS configuring for unmanaged %s", ipnet.String())
+									}
+
+									err := hostnet.RouterConfigureAddrs(attrs.BindInterface, ifname, unmanaged, ipnet.String())
+									if err != nil {
+										return err
+									}
+								}
+
+								for _, ipnet := range toRemove {
+									var unmanaged bool
+
+									// Skip QoS deconfiguring for prefixes from unmanaged networks
+									if s.AppConf.VirtNet.UnmanagedNets.Contains(ipnet.IP) {
+										unmanaged = true
+
+										l.Infof("Skip QoS deconfiguring for unmanaged %s", ipnet.String())
+									}
+
+									err := hostnet.RouterDeconfigureAddrs(attrs.BindInterface, ifname, unmanaged, ipnet.String())
+									if err != nil {
+										return err
+									}
+								}
+							}
+
+							// Send Gratuitous ARP for all router gateways
+							return hostnet.RouterAnnounceGateways(attrs.BindInterface, attrs.Addrs, attrs.Gateway4)
+						}()
 					}
 
 					if err != nil {
@@ -224,4 +219,8 @@ func (s *Server) RemoveConf(ctx context.Context, vmname, ifname string, deconfig
 	}
 
 	return nil
+}
+
+func (s *Server) GetConf(_ context.Context, vmname string, ifnames ...string) ([]*SchemeProperties, error) {
+	return GetNetworkSchemes(vmname, ifnames...)
 }

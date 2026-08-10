@@ -33,6 +33,7 @@ func newInstanceConf(vmname string) *InstanceConf {
 
 	vmc.Memory.Total = 128
 	vmc.Memory.Actual = 128
+
 	vmc.CPU.Total = 1
 	vmc.CPU.Actual = 1
 
@@ -213,6 +214,10 @@ func (c *InstanceConf) CPUSetModel(value string) error {
 
 func (c *InstanceConf) CPUSetQuota(value int) error {
 	return c.CPU.SetQuota(value)
+}
+
+func (c *InstanceConf) VgaDeviceSetType(value string) error {
+	return c.VgaDevice.SetType(value)
 }
 
 func (c *InstanceConf) InputDeviceAppend(opts InputDeviceProperties) error {

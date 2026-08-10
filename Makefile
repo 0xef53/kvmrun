@@ -101,7 +101,7 @@ protobufs:
 		--grpc-gateway_opt "logtostderr=true,paths=source_relative" \
 		--grpc-gateway_out ./api \
 		$(protofiles_grpc_gw)
-	scripts/fix-proto-names.sh $(shell find api/ -type f -name '*.pb.go')
+	scripts/fix-proto-names.sh $(shell find api/ -type f \( -name '*.pb.go' -o -name '*.pb.gw.go' \))
 
 install: $(binaries)
 	install -d $(DESTDIR)/usr/bin $(DESTDIR)/usr/lib/$(PROJECT_NAME) $(DESTDIR)/etc/$(PROJECT_NAME)
@@ -115,8 +115,6 @@ install: $(binaries)
 	cp -t $(DESTDIR)/etc/$(PROJECT_NAME) contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
 	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service
-	install -d $(DESTDIR)/etc/rsyslog.d
-	cp -t $(DESTDIR)/etc/rsyslog.d contrib/rsyslog/kvmrun.conf
 	install -d $(DESTDIR)/usr/share/kvmrun/tls
 	install -d $(DESTDIR)/etc/bash_completion.d
 	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/vmm

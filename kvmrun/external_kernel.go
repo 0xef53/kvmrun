@@ -3,6 +3,7 @@ package kvmrun
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,7 +26,13 @@ func (p *ExtKernelProperties) Validate(strict bool) error {
 	}
 
 	if strict {
-		for _, fname := range []string{p.Image, p.Initrd, p.Modiso} {
+		filesToCheck := []string{
+			filepath.Join(KERNELSDIR, p.Image),
+			filepath.Join(KERNELSDIR, p.Initrd),
+			filepath.Join(MODULESDIR, p.Modiso),
+		}
+
+		for _, fname := range filesToCheck {
 			if len(fname) > 0 {
 				if _, err := os.Stat(fname); err != nil {
 					if os.IsNotExist(err) {

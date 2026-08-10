@@ -97,7 +97,7 @@ func (s *Server) taskStart(fn func() (string, error)) (string, error) {
 				labels = append(labels, object+"/long-running")
 			}
 
-			if stats := s.Tasks.StatByLabel(labels...); len(stats) > 0 {
+			if stats := s.Tasks.Stat(labels...); len(stats) > 0 {
 				if md, ok := stats[0].Metadata.(*TaskMetadata); ok && md != nil {
 					if descErr, ok := longRunningTasks[md.Kind]; ok {
 						err = descErr
@@ -120,7 +120,6 @@ type TaskMetadata struct {
 	Kind string
 }
 
-// Всегда делается context.WithoutCancel для переданного контекста
 func (s *Server) TaskStart(ctx context.Context, t task.Task, resp interface{}, opts ...task.TaskOption) (string, error) {
 	if _, ok := metadata.FromContext(ctx); ok {
 		// do nothing, some metadata already set
@@ -135,7 +134,6 @@ func (s *Server) TaskStart(ctx context.Context, t task.Task, resp interface{}, o
 	})
 }
 
-// Всегда делается context.WithoutCancel для переданного контекста
 func (s *Server) TaskRunFunc(ctx context.Context, tgt map[string]task.OperationMode, wait bool, opts []task.TaskOption, fn func(*log.Entry) error) error {
 	if _, ok := metadata.FromContext(ctx); ok {
 		// do nothing, some metadata already set
@@ -162,7 +160,7 @@ func (s *Server) TaskRunFunc(ctx context.Context, tgt map[string]task.OperationM
 }
 
 func (s *Server) TaskCancel(labels ...string) error {
-	s.Tasks.CancelByLabel(labels...)
+	s.Tasks.Cancel(labels...)
 
 	return nil
 }
@@ -170,22 +168,22 @@ func (s *Server) TaskCancel(labels ...string) error {
 func (s *Server) TaskGetStats(labels ...string) ([]*task.TaskStat, error) {
 	m := make(map[string]*task.TaskStat)
 
-	for _, st := range s.Tasks.StatByLabel(labels...) {
+	for _, st := range s.Tasks.Stat(labels...) {
 		m[st.ID] = st
 	}
 
 	if len(labels) == 0 {
 		for _, tid := range s.Tasks.List() {
-			if st := s.Tasks.Stat(tid); st != nil {
-				m[st.ID] = st
+			if st := s.Tasks.Stat(tid); len(st) > 0 {
+				m[st[0].ID] = st[0]
 			}
 		}
 	} else {
-		// Сheck if there are task IDs in the label list
+		// Check if there are task IDs in the label list
 		for _, tid := range labels {
 			if err := uuid.Validate(tid); err == nil {
-				if st := s.Tasks.Stat(tid); st != nil {
-					m[st.ID] = st
+				if st := s.Tasks.Stat(tid); len(st) > 0 {
+					m[st[0].ID] = st[0]
 				}
 			}
 		}
@@ -246,8 +244,7 @@ func (s *Server) readTaskStatFile(label string) (*task.TaskStat, error) {
 	hashname := fmt.Sprintf("%x", md5.Sum([]byte(label)))
 
 	/*
-		COMMENT:
-			Метка всегда записана в формате: vmname/part1/part2/.../partN
+		The label is always written in the format: vmname/part1/part2/.../partN
 	*/
 
 	vmname := strings.TrimSpace(strings.SplitN(label, "/", 2)[0])

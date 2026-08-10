@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -120,7 +121,7 @@ func (p *SchemeProperties) ValueAs(key string, target interface{}) error {
 	return p.valueAs(key, target)
 }
 
-func (p *SchemeProperties) valueAs(key string, target interface{}) error {
+func (p *SchemeProperties) valueAs(key string, target interface{}) (err error) {
 	if target == nil {
 		return fmt.Errorf("target must be a non-nil pointer")
 	}
@@ -162,12 +163,18 @@ func (p *SchemeProperties) valueAs(key string, target interface{}) error {
 
 	valueRV := reflect.ValueOf(value)
 
-	// Is value from attrs can be assigned to the target ?
-	if !valueRV.Type().AssignableTo(targetElem.Type()) {
-		return fmt.Errorf("type mismatch: value type = %s, target type = %s", valueRV.Type(), targetElem.Type())
+	// Is value from attrs can be converted to the target ?
+	if !valueRV.Type().ConvertibleTo(targetElem.Type()) {
+		return fmt.Errorf("type mismatch: key = %s, value type = %s, target type = %s", key, valueRV.Type(), targetElem.Type())
 	}
 
-	targetElem.Set(valueRV)
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("type mismatch: key = %s, %v", key, r)
+		}
+	}()
+
+	targetElem.Set(valueRV.Convert(targetElem.Type()))
 
 	return nil
 }
@@ -338,6 +345,10 @@ func (p *SchemeProperties) ExtractAttrs_VLAN() (*NetworkSchemeAttrs_VLAN, error)
 	return &attrs, nil
 }
 
+func (p *SchemeProperties) ExtractAttrs_COMMON() (*commonAttrs, error) {
+	return p.extractCommonAttrs()
+}
+
 func GetNetworkSchemes(vmname string, ifnames ...string) ([]*SchemeProperties, error) {
 	// Check if machine exists
 	if _, err := kvmrun.GetInstanceConf(vmname); err != nil {
@@ -353,6 +364,10 @@ func GetNetworkSchemes(vmname string, ifnames ...string) ([]*SchemeProperties, e
 			return nil, err
 		}
 	} else {
+		if os.IsNotExist(err) {
+			// no one found, no problem
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -434,4 +449,30 @@ const (
 type AddrUpdate struct {
 	Action AddrUpdateAction
 	Prefix string
+}
+
+// returns two lists: to appand and to remove
+func SplitAddrUpdate(updates ...*AddrUpdate) ([]*net.IPNet, []*net.IPNet, error) {
+	if len(updates) == 0 {
+		return nil, nil, nil
+	}
+
+	toAppend := make([]*net.IPNet, 0, 8)
+	toRemove := make([]*net.IPNet, 0, 8)
+
+	for _, update := range updates {
+		ipnet, err := utils.ParseIPNet(update.Prefix)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid IP address: %s", update.Prefix)
+		}
+
+		switch update.Action {
+		case AddrUpdate_APPEND:
+			toAppend = append(toAppend, ipnet)
+		case AddrUpdate_REMOVE:
+			toRemove = append(toRemove, ipnet)
+		}
+	}
+
+	return toAppend, toRemove, nil
 }

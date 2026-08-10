@@ -23,7 +23,7 @@ service SystemService {
 
 message QemuInstanceRegisterRequest {
     string name = 1;
-    uint32 mem_actual = 2;
+    uint64 mem_actual = 2;
     uint32 pid = 3;
 }
 

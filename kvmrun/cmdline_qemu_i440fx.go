@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/0xef53/kvmrun/internal/pci"
+	"github.com/0xef53/kvmrun/internal/utils"
 )
 
 type qemuCommandLine_i440fx struct {
@@ -14,6 +15,12 @@ type qemuCommandLine_i440fx struct {
 }
 
 func (b *qemuCommandLine_i440fx) cdromArgs(dev *Cdrom) []string {
+	aioBackend := "native"
+
+	if utils.CheckIoUringSupport() {
+		aioBackend = "io_uring"
+	}
+
 	var backendOpts []string
 
 	if media := strings.TrimSpace(dev.Media); len(media) > 0 {
@@ -22,7 +29,7 @@ func (b *qemuCommandLine_i440fx) cdromArgs(dev *Cdrom) []string {
 			fmt.Sprintf("id=%s", dev.Name),
 			"format=raw",
 			"if=none",
-			"aio=native",
+			fmt.Sprintf("aio=%s", aioBackend),
 			"cache=none",
 			"detect-zeroes=on",
 		}
@@ -30,7 +37,7 @@ func (b *qemuCommandLine_i440fx) cdromArgs(dev *Cdrom) []string {
 		backendOpts = []string{
 			fmt.Sprintf("id=%s", dev.Name),
 			"if=none",
-			"aio=native",
+			fmt.Sprintf("aio=%s", aioBackend),
 			"detect-zeroes=on",
 		}
 	}
@@ -282,7 +289,11 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 	if hasPrimaryGPU {
 		args = append(args, "-vga", "none", "-nographic")
 	} else {
-		args = append(args, "-vga", "cirrus")
+		if t := b.vmconf.VgaDeviceGetType(); len(t.String()) > 0 {
+			args = append(args, "-vga", t.String())
+		} else {
+			args = append(args, "-vga", DefaultQemuVgaType().String())
+		}
 	}
 
 	// Input devices
@@ -301,7 +312,7 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 			cidrive.driver = CloudInitDriverType_FLOPPY
 		}
 
-		if err := cidrive.Validate(true); err != nil {
+		if err := cidrive.Validate(false); err != nil {
 			return nil, fmt.Errorf("cloud-init validation error: %w", err)
 		}
 

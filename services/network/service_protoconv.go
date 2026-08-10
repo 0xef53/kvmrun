@@ -126,3 +126,113 @@ func setFromUpdateConfRequest(req *pb.UpdateConfRequest) []*network.NetworkSchem
 
 	return updates
 }
+
+func schemePropertiesToProto(sc *network.SchemeProperties) (*pb_types.NetworkSchemeOpts, error) {
+	if sc == nil {
+		return nil, nil
+	}
+
+	proto := pb_types.NetworkSchemeOpts{
+		Ifname: sc.Ifname,
+	}
+
+	switch sc.SchemeType {
+	case network.Scheme_VLAN:
+		attrs, err := sc.ExtractAttrs_VLAN()
+		if err != nil {
+			return nil, err
+		}
+
+		proto.MTU = attrs.MTU
+		proto.Addrs = attrs.Addrs
+		proto.Gateway4 = attrs.Gateway4
+		proto.Gateway6 = attrs.Gateway6
+
+		proto.Attrs = &pb_types.NetworkSchemeOpts_Vlan{
+			Vlan: &pb_types.NetworkSchemeOpts_Attrs_VLAN{
+				ParentInterface: attrs.ParentInterface,
+				VlanID:          attrs.VlanID,
+			},
+		}
+	case network.Scheme_VXLAN:
+		attrs, err := sc.ExtractAttrs_VxLAN()
+		if err != nil {
+			return nil, err
+		}
+
+		proto.MTU = attrs.MTU
+		proto.Addrs = attrs.Addrs
+		proto.Gateway4 = attrs.Gateway4
+		proto.Gateway6 = attrs.Gateway6
+
+		proto.Attrs = &pb_types.NetworkSchemeOpts_Vxlan{
+			Vxlan: &pb_types.NetworkSchemeOpts_Attrs_VxLAN{
+				BindInterface: attrs.BindInterface,
+				VNI:           attrs.VNI,
+			},
+		}
+	case network.Scheme_ROUTED:
+		attrs, err := sc.ExtractAttrs_Routed()
+		if err != nil {
+			return nil, err
+		}
+
+		proto.MTU = attrs.MTU
+		proto.Addrs = attrs.Addrs
+		proto.Gateway4 = attrs.Gateway4
+		proto.Gateway6 = attrs.Gateway6
+
+		proto.Attrs = &pb_types.NetworkSchemeOpts_Router{
+			Router: &pb_types.NetworkSchemeOpts_Attrs_Router{
+				BindInterface: attrs.BindInterface,
+				InLimit:       attrs.InLimit,
+				OutLimit:      attrs.OutLimit,
+			},
+		}
+	case network.Scheme_BRIDGE:
+		attrs, err := sc.ExtractAttrs_Bridge()
+		if err != nil {
+			return nil, err
+		}
+
+		proto.MTU = attrs.MTU
+		proto.Addrs = attrs.Addrs
+		proto.Gateway4 = attrs.Gateway4
+		proto.Gateway6 = attrs.Gateway6
+
+		proto.Attrs = &pb_types.NetworkSchemeOpts_Bridge{
+			Bridge: &pb_types.NetworkSchemeOpts_Attrs_Bridge{
+				BridgeName: attrs.BridgeInterface,
+			},
+		}
+	case network.Scheme_MANUAL:
+		attrs, err := sc.ExtractAttrs_COMMON()
+		if err != nil {
+			return nil, err
+		}
+
+		proto.MTU = attrs.MTU
+		proto.Addrs = attrs.Addrs
+		proto.Gateway4 = attrs.Gateway4
+		proto.Gateway6 = attrs.Gateway6
+	}
+
+	return &proto, nil
+}
+
+func schemesToProto(schemes []*network.SchemeProperties) ([]*pb_types.NetworkSchemeOpts, error) {
+	protos := make([]*pb_types.NetworkSchemeOpts, 0, len(schemes))
+
+	for _, sc := range schemes {
+		proto, err := schemePropertiesToProto(sc)
+		if err != nil {
+			return nil, err
+		}
+
+		if proto != nil {
+			protos = append(protos, proto)
+		}
+	}
+
+	return protos, nil
+}
