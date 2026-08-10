@@ -115,8 +115,6 @@ install: $(binaries)
 	cp -t $(DESTDIR)/etc/$(PROJECT_NAME) contrib/kvmrun.ini
 	install -d $(DESTDIR)$(SYSTEMD_UNITDIR)
 	cp -t $(DESTDIR)$(SYSTEMD_UNITDIR) contrib/kvmrund.service contrib/kvmrun@.service
-	install -d $(DESTDIR)/etc/rsyslog.d
-	cp -t $(DESTDIR)/etc/rsyslog.d contrib/rsyslog/kvmrun.conf
 	install -d $(DESTDIR)/usr/share/kvmrun/tls
 	install -d $(DESTDIR)/etc/bash_completion.d
 	cp -t $(DESTDIR)/etc/bash_completion.d contrib/bash-completion/vmm
