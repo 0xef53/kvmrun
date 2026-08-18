@@ -323,9 +323,9 @@ func (b *qemuCommandLine_i440fx) gen() ([]string, error) {
 		case CloudInitDriverType_FLOPPY:
 			args = append(args, "-device", "floppy,drive=cidata,id=cidata")
 		case CloudInitDriverType_IDE_CD:
-			args = append(args, "-device", "ide-cd,bus=ide.0,unit=1,drive=cidata,id=cidata")
+			args = append(args, "-device", "ide-cd,bus=ide.0,unit=1,drive=cidata,id=cidata,bootindex=10000")
 			//case "virtio-blk-pci":
-			//	args = append(args, "-device", "virtio-blk-pci,drive=cidata,id=cidata,bus=pci.0,addr=0x1e")
+			//	args = append(args, "-device", "virtio-blk-pci,drive=cidata,id=cidata,bus=pci.0,addr=0x1e,bootindex=10000")
 		}
 	}
 
