@@ -1,5 +1,6 @@
 bin/
 packages/
+.devcontainer/devcontainer-lock.json
 debian/changelog
 debian/debhelper-build-stamp
 debian/files
