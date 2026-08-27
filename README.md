@@ -8,18 +8,22 @@ Kvmrun is a suite of tools that provides a command line and gRPC interface for c
 ## Features
 
 - create, edit, start and stop VMs via CLI and gRPC
-- attach/detach one or more block/network devices without restarting VMs (hot-plug/unplug)
+- attach/detach one or more block/network/PCI devices without restarting VMs (hot-plug/unplug)
 - live migration with/without local storage or with a specified list of block devices
 - full and incremental block backups
-- access to the guest virtual console (hvc0)
-- run with external kernel/initrd and iso-file with modules (linux specific)
-- limit CPU resources via cgroups
+- access to the guest virtual console (hvc0) and VNC console
+- run with external kernel/initrd and ISO-file with modules (linux specific)
+- configure and manage UEFI firmware (OVMF)
+- pass through host PCI devices (GPU) via vfio-pci
+- configure CloudInit drives and build CloudInit ISO images
+- VSock device for host-guest communication
+- limit CPU resources via cgroups (v1 and v2)
 - limit IO operations via QEMU
 - configure network using custom ifup/ifdown scripts
 
 ## Concept & idea
 
-Kvmrun uses Systemd to run virtual machines. Each QEMU process runs in its own personal chroot environment as an unprivileged user. Systemd is responsible for starting and for properly completion of virtual machines by invoking appropriate kvmrun's utils (start/stop/cleanup).
+Kvmrun uses Systemd to run virtual machines. Each QEMU process runs in its own personal chroot environment as an unprivileged user. Systemd is responsible for starting and for properly completion of virtual machines by invoking appropriate Kvmrun utilities (start/stop/cleanup).
 
 The primary goal of Kvmrun is to simplify as much as possible the most popular actions such as hot-plug/unplug devices, hot reconfiguration, full or incremental block backup and live migration between the same type hosts. These are the most required things for hosting providers to organize cloud services.
 
@@ -27,16 +31,20 @@ The primary goal of Kvmrun is to simplify as much as possible the most popular a
 
 Kvmrun provides API based on gRPC services. All exposed functions are defined in `.proto` files under `api` directory.
 
-Communication with the API server is possible using two interfaces -- secure TCP port `9393` or unsecure abstract UNIX socket `@/run/kvmrund.sock`.
+
+Communication with the API server is possible using two interfaces -- a secure TCP port 9393 (TLS) or an abstract UNIX socket @/run/kvmrund.sock (TLS). Both channels use mutual TLS authentication with server and client certificates.
 
 ## Supported configurations
 
 Kvmrun can work with all versions of QEMU starting from 3.1.x. Below are the tested configurations:
 
 - Debian 10 and QEMU 3.x/5.x
-- Debian 11 and QEMU 5.x/6.x
+- Debian 11 and QEMU 5.x/6.x/7.x
+- Debian 12 and QEMU 7.x/8.x
+- Debian 13 and QEMU 6.x/7.x/8.x/9.x
 - Ubuntu 20.04 LTS and QEMU 4.x
-- Ubuntu 22.04 LTS and QEMU 6.x
+- Ubuntu 22.04 LTS and QEMU 6.x/7.x/8.x
+- Ubuntu 24.04 LTS and QEMU 8.x/9.x
 
 # Installation
 
@@ -139,6 +147,13 @@ After that you can connect to the VNC server:
 ```shell
 $ gvncviewer localhost:1025
 ```
+
+## Network management
+
+Kvmrun includes `vnetctl` -- a CLI tool for managing host network infrastructure:
+- Create and configure network bridges
+- Configure VxLAN tunnels for multi-host networking
+- Manage VLANs and network schemes
 
 ## License
 
