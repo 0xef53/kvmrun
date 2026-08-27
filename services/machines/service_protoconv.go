@@ -1,7 +1,6 @@
 package machines
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -364,8 +363,6 @@ func optsFromStartMigrationRequest(req *pb.StartMigrationRequest) *machine.Migra
 }
 
 func optsFromVGADeviceSetTypeRequest(req *pb.VGADeviceSetTypeRequest) *kvmrun.VgaDeviceProperties {
-	fmt.Printf("optsFromVGADeviceSetTypeRequest: req = %q\n", req)
-	fmt.Printf("optsFromVGADeviceSetTypeRequest: req.Type string = %q\n", kvmrun.QemuVgaType(req.Type).String())
 	return &kvmrun.VgaDeviceProperties{
 		Type: kvmrun.QemuVgaType(req.Type).String(),
 	}

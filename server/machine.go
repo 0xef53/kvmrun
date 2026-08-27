@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/0xef53/kvmrun/internal/utils"
 	"github.com/0xef53/kvmrun/kvmrun"
@@ -20,7 +21,9 @@ func (s *Server) MachineGet(name string, runtime bool) (*kvmrun.Machine, error) 
 		vm, err := kvmrun.GetMachine(name, mon)
 
 		if err != nil {
-			if _, ok := err.(*net.OpError); ok {
+			var targetErr *net.OpError
+
+			if errors.As(err, &targetErr) {
 				// If a QEMU process was terminated bypassing kvmrun
 				// (for example: SIGTERM / SIGKILL / SIGINT) we will get
 				// an error of type *net.OpError with code == syscall.ECONNRESET.

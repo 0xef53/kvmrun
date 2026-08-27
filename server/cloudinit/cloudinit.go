@@ -17,6 +17,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// CloudInitOptions contains the configuration parameters used to generate
+// a cloud-init ISO image (cidata) for a virtual machine. It covers both
+// the cloud metadata (platform, region, availability zone, etc.) and
+// user-supplied overrides (hostname, domain, timezone), as well as
+// arbitrary vendor-data and user-data snippets in YAML format.
 type CloudInitOptions struct {
 	// The instance-data keys
 	Platform         string `json:"platform"`

@@ -128,11 +128,12 @@ func (v *VirtCPU) SetTotal(value int) error {
 }
 
 func (v *VirtCPU) SetSockets(value int) error {
-	if value < 0 {
+	switch {
+	case value == 0:
+		// ok
+	case value < 0:
 		return fmt.Errorf("invalid number of processor sockets: cannot be less than 0")
-	}
-
-	if v.Total%value != 0 {
+	case v.Total%value != 0:
 		return fmt.Errorf("invalid number of processor sockets: total cpu count must be multiple of %d", value)
 	}
 
