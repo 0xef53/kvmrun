@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kvmrun — QEMU-KVM Virtual Machine Manager</title>
+  <meta name="description" content="A suite of tools that provides a CLI and gRPC interface for creating and managing virtual machines based on QEMU-KVM.">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0d1117;--bg-card:#161b22;--bg-code:#1a1f26;--text:#e6edf3;--text-muted:#8b949e;--accent:#58a6ff;--accent-green:#3fb950;--accent-purple:#bc8cff;--border:#30363d;--radius:10px;--max-w:1100px}
+    html{scroll-behavior:smooth}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+    a{color:var(--accent);text-decoration:none;transition:opacity .2s}
+    a:hover{opacity:.8}
+    .container{max-width:var(--max-w);margin:0 auto;padding:0 24px}
+    nav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+    nav .container{display:flex;align-items:center;justify-content:space-between;height:56px}
+    .logo{font-size:1.2rem;font-weight:700;display:flex;align-items:center;gap:8px;color:var(--text)}
+    .logo svg{width:28px;height:28px}
+    nav ul{display:flex;list-style:none;gap:24px}
+    nav ul li a{color:var(--text-muted);font-size:.9rem;font-weight:500}
+    nav ul li a:hover{color:var(--text);opacity:1}
+    .nav-github{display:flex;align-items:center;gap:6px;background:var(--bg-card);border:1px solid var(--border);padding:6px 14px;border-radius:6px;font-size:.85rem;color:var(--text)!important}
+    .nav-github:hover{border-color:var(--accent);opacity:1!important}
+    .nav-toggle{display:none;background:none;border:none;color:var(--text);cursor:pointer}
+    section{padding:80px 0}
+    .section-label{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px}
+    .section-title{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;margin-bottom:12px}
+    .section-desc{color:var(--text-muted);max-width:600px;margin-bottom:48px;font-size:1.05rem}
+    .section-desc.center,.section-title.center,.section-label.center{text-align:center}
+    .hero{padding:100px 0 80px;text-align:center;position:relative;overflow:hidden}
+    .hero::before{content:'';position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(88,166,255,.12) 0%,transparent 70%);pointer-events:none}
+    .hero-badge{display:inline-block;background:rgba(88,166,255,.1);color:var(--accent);border:1px solid rgba(88,166,255,.2);padding:4px 16px;border-radius:20px;font-size:.8rem;font-weight:500;margin-bottom:24px}
+    .hero h1{font-size:clamp(2.2rem,5vw,3.5rem);font-weight:800;letter-spacing:-.02em;margin-bottom:16px;line-height:1.15}
+    .hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero p{font-size:1.15rem;color:var(--text-muted);max-width:640px;margin:0 auto 32px}
+    .hero-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;border:none;transition:transform .15s,box-shadow .15s}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(88,166,255,.25)}
+    .btn-secondary{background:var(--bg-card);color:var(--text);border:1px solid var(--border)}
+    .features-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+    .feature-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;transition:border-color .2s,transform .15s}
+    .feature-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .feature-icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:1.2rem}
+    .feature-icon.blue{background:rgba(88,166,255,.12);color:var(--accent)}
+    .feature-icon.green{background:rgba(63,185,80,.12);color:var(--accent-green)}
+    .feature-icon.purple{background:rgba(188,140,255,.12);color:var(--accent-purple)}
+    .feature-card h3{font-size:1rem;font-weight:600;margin-bottom:8px}
+    .feature-card p{color:var(--text-muted);font-size:.9rem}
+    .concept-section{background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .concept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px}
+    .concept-item{text-align:center}
+    .concept-item .number{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:rgba(88,166,255,.1);color:var(--accent);font-weight:700;font-size:1.2rem;margin-bottom:16px}
+    .concept-item h3{font-size:1rem;font-weight:600;margin-bottom:8px}
+    .concept-item p{color:var(--text-muted);font-size:.9rem}
+    .code-block{background:var(--bg-code);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;font-family:'SF Mono','Fira Code','Fira Mono',Menlo,monospace;font-size:.85rem;overflow-x:auto;line-height:1.7;margin-bottom:16px}
+    .code-block code{color:var(--text)}
+    .code-block .prompt{color:var(--accent-green)}
+    .code-block .comment{color:var(--text-muted)}
+    .code-block .flag{color:var(--accent-purple)}
+    .code-block .string{color:#a5d6ff}
+    .steps{counter-reset:step}
+    .step{position:relative;padding-left:60px;margin-bottom:32px}
+    .step::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:2px;width:36px;height:36px;border-radius:50%;background:var(--bg-card);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:var(--accent)}
+    .step h3{font-size:1rem;font-weight:600;margin-bottom:8px}
+    .step p{color:var(--text-muted);font-size:.9rem;margin-bottom:12px}
+    .install-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:24px}
+    .install-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+    .install-card h3{font-size:1.1rem;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    .install-card .tag{display:inline-block;background:rgba(63,185,80,.12);color:var(--accent-green);font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:4px}
+    .configs-list{display:flex;flex-wrap:wrap;gap:8px}
+    .config-chip{background:var(--bg-card);border:1px solid var(--border);padding:6px 14px;border-radius:6px;font-size:.82rem;color:var(--text-muted)}
+    footer{border-top:1px solid var(--border);padding:40px 0;text-align:center;color:var(--text-muted);font-size:.85rem}
+    footer a{color:var(--text-muted)}
+    footer a:hover{color:var(--accent)}
+    @media(max-width:768px){
+      .nav-toggle{display:block}
+      nav ul{display:none;position:absolute;top:56px;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--border);flex-direction:column;padding:16px 24px;gap:12px}
+      nav ul.open{display:flex}
+      .hero{padding:60px 0 40px}
+      section{padding:48px 0}
+      .features-grid,.install-grid{grid-template-columns:1fr}
+      .step{padding-left:48px}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="container">
+    <a href="#" class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      Kvmrun
+    </a>
+    <button class="nav-toggle" onclick="document.querySelector('nav ul').classList.toggle('open')" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <ul>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#concept">Concept</a></li>
+      <li><a href="#quickstart">Quick Start</a></li>
+      <li><a href="#install">Install</a></li>
+      <li>
+        <a class="nav-github" href="https://github.com/0xef53/kvmrun" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">&#9889; Written in Go</div>
+    <h1>Manage QEMU-KVM VMs<br><span>simply &amp; powerfully</span></h1>
+    <p>Kvmrun is a suite of tools providing a CLI and gRPC interface for creating and managing virtual machines. Built for hosting providers who need hot-plug devices, live migration, and block backups.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/0xef53/kvmrun" target="_blank" rel="noopener" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+      <a href="#install" class="btn btn-secondary">Installation Guide</a>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-label center">Features</div>
+    <h2 class="section-title center">Everything you need for VM management</h2>
+    <p class="section-desc center">From hot-plugging devices to live migration, Kvmrun simplifies the most essential tasks for cloud service providers.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon blue">&#128187;</div>
+        <h3>CLI &amp; gRPC Interface</h3>
+        <p>Create, edit, start and stop VMs via command line or the full-featured gRPC API with mutual TLS authentication.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">&#128262;</div>
+        <h3>Hot-plug / Unplug Devices</h3>
+        <p>Attach and detach block, network, and PCI devices without restarting virtual machines.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">&#128640;</div>
+        <h3>Live Migration</h3>
+        <p>Migrate running VMs between hosts -- with or without local storage, or with a specified list of block devices.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon blue">&#128190;</div>
+        <h3>Block Backups</h3>
+        <p>Full and incremental block backups to protect your virtual machine data.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">&#128065;</div>
+        <h3>VNC &amp; Console Access</h3>
+        <p>Access the guest virtual console (hvc0) and VNC console for interactive management.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">&#127918;</div>
+        <h3>PCI Passthrough (GPU)</h3>
+        <p>Pass through host PCI devices via vfio-pci for GPU acceleration and other hardware access.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon blue">&#9729;</div>
+        <h3>CloudInit Support</h3>
+        <p>Configure CloudInit drives and build CloudInit ISO images for automated VM provisioning.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">&#128274;</div>
+        <h3>UEFI / OVMF</h3>
+        <p>Configure and manage UEFI firmware for modern boot scenarios.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">&#9881;</div>
+        <h3>Resource Limits</h3>
+        <p>Limit CPU resources via cgroups (v1 and v2) and IO operations via QEMU for fair scheduling.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon blue">&#127760;</div>
+        <h3>Network Management</h3>
+        <p>Use the included vnetctl tool to create network bridges, VxLAN tunnels, VLANs and custom network schemes.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green">&#128225;</div>
+        <h3>VSock Communication</h3>
+        <p>Use VSock devices for efficient host-guest communication without exposing network ports.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple">&#128295;</div>
+        <h3>External Kernel / Initrd</h3>
+        <p>Run VMs with an external kernel and initrd, plus an ISO-file with modules (Linux-specific).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Concept -->
+<section id="concept" class="concept-section">
+  <div class="container">
+    <div class="section-label center">Architecture</div>
+    <h2 class="section-title center">How Kvmrun works</h2>
+    <p class="section-desc center">Kvmrun uses Systemd to orchestrate virtual machines, providing isolation, reliability, and easy lifecycle management.</p>
+    <div class="concept-grid">
+      <div class="concept-item">
+        <div class="number">1</div>
+        <h3>Systemd Management</h3>
+        <p>Each VM is managed as a systemd unit. Systemd handles starting, stopping, and proper cleanup by invoking the appropriate Kvmrun utilities.</p>
+      </div>
+      <div class="concept-item">
+        <div class="number">2</div>
+        <h3>Isolation</h3>
+        <p>Every QEMU process runs in its own personal chroot environment as an unprivileged user -- minimizing the blast radius of any single VM.</p>
+      </div>
+      <div class="concept-item">
+        <div class="number">3</div>
+        <h3>API-Driven</h3>
+        <p>All exposed functions are defined in .proto files under the api directory. Communication uses a secure TCP port (TLS) or an abstract UNIX socket with mutual TLS authentication.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Start -->
+<section id="quickstart">
+  <div class="container">
+    <div class="section-label">Quick Start</div>
+    <h2 class="section-title">Up and running in 5 steps</h2>
+    <p class="section-desc">Create your first Debian virtual machine from scratch.</p>
+    <div class="steps">
+      <div class="step">
+        <h3>Install Kvmrun</h3>
+        <p>Follow the installation instructions below, and make sure QEMU is installed if you built from source.</p>
+      </div>
+      <div class="step">
+        <h3>Create a bootable image</h3>
+        <p>Use the included script to create a Debian guest image:</p>
+        <div class="code-block"><code><span class="prompt">$ </span>/usr/share/kvmrun/mk-debian-image <span class="flag">-t</span> <span class="string">bullseye-slim</span></code></div>
+      </div>
+      <div class="step">
+        <h3>Wrap the image in a loop device</h3>
+        <div class="code-block"><code><span class="prompt">$ </span>losetup -f --show debian-bullseye-slim.img<br><span class="comment">/dev/loop0</span></code></div>
+      </div>
+      <div class="step">
+        <h3>Create your first VM</h3>
+        <div class="code-block"><code><span class="prompt">$ </span>vmm create-conf <span class="flag">--mem</span> <span class="string">2048</span> <span class="flag">--cpu</span> <span class="string">2-4</span> alice<br><span class="prompt">$ </span>vmm storage attach alice /dev/loop0</code></div>
+      </div>
+      <div class="step">
+        <h3>Start and connect</h3>
+        <p>Launch the VM and access it via VNC:</p>
+        <div class="code-block"><code><span class="prompt">$ </span>vmm start alice<br><span class="prompt">$ </span>vmm list<br><br>Name      PID      Mem(MiB)   CPUs   State      Time<br>alice     32531    2048/2048  2/4    running    34s<br><br><span class="prompt">$ </span>vmm vnc activate alice<br><span class="comment">Password: ofKajev5<br>Display/Port: 1024/6924</span></code></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Installation -->
+<section id="install">
+  <div class="container">
+    <div class="section-label">Installation</div>
+    <h2 class="section-title">Get Kvmrun</h2>
+    <p class="section-desc">Available as pre-built packages for Debian/Ubuntu, or build from source.</p>
+    <div class="install-grid">
+      <div class="install-card">
+        <h3>Pre-built Package <span class="tag">Easiest</span></h3>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Install the repository and package in two commands:</p>
+        <div class="code-block"><code><span class="prompt">$ </span>curl -s https://packagecloud.io/install/repositories/0xef53/kvmrun/script.deb.sh | sudo bash<br><br><span class="prompt">$ </span>sudo apt-get install kvmrun</code></div>
+      </div>
+      <div class="install-card">
+        <h3>Build from Source</h3>
+        <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:16px">Requires <code>make</code>, <code>git</code>, and <code>docker-ce</code>:</p>
+        <div class="code-block"><code><span class="prompt">$ </span>git clone https://github.com/0xef53/kvmrun.git<br><span class="prompt">$ </span>cd kvmrun<br><span class="prompt">$ </span>make && make install<br><br><span class="comment"># Generate certificates and start the server</span><br><span class="prompt">$ </span>/usr/lib/kvmrun/gencert<br><span class="prompt">$ </span>systemctl enable kvmrund.service<br><span class="prompt">$ </span>systemctl start kvmrund.service</code></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Supported Configurations -->
+<section>
+  <div class="container">
+    <div class="section-label center">Compatibility</div>
+    <h2 class="section-title center">Supported Configurations</h2>
+    <p class="section-desc center">Kvmrun works with QEMU 3.1.x and above. Below are tested combinations:</p>
+    <div class="configs-list" style="justify-content:center">
+      <span class="config-chip">Debian 10 + QEMU 3.x/5.x</span>
+      <span class="config-chip">Debian 11 + QEMU 5.x/6.x/7.x</span>
+      <span class="config-chip">Debian 12 + QEMU 7.x/8.x</span>
+      <span class="config-chip">Debian 13 + QEMU 6.x/7.x/8.x/9.x</span>
+      <span class="config-chip">Ubuntu 20.04 LTS + QEMU 4.x</span>
+      <span class="config-chip">Ubuntu 22.04 LTS + QEMU 6.x/7.x/8.x</span>
+      <span class="config-chip">Ubuntu 24.04 LTS + QEMU 8.x/9.x</span>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <p>
+      Kvmrun is licensed under the <a href="https://github.com/0xef53/kvmrun/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>.<br>
+      Source code available on <a href="https://github.com/0xef53/kvmrun" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
