@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package kvmrun.api.services.misc.v2;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/0xef53/kvmrun/api/services/misc/v2;misc";
+
+service MiscService {
+    rpc GetMachineComment(GetMachineCommentRequest) returns (GetMachineCommentResponse) { }
+    rpc UpdateMachineComment(UpdateMachineCommentRequest) returns (google.protobuf.Empty) { }
+    rpc RemoveMachineComment(RemoveMachineCommentRequest) returns (google.protobuf.Empty) { }
+}
+
+message GetMachineCommentRequest {
+    string name = 1;
+}
+
+message GetMachineCommentResponse {
+    bytes data = 2;
+}
+
+message UpdateMachineCommentRequest {
+    string name = 1;
+    bytes data = 2;
+}
+
+message RemoveMachineCommentRequest {
+    string name = 1;
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/0xef53/kvmrun/server/cloudinit"
 	"github.com/0xef53/kvmrun/server/hardware"
 	"github.com/0xef53/kvmrun/server/machine"
+	"github.com/0xef53/kvmrun/server/misc"
 	"github.com/0xef53/kvmrun/server/network"
 	"github.com/0xef53/kvmrun/server/system"
 
@@ -21,6 +22,7 @@ type ServiceServer struct {
 	Network   *network.Server
 	Hardware  *hardware.Server
 	CloudInit *cloudinit.Server
+	Misc      *misc.Server
 }
 
 func NewServiceServer(base *server.Server) (*ServiceServer, error) {
@@ -31,6 +33,7 @@ func NewServiceServer(base *server.Server) (*ServiceServer, error) {
 		Network:   &network.Server{Server: base},
 		Hardware:  &hardware.Server{Server: base},
 		CloudInit: &cloudinit.Server{Server: base},
+		Misc:      &misc.Server{Server: base},
 	}
 
 	for _, s := range grpcserver.Services("kvmrun") {
