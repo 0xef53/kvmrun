@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -8,7 +9,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"errors"
 
 	"github.com/0xef53/kvmrun/internal/utils"
 	"github.com/0xef53/kvmrun/kvmrun"

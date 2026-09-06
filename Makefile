@@ -40,7 +40,8 @@ protofiles_grpc = \
     services/system/v2/system.proto \
     services/network/v2/network.proto \
     services/hardware/v2/hardware.proto \
-    services/cloudinit/v2/cloudinit.proto
+    services/cloudinit/v2/cloudinit.proto \
+	services/misc/v2/misc.proto
 
 protofiles_grpc_gw = \
     services/machines/v2/machines.proto \
